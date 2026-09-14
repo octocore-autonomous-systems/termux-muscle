@@ -17,7 +17,7 @@ rejects() {
     grep -Fq ": $expected:" "$scratch/error" || { cat "$scratch/error" >&2; fail "wrong failure for $expected"; }
 }
 prefix=$scratch/prefix
-mkdir -p -- "$prefix/bin" "$scratch/stage/bin" "$scratch/stage/libexec"
+mkdir -p -- "$prefix/bin" "$prefix/tmp" "$scratch/stage/bin" "$scratch/stage/libexec"
 ln -s -- "$(command -v bash)" "$prefix/bin/bash"
 stage=$scratch/stage
 cp -- "$core" "$stage/libexec/tm-core"
@@ -290,30 +290,35 @@ new_case shell-bootstrap
 export TM_ROOT=$root
 hook_home=$scratch/hook-home
 printf original-manager > "$hook_home/.local/bin/termux-muscle"
-HOME=$hook_home PATH=$scratch/mocks:$PATH "$core" with-lock "$root" existing -- bash "$scratch/hook.sh" \
+# Model the real prefix fallback even when native Termux exports TMPDIR.
+HOME=$hook_home PATH=$scratch/mocks:$PATH env -u TMPDIR "$core" with-lock "$root" existing -- bash "$scratch/hook.sh" \
     bootstrap --source-dir "$TM_SOURCE" --build-dir "$TM_SOURCE/build" --no-install > "$scratch/hook-output"
 [[ $(cat "$hook_home/.local/bin/termux-muscle") == original-manager && ! -e $scratch/remote/runtime ]] || fail 'foreign manager/default no-install'
 rm "$hook_home/.local/bin/termux-muscle"
-HOME=$hook_home PATH=$scratch/mocks:$PATH "$core" with-lock "$root" existing -- bash "$scratch/hook.sh" \
+HOME=$hook_home PATH=$scratch/mocks:$PATH env -u TMPDIR "$core" with-lock "$root" existing -- bash "$scratch/hook.sh" \
     bootstrap --source-dir "$TM_SOURCE" --build-dir "$TM_SOURCE/build" --link > "$scratch/hook-output"
 [[ $(readlink "$hook_home/.local/bin/termux-muscle") == "$root/bin/termux-muscle" &&
    $(readlink "$prefix/bin/claude") == "$root/bin/claude" && -s $scratch/remote/runtime ]] || fail 'shell bootstrap ownership/install/link'
 pass 'shell bootstrap stages locally, preserves foreign commands, registers owned entries and honors no-install'
+prefix_scratch=("$prefix/tmp/"*)
+[[ ${#prefix_scratch[@]} == 0 ]] || fail 'bootstrap fallback temporary directory not cleaned'
 
 cat > "$scratch/remote/install.sh" <<'SH'
 printf '%s\0' "$@" > "$TM_TEST_REMOTE/executed"
 SH
 (cd "$scratch/remote" && sha256sum install.sh > SHA256SUMS)
 cp "$root/state.json" "$scratch/runtime-before-self-update.json"
-PATH=$scratch/mocks:$PATH bash "$scratch/hook.sh" self_update > "$scratch/hook-output"
+PATH=$scratch/mocks:$PATH env -u TMPDIR bash "$scratch/hook.sh" self_update > "$scratch/hook-output"
 printf '%s\0' --version 0.1.0 --root "$root" --prefix "$prefix" --no-install > "$scratch/expected"
 cmp "$scratch/remote/executed" "$scratch/expected" || fail 'self-update immutable source forwarding'
 cmp "$root/state.json" "$scratch/runtime-before-self-update.json" || fail 'self-update changed runtime state'
+prefix_scratch=("$prefix/tmp/"*)
+[[ ${#prefix_scratch[@]} == 0 ]] || fail 'self-update fallback temporary directory not cleaned'
 rm "$scratch/remote/executed"
 printf corrupt >> "$scratch/remote/install.sh"
 rejects checksum_failed env PATH="$scratch/mocks:$PATH" bash "$scratch/hook.sh" self_update --version 0.1.0
 [[ ! -e $scratch/remote/executed ]] || fail 'unverified self-update code executed'
-pass 'self-update resolves an exact tag, verifies installer checksums and rejects corruption before execution'
+pass 'self-update resolves an exact tag, verifies installer checksums, cleans the TMPDIR-unset fallback and rejects corruption before execution'
 
 before_calls=$(wc -l < "$scratch/remote/calls")
 rejects invalid_version env PATH="$scratch/mocks:$PATH" bash "$scratch/hook.sh" self_update --version '../../escape'

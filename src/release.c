@@ -373,7 +373,8 @@ int tm_release_main(int argc, char **argv) {
         for (size_t i = 0; i < sizeof files / sizeof *files; i++) require_source(root,files[i]);
         path = source_path(root,"install.sh"); char *installer = tm_read_file(path,TM_METADATA_MAX,NULL); free(path);
         char declaration[160]; snprintf(declaration,sizeof declaration,"\nVERSION=\"%s\"\n",version);
-        if (!strstr(installer,declaration)) invalid("Installer VERSION must match the release."); free(installer);
+        if (!strstr(installer,declaration)) invalid("Installer VERSION must match the release.");
+        free(installer);
         path = source_path(root,"CHANGELOG.md"); char *changelog = tm_read_file(path,TM_METADATA_MAX,NULL); free(path);
         char heading[160], bracket[160]; snprintf(heading,sizeof heading,"## %s",version); snprintf(bracket,sizeof bracket,"## [%s]",version);
         bool found = false; char *save = NULL;
