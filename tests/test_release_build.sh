@@ -7,6 +7,9 @@ work=$(mktemp -d "${TMPDIR:-/tmp}/muscle-release-test.XXXXXXXX")
 trap 'rm -rf -- "$work"' EXIT
 source="$work/source"
 mkdir -p "$source/src" "$source/bin" "$source/lib" "$source/tests" "$source/scripts" "$source/docs"
+mkdir -p "$source/.githooks"
+printf 'BasedOnStyle: LLVM\n' > "$source/.clang-format"
+printf '#!/bin/sh\nexit 0\n' > "$source/.githooks/pre-commit"
 cp "$project/install.sh" "$source/install.sh"
 cp "$project/compatibility.json" "$source/compatibility.json"
 printf '0.1.0\n' > "$source/VERSION"
@@ -47,7 +50,18 @@ grep -q 'Development build' "$work/dist/RELEASE_NOTES.md" || fail 'development b
 tar -tzf "$work/dist/$asset" > "$work/names"
 grep -q 'src/example.c' "$work/names" || fail 'source omitted'
 grep -q 'LICENSE' "$work/names" || fail 'license omitted'
+grep -q '/.clang-format$' "$work/names" || fail 'formatter configuration omitted'
+grep -q '/.githooks/pre-commit$' "$work/names" || fail 'contributor hook omitted'
+tar -tvzf "$work/dist/$asset" > "$work/modes"
+grep -Eq '^-rwxr-xr-x .*[/]\.githooks/pre-commit$' "$work/modes" || fail 'contributor hook is not executable'
 if grep -Eq '/build/|\.pyz$|\.py$|tm-core$' "$work/names"; then fail 'archive included compiler output or Python'; fi
+passed
+
+printf '# unapproved hook\n' > "$source/.githooks/other.sh"
+run_build
+[[ $status != 0 ]] || fail 'unexpected contributor hook accepted'
+grep -q 'unexpected contributor hook' "$work/error" || fail 'wrong unexpected hook diagnostic'
+rm "$source/.githooks/other.sh"
 passed
 
 first=$(sha256sum "$work/dist/$asset")

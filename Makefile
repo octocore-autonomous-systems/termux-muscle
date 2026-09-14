@@ -16,7 +16,7 @@ UNITS := $(patsubst tests/%.c,build/tests/%,$(UNIT_SOURCES))
 override DESTDIR := $(value DESTDIR)
 export DESTDIR
 
-.PHONY: all check check-deps stage clean dist release
+.PHONY: all check check-deps check-format check-format-tooling stage clean dist release
 all: build/tm-core
 
 check-deps:
@@ -37,6 +37,13 @@ build/tests/%: tests/%.c $(LIB_OBJECTS) src/tm.h | check-deps
 
 check: all $(UNITS)
 	@bash tests/run.sh
+
+# Contributor checks stay separate from the installer's offline build/tests.
+check-format:
+	@bash scripts/check_format.sh --all
+
+check-format-tooling:
+	@bash tests/dev/check_format.sh
 
 # Only stage into a fresh explicit destination; the CLI owns installation.
 stage: all

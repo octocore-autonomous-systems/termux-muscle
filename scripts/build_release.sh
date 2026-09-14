@@ -42,8 +42,8 @@ stage="$scratch/$prefix"
 mkdir "$stage"
 shopt -s nullglob dotglob globstar
 cd -- "$source_root"
-files=(Makefile VERSION LICENSE CREDITS.md README.md CONTRIBUTING.md CHANGELOG.md compatibility.json install.sh .gitignore)
-for directory in src lib bin scripts tests docs .github compatibility; do
+files=(Makefile VERSION LICENSE CREDITS.md README.md CONTRIBUTING.md CHANGELOG.md compatibility.json install.sh .gitignore .clang-format)
+for directory in src lib bin scripts tests docs .github .githooks compatibility; do
     [[ ! -L "$directory" ]] || fail "source directory is a symlink: $directory"
     [[ ! -d "$directory" ]] || files+=("$directory" "$directory"/**)
 done
@@ -59,12 +59,16 @@ while IFS= read -r file; do
     if [[ -d "$file" ]]; then continue; fi
     [[ -f "$file" ]] || fail "source contains a special file: $file"
     case "$file" in
-        *.c|*.h|*.sh|*.md|*.yml|*.yaml|*.json|Makefile|VERSION|LICENSE|.gitignore|bin/termux-muscle) ;;
+        .githooks/pre-commit) ;;
+        .githooks/*) fail "unexpected contributor hook: $file";;
+    esac
+    case "$file" in
+        *.c|*.h|*.sh|*.md|*.yml|*.yaml|*.json|Makefile|VERSION|LICENSE|.gitignore|.clang-format|.githooks/pre-commit|bin/termux-muscle) ;;
         *) fail "unexpected source file type (vendor/build artifacts are excluded): $file";;
     esac
     mkdir -p -- "$stage/$(dirname -- "$file")"
     cp -- "$file" "$stage/$file"
-    case "$file" in *.sh|bin/termux-muscle) chmod 755 "$stage/$file";; *) chmod 644 "$stage/$file";; esac
+    case "$file" in *.sh|.githooks/pre-commit|bin/termux-muscle) chmod 755 "$stage/$file";; *) chmod 644 "$stage/$file";; esac
 done < "$scratch/files"
 asset="$prefix.tar.gz"
 for name in "$asset" install.sh compatibility.json RELEASE_NOTES.md SHA256SUMS; do

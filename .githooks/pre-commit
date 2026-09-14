@@ -1,0 +1,5 @@
+#!/bin/sh
+# SPDX-License-Identifier: MPL-2.0
+set -eu
+repo=$(git rev-parse --show-toplevel)
+exec bash "$repo/scripts/check_format.sh" --staged

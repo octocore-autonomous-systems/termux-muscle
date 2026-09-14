@@ -48,6 +48,9 @@ chmod +x "$work/mock"
 for tool in uname getprop pkg-config curl pkg make proot rg cc; do ln -s "$work/mock" "$mock_bin/$tool"; done
 fixture="$work/fixture/termux-muscle-0.1.0"
 mkdir -p "$fixture/bin" "$fixture/src"
+mkdir -p "$fixture/.githooks"
+printf 'BasedOnStyle: LLVM\n' > "$fixture/.clang-format"
+printf '#!/bin/sh\nexit 99\n' > "$fixture/.githooks/pre-commit"
 printf '0.1.0\n' > "$fixture/VERSION"
 printf 'all:\n\t@true\ncheck:\n\t@true\n' > "$fixture/Makefile"
 printf '/* fixture */\n' > "$fixture/src/main.c"
@@ -84,6 +87,11 @@ mapfile -d '' -t arguments < "$work/cli.args"
 [[ ${arguments[5]} == --root && ${arguments[6]} == "$root_arg" && ${arguments[9]} == --no-install && ${arguments[10]} == --link ]] || fail 'literal arguments not preserved'
 [[ $(cat "$work/make.log") == $'all\ncheck' && ! -e "$work/pkg.log" ]] || fail 'build/check order or prerequisite handling incorrect'
 clean; passed
+
+printf 'unexpected hook\n' > "$fixture/.githooks/post-install"
+archive; run_install
+[[ $status != 0 && ! -e "$work/make.log" ]] || fail 'unexpected hook archive path accepted'
+rm "$fixture/.githooks/post-install"; clean; passed; archive
 
 rm "$mock_bin/cmp"
 export MOCK_MISSING_CMP=1

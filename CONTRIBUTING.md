@@ -32,6 +32,37 @@ Use lowercase words separated by hyphens after one of these prefixes:
 
 One bug or coherent feature per PR is easier to review. Discuss a new runtime backend or a behavior change that affects existing installations before doing substantial work.
 
+## C and header formatting
+
+Use **clang-format 21** with the committed `.clang-format` for both `.c` and `.h` files. On Termux it is included in `pkg install clang`. Check `clang-format --version`; other major versions can produce different results. If needed, select a specific executable with `CLANG_FORMAT=clang-format-21 make check-format`.
+
+Before enabling the repository's pre-commit hook, inspect any existing hook configuration:
+
+```sh
+git config --get core.hooksPath
+```
+
+The command prints any existing hook directory (and exits 1 if none is configured). Also check for active hooks in `.git/hooks`. If you already use hooks, keep them and call `bash scripts/check_format.sh --staged` from your existing pre-commit hook instead of replacing its configuration. Otherwise, enable this hook once per clone:
+
+```sh
+git config --local core.hooksPath .githooks
+```
+
+Git does not enable repository hooks automatically.
+
+The hook checks the exact staged C/header contents against the staged formatting configuration, including partially staged files. A style change checks all staged C/header files. It rejects formatting errors without rewriting or staging anything. Documentation-only commits do not need the formatter. To fix a file, format it explicitly, review the diff, then stage only the intended changes:
+
+```sh
+clang-format -i --style=file src/example.c src/example.h
+git diff
+git add src/example.c src/example.h
+make check-format
+```
+
+Replace the example paths with files you changed. `make check-format` checks tracked working-tree files; add newly created files before running it. CI runs the same check with clang-format 21. Developer hook regressions run with `make check-format-tooling`. These contributor checks require Git and clang-format; installing and running Termux Muscle does not.
+
+Formatting covers layout. Compiler warnings and the regression suite check separate classes of defects. For shell contributions, **ShellCheck** finds likely bugs and **shfmt** formats shell syntax; neither substitutes for the C formatter.
+
 ## Validate and open a PR
 
 Build with a C11 compiler, make, pkg-config and development files for json-c, libarchive and OpenSSL. The C and Bash suite needs no account, network or Python:

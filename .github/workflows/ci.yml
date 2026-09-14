@@ -34,6 +34,32 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes gcc clang make pkg-config libjson-c-dev libarchive-dev libssl-dev bash coreutils diffutils curl ca-certificates tar gzip proot ripgrep
+      - name: Install Clang Format 21 from LLVM
+        if: matrix.compiler == 'clang'
+        run: |
+          # Ubuntu 24.04's runner image includes formatters through 18 only.
+          # Keep the LLVM signing key scoped to this developer-tool repository.
+          llvm_key="$RUNNER_TEMP/termux-muscle-llvm.asc"
+          llvm_gnupg="$RUNNER_TEMP/termux-muscle-llvm-gnupg"
+          mkdir -m 700 -- "$llvm_gnupg"
+          curl -q --fail --silent --show-error --proto '=https' --tlsv1.2 \
+            --connect-timeout 15 --max-time 120 \
+            https://apt.llvm.org/llvm-snapshot.gpg.key --output "$llvm_key"
+          fingerprint=$(gpg --batch --homedir "$llvm_gnupg" --show-keys --with-colons "$llvm_key" | awk -F: '$1 == "fpr" { print $10; exit }')
+          test "$fingerprint" = 6084F3CF814B57C1CF12EFD515CF4D18AF4F7421
+          sudo install -m 644 "$llvm_key" /usr/share/keyrings/termux-muscle-llvm.asc
+          printf '%s\n' 'deb [arch=amd64 signed-by=/usr/share/keyrings/termux-muscle-llvm.asc] https://apt.llvm.org/noble/ llvm-toolchain-noble-21 main' \
+            | sudo tee /etc/apt/sources.list.d/termux-muscle-llvm21.list > /dev/null
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends clang-format-21
+          clang-format-21 --version
+      - name: Check C formatting and developer hook regressions
+        if: matrix.compiler == 'clang'
+        env:
+          CLANG_FORMAT: clang-format-21
+        run: |
+          bash scripts/check_format.sh --all
+          bash tests/dev/check_format.sh
       - name: Build C helper
         run: make -j2 CFLAGS='-std=c11 -Wall -Wextra -Wpedantic -Werror -O2 -g'
       - name: Run offline unit and regression tests

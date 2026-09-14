@@ -106,7 +106,7 @@ awk -v prefix="termux-muscle-$version/" '
         count++
         if ($0 !~ /^[A-Za-z0-9._+\/-]+$/ || index($0,prefix)!=1 || $0 ~ /(^|\/)\.\.?($|\/)/ || $0 ~ /\/\//) exit 1
         relative=substr($0,length(prefix)+1)
-        if(relative!="" && relative!~/^(src|lib|bin|scripts|tests|docs|\.github|compatibility)\// && relative!~/^(Makefile|VERSION|LICENSE|CREDITS\.md|README\.md|CONTRIBUTING\.md|CHANGELOG\.md|compatibility\.json|install\.sh|\.gitignore)$/) exit 1
+        if(relative!="" && relative!~/^(src|lib|bin|scripts|tests|docs|\.github|compatibility)\// && relative!~/^(Makefile|VERSION|LICENSE|CREDITS\.md|README\.md|CONTRIBUTING\.md|CHANGELOG\.md|compatibility\.json|install\.sh|\.gitignore|\.clang-format|\.githooks\/|\.githooks\/pre-commit)$/) exit 1
         if(seen[$0]++) exit 1
     }
     END {if(count==0 || count>4096) exit 1}
