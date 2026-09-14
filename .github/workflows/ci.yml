@@ -1,0 +1,59 @@
+name: C and Bash checks
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Linux / ${{ matrix.compiler }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+    env:
+      CC: ${{ matrix.compiler }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install build and test prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes gcc clang make pkg-config libjson-c-dev libarchive-dev libssl-dev bash coreutils diffutils curl ca-certificates tar gzip proot ripgrep
+      - name: Build C helper
+        run: make -j2
+      - name: Run offline unit and regression tests
+        run: make check
+      - name: Build source assets twice and verify reproducibility
+        run: |
+          bash scripts/build_release.sh --output dist-first
+          bash scripts/build_release.sh --output dist-second
+          cmp dist-first/SHA256SUMS dist-second/SHA256SUMS
+          cd dist-first
+          sha256sum -c SHA256SUMS
+      - name: Enforce device evidence for release tags
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          test "${GITHUB_REF_NAME}" = "v$(cat VERSION)"
+          bash scripts/build_release.sh --output dist-release --release
+      - name: Preserve development source assets
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: source-assets-${{ matrix.compiler }}
+          path: dist-first/
+          if-no-files-found: error
+          retention-days: 14

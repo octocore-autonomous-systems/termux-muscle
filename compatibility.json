@@ -1,0 +1,48 @@
+{
+  "schema": 1,
+  "project_version": "0.1.0",
+  "verified_on": "2026-09-14",
+  "claude": {
+    "version": "2.1.270",
+    "package": "@anthropic-ai/claude-code-linux-arm64-musl",
+    "tarball": "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-arm64-musl/-/claude-code-linux-arm64-musl-2.1.270.tgz",
+    "integrity": "sha512-8QeMcNCn89vIlz09hhkZeoZbPHbpMfIXKIIwL3fW6hI49EQAGJGSgZK2YaD+LnWosrxw+6zJun7yMOecDp7wqA==",
+    "binary_sha256": "067b322dfca0ed81521b562ef05825e8be282eeb5c83441e4be824415572dbc0"
+  },
+  "musl": {
+    "version": "1.2.6-r2",
+    "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/aarch64/musl-1.2.6-r2.apk",
+    "sha256": "5e9674b7f41152fe2119093b5cb4c13eaaadb19c2d5422b2d7267913e663ee6e",
+    "loader_sha256": "32377e6d71725bb019e9ff6d5e9f16b4d5156d6f2c36504191c2d6a7c4d4a44d"
+  },
+  "backend": "unmodified-musl-proot",
+  "models": {
+    "checked_documentation_on": "2026-09-14",
+    "source": "https://code.claude.com/docs/en/model-config",
+    "documented": [
+      {
+        "id": "claude-fable-5-1",
+        "name": "Fable 5.1",
+        "minimum_claude_version": "2.1.257"
+      },
+      {
+        "id": "claude-opus-5",
+        "name": "Opus 5",
+        "minimum_claude_version": "2.1.219"
+      },
+      {
+        "id": "claude-sonnet-5",
+        "name": "Sonnet 5",
+        "minimum_claude_version": "2.1.197"
+      }
+    ],
+    "verified": [
+      "claude-opus-5",
+      "claude-sonnet-5"
+    ],
+    "availability_note": "Model availability depends on account, provider and organization policy. Documented compatibility is separate from authenticated verification."
+  },
+  "reports": [
+    "compatibility/galaxy-s26-ultra-20260914.json"
+  ]
+}

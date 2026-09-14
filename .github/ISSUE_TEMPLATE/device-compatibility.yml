@@ -1,0 +1,47 @@
+name: Device compatibility
+description: Share a successful or failing Android/Termux test report.
+title: "[Device] Manufacturer / model — Android / Termux"
+labels: ["compatibility"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for testing another configuration. Failures and skipped checks are useful too.
+        Run `termux-muscle test --output report.json`, review the file, and attach it below.
+        Reports are public. Do not attach OAuth tokens, API keys, private transcripts or full environment/settings dumps.
+  - type: input
+    id: device
+    attributes:
+      label: Device
+      description: Manufacturer and model; include the model code if known.
+      placeholder: Samsung Galaxy S26 Ultra (SM-S948U)
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Android and Termux
+      description: Exact Android version and Termux version/source, if known.
+      placeholder: Android 16 / API 36; Termux 0.118.3 from GitHub
+    validations:
+      required: true
+  - type: textarea
+    id: report
+    attributes:
+      label: Reviewed device report
+      description: Attach report.json or paste its contents. If the command failed, paste only the sanitized error and exact command.
+    validations:
+      required: true
+  - type: textarea
+    id: manual
+    attributes:
+      label: Additional manual checks
+      description: What worked or failed? Include exact steps; leave untested capabilities marked SKIP.
+      placeholder: "Interactive session: PASS. MCP server: SKIP."
+  - type: checkboxes
+    id: review
+    attributes:
+      label: Privacy review
+      options:
+        - label: I reviewed the report and attachments and removed secrets and private data.
+          required: true

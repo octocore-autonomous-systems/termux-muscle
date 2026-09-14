@@ -1,0 +1,220 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: MPL-2.0
+set -euo pipefail
+shopt -s inherit_errexit
+umask 077
+
+TM_SOURCE=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
+if [[ -x $TM_SOURCE/libexec/tm-core ]]; then
+    TM_CORE=$TM_SOURCE/libexec/tm-core
+else
+    TM_CORE=$TM_SOURCE/build/tm-core
+fi
+export TM_CORE
+TM_ROOT=${XDG_DATA_HOME:-$HOME/.local/share}/termux-muscle
+TM_PREFIX=${PREFIX:-/data/data/com.termux/files/usr}
+TM_PROJECT_VERSION=$(cat -- "$TM_SOURCE/VERSION")
+source "$TM_SOURCE/lib/acquire.sh"
+
+tm_error() { printf 'termux-muscle: %s: %s\n' "$1" "$2" >&2; exit 1; }
+tm_help() {
+    cat <<'EOF'
+Termux Muscle — install, run and maintain Claude Code on Termux
+
+Usage: termux-muscle [--root DIR] [--prefix TERMUX_PREFIX] COMMAND [OPTIONS]
+
+  install                      Install the project's pinned Claude Code version
+  run [--] CLAUDE_ARGUMENTS     Run Claude with its ordinary authentication/settings
+  update                       Validate a candidate before changing the active release
+  rollback                     Restore the previous validated release, without a download
+  repair [--offline]           Rebuild from verified original artifacts
+  versions                     Show active, previous and retained release identifiers
+  doctor                       Check local installation health; no model requests
+  test --output FILE           Write a sanitized local device report; no uploads
+  link [--replace] [--path P]  Own a Claude entry; preserve or back up an existing command
+  cleanup [--keep N]           Remove inactive releases; keep active sessions protected
+  self-update [--version X.Y.Z] Build a newer release of Termux Muscle
+  uninstall                    Remove owned files and restore unchanged command entries
+
+Install/update: --claude-version X.Y.Z|latest --allow-unverified requests an
+upstream release beyond the project pin. It still must pass local startup checks.
+Repair/update: --offline uses only verified cached artifacts.
+Test: --model MODEL_ID explicitly permits an authenticated model request and usage.
+
+This independent OAS project is not affiliated with or authorized by Anthropic.
+EOF
+}
+tm_preflight() {
+    local dependency
+    [[ -x $TM_CORE ]] || tm_error helper_missing 'Build this checkout with make, or rerun the source installer.'
+    [[ -d $TM_PREFIX && -x $TM_PREFIX/bin/proot && -x $TM_PREFIX/bin/bash ]] ||
+        tm_error prerequisites 'Use native Termux with proot and bash installed; check --prefix.'
+    [[ $(uname -m) == aarch64 ]] || tm_error unsupported_platform 'This release supports the official ARM64 musl Claude Code backend.'
+    for dependency in timeout sha256sum; do command -v "$dependency" >/dev/null || tm_error prerequisites "Missing command: $dependency"; done
+}
+tm_probe_candidate() (
+    set -euo pipefail
+    local id=$1 version=$2 release=$TM_ROOT/releases/$1
+    local output expected
+    expected="$version (Claude Code)"
+    # Bound both execution time and diagnostic file growth. A failed candidate
+    # remains owned but inactive; the current state is never changed here.
+    (
+        ulimit -f 2048
+        timeout --kill-after=3 30 "$TM_CORE" run "$TM_ROOT" "$TM_PREFIX" "$id" probe -- --version \
+            > "$release/probe-version.txt" 2> "$release/probe-version.err"
+    ) || { printf '%s\n' 'termux-muscle: startup_failed: Candidate cannot start; current release was preserved. Run doctor from a native Termux shell.' >&2; exit 1; }
+    output=$(cat -- "$release/probe-version.txt")
+    [[ $output == "$expected" ]] || { printf '%s\n' 'termux-muscle: version_mismatch: Candidate reported an unexpected version; current release was preserved.' >&2; exit 1; }
+    (
+        ulimit -f 2048
+        timeout --kill-after=3 30 "$TM_CORE" run "$TM_ROOT" "$TM_PREFIX" "$id" probe -- --help \
+            > "$release/probe-help.txt" 2> "$release/probe-help.err"
+    ) || { printf '%s\n' 'termux-muscle: startup_failed: Candidate help initialization failed; current release was preserved.' >&2; exit 1; }
+    [[ -s $release/probe-help.txt ]] || { printf '%s\n' 'termux-muscle: startup_failed: Candidate help output was empty.' >&2; exit 1; }
+    printf '{"status":"PASS","version":"%s","checks":[{"id":"startup_version","status":"PASS"},{"id":"startup_help","status":"PASS"}]}\n' \
+        "$version" > "$release/candidate-acceptance.json"
+    "$TM_CORE" state "$TM_ROOT" validate "$id" "$release/candidate-acceptance.json"
+)
+tm_install_release() (
+    set -euo pipefail
+    local operation=$1; shift
+    local selector=pinned policy=pinned offline=false arg manifest=$TM_SOURCE/compatibility.json
+    while (($#)); do
+        arg=$1; shift
+        case $arg in
+            --claude-version) (($#)) || tm_error usage '--claude-version needs a value.'; selector=$1; shift ;;
+            --allow-unverified) policy=allow-unverified ;;
+            --offline) offline=true ;;
+            *) tm_error usage "Unknown $operation option: $arg" ;;
+        esac
+    done
+    if [[ $operation == repair ]]; then
+        local current
+        current=$("$TM_CORE" state "$TM_ROOT" current)
+        manifest=$TM_ROOT/releases/$current/payload.json
+        # The receipt keeps the exact originally selected source hashes and
+        # whether the release was pinned. Repair does not silently choose latest.
+        selector=pinned
+        policy=allow-unverified
+    fi
+    local work id version
+    work=$(mktemp -d "$TM_ROOT/cache/.lifecycle.XXXXXXXX")
+    trap 'rm -rf -- "$work"' EXIT
+    tm_acquire_plan "$manifest" "$selector" "$policy" "$offline" "$work/plan.json"
+    version=$("$TM_CORE" acquire-field "$work/plan.json" version)
+    id=$("$TM_CORE" state "$TM_ROOT" candidate "$version")
+    printf 'Preparing Claude Code %s...\n' "$version" >&2
+    tm_acquire "$TM_ROOT/releases/$id" "$TM_ROOT/cache" "$work/plan.json" pinned "$policy" "$offline" > "$work/receipt.json"
+    "$TM_CORE" context "$TM_ROOT" "$TM_PREFIX" "$id"
+    tm_probe_candidate "$id" "$version"
+    "$TM_CORE" state "$TM_ROOT" activate "$id"
+    if [[ $("$TM_CORE" json-get "$TM_ROOT/releases/$id/payload.json" compatibility_status) == pinned ]]; then
+        printf 'Claude Code %s is active (project pin).\n' "$version"
+    else
+        printf 'Claude Code %s is active (unverified upstream version; local startup checks passed).\n' "$version"
+    fi
+    if ! "$TM_CORE" state "$TM_ROOT" cleanup 2 >/dev/null; then
+        printf '%s\n' 'Claude Code is active, but old-release cleanup needs attention. Run termux-muscle cleanup.' >&2
+    fi
+)
+tm_locked() {
+    local operation=$1; shift
+    case $operation in
+        install|update|repair) tm_install_release "$operation" "$@" ;;
+        rollback)
+            (($# == 0)) || tm_error usage 'rollback takes no arguments.'
+            local previous version
+            previous=$("$TM_CORE" json-get "$TM_ROOT/state.json" previous)
+            [[ $previous != null ]] || tm_error no_rollback 'No previous validated release is available.'
+            version=$("$TM_CORE" json-get "$TM_ROOT/releases/$previous/payload.json" version)
+            tm_probe_candidate "$previous" "$version"
+            "$TM_CORE" state "$TM_ROOT" rollback
+            printf 'Restored Claude Code %s.\n' "$version"
+            ;;
+        cleanup)
+            local keep=2 dry=()
+            while (($#)); do
+                case $1 in
+                    --keep) (($# > 1)) || tm_error usage '--keep needs a number.'; keep=$2; shift 2 ;;
+                    --dry-run) dry=(--dry-run); shift ;;
+                    *) tm_error usage "Unknown cleanup option: $1" ;;
+                esac
+            done
+            "$TM_CORE" state "$TM_ROOT" cleanup "$keep" "${dry[@]}"
+            ;;
+        link)
+            local path=$TM_PREFIX/bin/claude replace=()
+            while (($#)); do
+                case $1 in
+                    --replace) replace=(--replace); shift ;;
+                    --path) (($# > 1)) || tm_error usage '--path needs a destination.'; path=$2; shift 2 ;;
+                    *) tm_error usage "Unknown link option: $1" ;;
+                esac
+            done
+            "$TM_CORE" links "$TM_ROOT" install "$path" "$TM_ROOT/bin/claude" "${replace[@]}"
+            ;;
+        bootstrap|uninstall) source "$TM_SOURCE/lib/tooling.sh"; "tm_$operation" "$@" ;;
+        *) tm_error usage 'Unknown maintenance operation.' ;;
+    esac
+}
+
+# Internal re-exec preserves a single inherited kernel lock around the complete
+# lifecycle transaction. C mutators independently validate its root and inode.
+if [[ ${1:-} == _locked ]]; then
+    (($# >= 4)) || tm_error usage 'Invalid internal maintenance invocation.'
+    TM_ROOT=$2 TM_PREFIX=$3 operation=$4; shift 4
+    "$TM_CORE" state "$TM_ROOT" assert-lock
+    tm_locked "$operation" "$@"
+    exit
+fi
+
+# Global path options can occur before or after the command, but never consume
+# the arguments following run/--, which belong exclusively to Claude Code.
+arguments=()
+while (($#)); do
+    case $1 in
+        --root) (($# > 1)) || tm_error usage '--root needs a directory.'; TM_ROOT=$2; shift 2 ;;
+        --prefix) (($# > 1)) || tm_error usage '--prefix needs a directory.'; TM_PREFIX=$2; shift 2 ;;
+        --) shift; arguments+=("$@"); break ;;
+        run) arguments+=("$@"); break ;;
+        *) arguments+=("$1"); shift ;;
+    esac
+done
+set -- "${arguments[@]}"
+command=${1:-help}; (($# == 0)) || shift
+case $command in
+    help|-h|--help) tm_help; exit ;;
+    --version) printf 'Termux Muscle %s\n' "$TM_PROJECT_VERSION"; exit ;;
+esac
+if [[ $command != run && ${1:-} == --help ]]; then tm_help; exit; fi
+[[ -x $TM_CORE ]] || tm_error helper_missing 'Build this checkout with make, or rerun the source installer.'
+TM_ROOT=$("$TM_CORE" root-check "$TM_ROOT")
+TM_PREFIX=$(realpath -m -- "$TM_PREFIX")
+case $command in
+    run)
+        [[ ${1:-} != -- ]] || shift
+        case ${1:-} in
+            update|upgrade) shift; command=update ;;
+            install) printf '%s\n' 'This Claude installation is managed by Termux Muscle. Run termux-muscle install or update.'; exit ;;
+            *) exec "$TM_CORE" run "$TM_ROOT" "$TM_PREFIX" current normal -- "$@" ;;
+        esac
+        ;;
+    versions)
+        if (($# == 0)); then exec "$TM_CORE" state "$TM_ROOT" versions; fi
+        [[ $# == 1 && $1 == --json ]] || tm_error usage 'Use versions or versions --json.'
+        exec "$TM_CORE" state "$TM_ROOT" show
+        ;;
+    doctor|test) source "$TM_SOURCE/lib/diagnostics.sh"; tm_diagnostics "$command" "$@"; exit ;;
+    self-update) source "$TM_SOURCE/lib/tooling.sh"; tm_self_update "$@"; exit ;;
+esac
+case $command in
+    install|update|repair|rollback|cleanup|link|uninstall|bootstrap)
+        case $command in install|update|repair|rollback|bootstrap) tm_preflight ;; esac
+        mode=existing
+        [[ $command != install && $command != bootstrap ]] || mode=create
+        exec "$TM_CORE" with-lock "$TM_ROOT" "$mode" -- "$BASH" \
+            "$TM_SOURCE/bin/termux-muscle" _locked "$TM_ROOT" "$TM_PREFIX" "$command" "$@"
+        ;;
+    *) tm_error usage "Unknown command: $command. Run termux-muscle --help." ;;
+esac

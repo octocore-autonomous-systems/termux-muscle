@@ -1,0 +1,199 @@
+{
+  "schema": 1,
+  "generated_at": "2026-09-14T22:44:42Z",
+  "project": {
+    "name": "Termux Muscle",
+    "version": "0.1.0"
+  },
+  "claude_code": {
+    "version": "2.1.270",
+    "musl_version": "1.2.6-r2"
+  },
+  "environment": {
+    "manufacturer": "samsung",
+    "model": "SM-S948U",
+    "android_version": "16",
+    "android_api": 36,
+    "abi": "arm64-v8a",
+    "device_name": "Samsung Galaxy S26 Ultra",
+    "kernel": "6.12.30-android16-5-pd30ff70-abogkiS948USQS4AZHL-4k",
+    "page_size": 4096,
+    "termux_version": "0.118.3",
+    "termux_source": "GITHUB",
+    "packages": {
+      "bash": "5.3.15",
+      "coreutils": "9.11-1",
+      "curl": "8.22.0",
+      "ca-certificates": "1:2026.08.13",
+      "proot": "5.1.107.92",
+      "ripgrep": "15.2.0",
+      "clang": "21.1.8-3",
+      "make": "4.4.1-1",
+      "pkg-config": "0.29.2-3",
+      "json-c": "0.19",
+      "libarchive": "3.8.9",
+      "openssl": "1:3.6.3",
+      "zlib": "1.3.2",
+      "termux-tools": "1.46.0+really1.45.0-1",
+      "termux-exec": "1:2.5.0-1",
+      "diffutils": "3.12-2",
+      "tar": "1.35-3",
+      "gzip": "1.14-1"
+    }
+  },
+  "provenance": "maintainer",
+  "checks": [
+    {
+      "id": "dns_configuration",
+      "status": "PASS",
+      "detail_code": "nameserver_configured"
+    },
+    {
+      "id": "command_links",
+      "status": "SKIP",
+      "detail_code": "no_managed_commands"
+    },
+    {
+      "id": "runtime_integrity",
+      "status": "PASS",
+      "detail_code": "receipt_hashes_match"
+    },
+    {
+      "id": "startup_version",
+      "status": "PASS",
+      "detail_code": "local_probe_passed"
+    },
+    {
+      "id": "startup_help",
+      "status": "PASS",
+      "detail_code": "local_probe_passed"
+    },
+    {
+      "id": "namespace_shell",
+      "status": "PASS",
+      "detail_code": "local_probe_passed"
+    },
+    {
+      "id": "install",
+      "status": "PASS",
+      "detail_code": "packaged_manager_and_real_source_runtime_lifecycle"
+    },
+    {
+      "id": "update",
+      "status": "PASS",
+      "detail_code": "offline_candidate_activation_observed"
+    },
+    {
+      "id": "rollback",
+      "status": "PASS",
+      "detail_code": "previous_release_restored_offline"
+    },
+    {
+      "id": "uninstall",
+      "status": "PASS",
+      "detail_code": "owned_root_removed_foreign_entry_restored"
+    },
+    {
+      "id": "shell_tools",
+      "status": "PASS",
+      "detail_code": "authenticated_fixture_observed"
+    },
+    {
+      "id": "interactive",
+      "status": "PASS",
+      "detail_code": "authenticated_tui_startup_and_interrupt"
+    },
+    {
+      "id": "background",
+      "status": "SKIP",
+      "detail_code": "not_exercised_on_device"
+    },
+    {
+      "id": "screen_off",
+      "status": "SKIP",
+      "detail_code": "not_exercised_on_device"
+    },
+    {
+      "id": "native_shell",
+      "status": "PASS",
+      "detail_code": "authenticated_fixture_observed"
+    },
+    {
+      "id": "portable_shebang",
+      "status": "PASS",
+      "detail_code": "authenticated_fixture_observed"
+    },
+    {
+      "id": "ripgrep",
+      "status": "PASS",
+      "detail_code": "authenticated_fixture_observed"
+    },
+    {
+      "id": "nested_launcher",
+      "status": "PASS",
+      "detail_code": "authenticated_fixture_observed"
+    },
+    {
+      "id": "hook_setup",
+      "status": "PASS",
+      "detail_code": "isolated_init_only_command_hook_observed"
+    },
+    {
+      "id": "hook_session_start",
+      "status": "PASS",
+      "detail_code": "isolated_init_only_command_hook_observed"
+    },
+    {
+      "id": "mcp_initialization",
+      "status": "PASS",
+      "detail_code": "local_stdio_handshake_and_tools_list_observed"
+    },
+    {
+      "id": "mcp_tool_call",
+      "status": "SKIP",
+      "detail_code": "initialization_only_test"
+    },
+    {
+      "id": "failed_update",
+      "status": "PASS",
+      "detail_code": "corrupt_cache_preserved_active_state"
+    },
+    {
+      "id": "repair",
+      "status": "PASS",
+      "detail_code": "offline_original_bytes_reconstructed"
+    },
+    {
+      "id": "cross_session_messaging",
+      "status": "FAIL",
+      "detail_code": "vendor_uid_mapping_check_disabled_default_socket"
+    }
+  ],
+  "models": [
+    {
+      "requested": "claude-sonnet-5",
+      "status": "PASS",
+      "detail_code": "exact_model_verified",
+      "observed": [
+        "claude-sonnet-5"
+      ]
+    },
+    {
+      "requested": "claude-opus-5",
+      "status": "PASS",
+      "detail_code": "exact_model_verified",
+      "observed": [
+        "claude-opus-5"
+      ]
+    },
+    {
+      "requested": "claude-fable-5-1",
+      "status": "FAIL",
+      "detail_code": "model_fallback_observed",
+      "observed": [
+        "claude-opus-5"
+      ]
+    }
+  ],
+  "evidence_notes": "galaxy-s26-ultra-20260914.md"
+}

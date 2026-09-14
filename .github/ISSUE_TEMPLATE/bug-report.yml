@@ -1,0 +1,44 @@
+name: Bug report
+description: Report an installation, runtime, update, recovery or removal failure.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Include the smallest reproduction you can. Run `termux-muscle doctor` and
+        `termux-muscle test --output report.json` when possible. Review everything before attaching it.
+        Never post tokens, full settings/environment dumps or private Claude conversations.
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps and failing command
+      description: Include exact arguments with sensitive values removed.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior
+      description: Include the error category and a short sanitized error message.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Versions and device report
+      description: Attach the reviewed report, or supply project/Claude versions, device, Android and Termux version/source.
+    validations:
+      required: true
+  - type: textarea
+    id: recovery
+    attributes:
+      label: Recovery attempted
+      description: Did rerunning, rollback or offline repair work? Do not remove ownership/state files to investigate.
+  - type: checkboxes
+    id: review
+    attributes:
+      label: Privacy review
+      options:
+        - label: I reviewed the report and attachments and removed secrets and private data.
+          required: true
