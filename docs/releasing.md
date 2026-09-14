@@ -29,13 +29,18 @@ Artifacts are `termux-muscle-VERSION.tar.gz` containing project source, `install
 
 ## Publish
 
-Use the reviewed source commit, passing CI and a matching tag. For example, after the version has been chosen and the complete gate passes:
+Use the reviewed source commit after both branch CI compiler jobs pass. Add reviewed human notes at `docs/releases/VERSION.md`; they are combined with the generated, verified metadata on the release page. Preserve mixed model results, failed features and untested workflows explicitly.
+
+Then push a matching annotated tag. For example, after device acceptance and the branch checks pass:
 
 ```sh
 git tag -a v0.1.0 -m "Release 0.1.0"
 git push origin main v0.1.0
-gh release create v0.1.0 dist/termux-muscle-0.1.0.tar.gz dist/install.sh dist/compatibility.json dist/RELEASE_NOTES.md dist/SHA256SUMS --verify-tag --title "0.1.0 — Claude Code 2.1.270" --notes-file dist/RELEASE_NOTES.md
 ```
+
+The tag starts a fresh GCC/Clang matrix. The `Publish verified tag` job depends on the entire matrix and receives release write permission only after its success condition is satisfied. `scripts/publish_release.sh` independently verifies that this exact workflow attempt has one completed successful GCC job and one completed successful Clang job for the checked-out commit. It rejects branch/manual/PR contexts, tag/version mismatches, changed checkouts, missing or failed jobs, and a remote tag that differs from the tested commit. It builds strict release assets from that checkout, verifies their checksums, rechecks the remote tag, and creates the release without overwriting existing releases or assets.
+
+Use this automated publication path; do not substitute a manual `gh release create` command. GitHub administrators can still bypass repository automation manually, so this is a guarantee of the documented workflow, not a claim that administrators have lost their GitHub permissions. A failing, cancelled, skipped or incomplete matrix cannot reach the workflow's publication job. GitHub's [job dependency semantics](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idneeds) underpin that dependency; the publisher also checks the live job evidence.
 
 Inspect the public repository visibility, tag, release notes and downloaded asset hashes. Then test the actual public `curl ... | sh` path on Termux with an isolated root. A successful local build does not prove the public asset names, redirects or install command are correct. Record that result in the release engineering evidence.
 

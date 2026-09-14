@@ -2,6 +2,7 @@
 #include "tm.h"
 #include <assert.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -22,6 +23,20 @@ static void rejects_json(const char *s, size_t n) {
     assert(WIFEXITED(status) && WEXITSTATUS(status) != 0);
 }
 int main(void) {
+    char near_limit[PATH_MAX]; memset(near_limit, 'a', sizeof near_limit);
+    near_limit[PATH_MAX - 4] = 0;
+    char *joined = tm_path(near_limit, "b");
+    assert(strlen(joined) == PATH_MAX - 2 && joined[PATH_MAX - 4] == '/' && joined[PATH_MAX - 3] == 'b');
+    assert(!memcmp(joined, near_limit, PATH_MAX - 4)); free(joined);
+    near_limit[PATH_MAX - 4] = 'a'; near_limit[PATH_MAX - 3] = 0;
+    fflush(NULL); pid_t path_child = fork(); assert(path_child >= 0);
+    if (!path_child) {
+        int null = open("/dev/null", O_WRONLY); assert(null >= 0); dup2(null, 2); close(null);
+        free(tm_path(near_limit, "b")); _exit(0);
+    }
+    int path_status; assert(waitpid(path_child, &path_status, 0) == path_child);
+    assert(WIFEXITED(path_status) && WEXITSTATUS(path_status));
+    puts("PASS C unit: joined paths preserve exact boundary bytes and reject excessive length");
     assert(tm_version_valid("0.1.0")); assert(tm_version_valid("2.1.270"));
     const char *invalid[] = {"", "2.1", "2.1.0-beta", "02.1.0", "-1.0.0", "2.1.0\n", "2.1.0/../x"};
     for (size_t i = 0; i < sizeof invalid / sizeof *invalid; i++) assert(!tm_version_valid(invalid[i]));

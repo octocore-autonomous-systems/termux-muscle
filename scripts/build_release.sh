@@ -54,7 +54,9 @@ printf '%s\n' "${files[@]}" | LC_ALL=C sort -u > "$scratch/files"
 while IFS= read -r file; do
     [[ -e "$file" || -L "$file" ]] || continue
     [[ "$file" =~ ^[A-Za-z0-9._/-]+$ && "$file" != /* && "$file" != *'/../'* && ! -L "$file" ]] || fail "unsafe source name or symlink: $file"
-    if [[ -d "$file" ]]; then mkdir -p -- "$stage/$file"; continue; fi
+    # Git does not preserve empty directories. Create only parents of source files,
+    # so a working tree and a fresh checkout produce the same archive contents.
+    if [[ -d "$file" ]]; then continue; fi
     [[ -f "$file" ]] || fail "source contains a special file: $file"
     case "$file" in
         *.c|*.h|*.sh|*.md|*.yml|*.yaml|*.json|Makefile|VERSION|LICENSE|.gitignore|bin/termux-muscle) ;;

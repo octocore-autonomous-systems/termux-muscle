@@ -35,7 +35,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes gcc clang make pkg-config libjson-c-dev libarchive-dev libssl-dev bash coreutils diffutils curl ca-certificates tar gzip proot ripgrep
       - name: Build C helper
-        run: make -j2
+        run: make -j2 CFLAGS='-std=c11 -Wall -Wextra -Wpedantic -Werror -O2 -g'
       - name: Run offline unit and regression tests
         run: make check
       - name: Build source assets twice and verify reproducibility
@@ -57,3 +57,32 @@ jobs:
           path: dist-first/
           if-no-files-found: error
           retention-days: 14
+
+  publish:
+    name: Publish verified tag
+    needs: checks
+    if: >-
+      ${{ success() && needs.checks.result == 'success' &&
+          github.event_name == 'push' && github.ref_type == 'tag' &&
+          startsWith(github.ref, 'refs/tags/v') &&
+          github.repository == 'octocore-autonomous-systems/termux-muscle' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Check out the tested tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Install release build prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes gcc make pkg-config libjson-c-dev libarchive-dev libssl-dev bash coreutils curl ca-certificates tar gzip
+      - name: Verify this CI attempt and publish its exact tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TM_CHECKS_RESULT: ${{ needs.checks.result }}
+        run: bash scripts/publish_release.sh

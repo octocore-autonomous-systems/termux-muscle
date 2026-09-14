@@ -282,7 +282,8 @@ static void candidate(const char *root, const char *version) {
     setstr(j, "installation_id", tm_json_string(identity, "id")); setstr(j, "id", id);
     char *p = tm_path(staging, ".owned.json"); tm_json_write(p, j); free(p);
     p = tm_path(staging, ".lease"); int fd = open_lock(p, true); free(p);
-    if (fsync(fd)) tm_die("sync_failed", "Cannot save candidate lease."); close(fd);
+    if (fsync(fd)) tm_die("sync_failed", "Cannot save candidate lease.");
+    close(fd);
     tm_sync_dir(staging);
     if (exists(target) || rename(staging, target)) tm_die("candidate_failed", "Cannot publish the candidate directory.");
     tm_sync_dir(releases); puts(id);
@@ -389,7 +390,9 @@ static void recover_deletions(const char *root, json_object *state) {
         if (!tm_release_valid(id) || selected(state, id, 0)) tm_die("invalid_state", "Cleanup journal refers to an active or invalid release.");
         dev_t dev = (dev_t)json_object_get_int64(tm_json_field(record, "device", json_type_int));
         ino_t ino = (ino_t)json_object_get_int64(tm_json_field(record, "inode", json_type_int));
-        char name[80]; snprintf(name, sizeof name, ".deleting-%s", id);
+        char name[80]; int length = snprintf(name, sizeof name, ".deleting-%s", id);
+        if (length < 0 || (size_t)length >= sizeof name)
+            tm_die("invalid_state", "The release deletion name is too long.");
         char *target = tm_path(releases, name), *original = tm_path(releases, id);
         struct stat st; int lease = -1;
         if (!exists(target) && exists(original)) {
@@ -445,7 +448,9 @@ static void cleanup(const char *root, size_t keep, bool dry_run) {
             json_object_object_add(record, "device", json_object_new_int64((int64_t)st.st_dev));
             json_object_object_add(record, "inode", json_object_new_int64((int64_t)st.st_ino));
             json_object_array_add(journal, record); save_state(root, state);
-            char name[80]; snprintf(name, sizeof name, ".deleting-%s", id);
+            char name[80]; int length = snprintf(name, sizeof name, ".deleting-%s", id);
+            if (length < 0 || (size_t)length >= sizeof name)
+                tm_die("invalid_state", "The release deletion name is too long.");
             char *target = tm_path(releases, name);
             if (exists(target) || rename(release, target)) tm_die("cleanup_failed", "Cannot stage the journaled release deletion.");
             tm_sync_dir(releases); free(target);
@@ -497,7 +502,8 @@ int tm_state_main(int argc, char **argv) {
             size_t keep = 2; bool dry = false;
             if (argc > 3) {
                 char *end; errno = 0; unsigned long v = strtoul(argv[3], &end, 10);
-                if (errno || !*argv[3] || *end || v > 10000) tm_die("invalid_retention", "Retention count is invalid."); keep = (size_t)v;
+                if (errno || !*argv[3] || *end || v > 10000) tm_die("invalid_retention", "Retention count is invalid.");
+                keep = (size_t)v;
             }
             if (argc == 5) { if (strcmp(argv[4], "--dry-run")) tm_die("usage", "Unknown cleanup argument."); dry = true; }
             cleanup(root, keep, dry);

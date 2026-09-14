@@ -57,6 +57,11 @@ run_build
 [[ $status == 0 && $(sha256sum "$work/dist/$asset") == "$first" ]] || fail 'source archive is not deterministic'
 passed
 
+mkdir -p "$source/compatibility/reports/empty" "$source/docs/local-empty"
+run_build
+[[ $status == 0 && $(sha256sum "$work/dist/$asset") == "$first" ]] || fail 'untracked empty directories changed source archive'
+passed
+
 rm -rf "$work/dist"
 run_build --release
 [[ $status != 0 && ! -e "$work/dist" ]] || fail 'failed release gate created artifacts'

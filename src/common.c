@@ -31,11 +31,16 @@ char *tm_strdup(const char *s) {
     return out;
 }
 char *tm_path(const char *base, const char *suffix) {
-    if (!base || !suffix || strlen(base) + strlen(suffix) + 2 >= PATH_MAX)
+    if (!base || !suffix)
         tm_die("unsafe_path", "Path is missing or too long.");
-    size_t n = strlen(base) + strlen(suffix) + 2;
+    size_t base_length = strnlen(base, PATH_MAX), suffix_length = strnlen(suffix, PATH_MAX);
+    if (base_length >= PATH_MAX || suffix_length >= PATH_MAX || base_length + suffix_length + 2 >= PATH_MAX)
+        tm_die("unsafe_path", "Path is missing or too long.");
+    size_t n = base_length + suffix_length + 2;
     char *p = tm_alloc(n);
-    snprintf(p, n, "%s/%s", base, suffix);
+    memcpy(p, base, base_length);
+    p[base_length] = '/';
+    memcpy(p + base_length + 1, suffix, suffix_length + 1);
     return p;
 }
 char *tm_canonical(const char *path, bool allow_missing_leaf) {

@@ -257,7 +257,8 @@ static char *normalized_name(const char *raw) {
     for (char *part = strtok_r(copy, "/", &save); part; part = strtok_r(NULL, "/", &save)) {
         if (!strcmp(part, "..")) tm_die("unsafe_archive", "The archive contains a traversing path.");
         if (!strcmp(part, ".")) continue;
-        if (*out) strcat(out, "/"); strcat(out, part);
+        if (*out) strcat(out, "/");
+        strcat(out, part);
     }
     free(copy); return out;
 }
