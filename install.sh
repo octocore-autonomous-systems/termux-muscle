@@ -5,16 +5,18 @@ set -eu
 # Archive validation must not inherit options from unrelated shell customizations.
 unset TAR_OPTIONS GZIP
 REPOSITORY="octocore-autonomous-systems/termux-muscle"
-VERSION="0.1.0"
+VERSION="0.2.0"
 
 fail() { printf '%s\n' "termux-muscle: $*" >&2; exit 1; }
 usage() {
     cat <<'USAGE'
 Usage: sh install.sh [--version X.Y.Z] [--root DIR] [--prefix DIR]
-                     [--no-install] [--link]
+                     [--no-install] [--no-link]
 Download verified source, build and test it locally, then install Claude Code.
---no-install installs the management tool without downloading Claude Code.
---link explicitly opts into managing claude; an existing command is preserved by default.
+Normal installation sets up claude on PATH and saves replaced command entries.
+--no-install installs the management tool and manual without downloading or linking Claude.
+--no-link installs Claude but leaves Claude command entries unchanged.
+--link is accepted for compatibility; linking is already the default.
 --prefix is the Termux package root, normally the existing $PREFIX.
 Requires native Termux on Android aarch64. Missing prerequisites use Termux pkg.
 USAGE
@@ -23,7 +25,7 @@ version=$VERSION
 install_root=
 install_prefix=
 no_install=0
-link_claude=0
+link_claude=1
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --version|--root|--prefix)
@@ -32,6 +34,7 @@ while [ "$#" -gt 0 ]; do
             shift 2;;
         --no-install) no_install=1; shift;;
         --link) link_claude=1; shift;;
+        --no-link) link_claude=0; shift;;
         --help|-h) usage; exit 0;;
         *) fail "unknown argument: $1 (use --help)";;
     esac
@@ -46,7 +49,7 @@ command -v getprop >/dev/null 2>&1 || fail "run in native Termux, outside a proo
 [ -z "${PROOT_TMP_DIR:-}" ] || fail "run the installer outside a proot distribution"
 command -v pkg >/dev/null 2>&1 || fail "Termux pkg is unavailable"
 missing=
-for pair in bash:bash proot:proot sha256sum:coreutils cmp:diffutils rg:ripgrep curl:curl make:make cc:clang pkg-config:pkg-config tar:tar gzip:gzip; do
+for pair in bash:bash proot:proot sha256sum:coreutils cmp:diffutils rg:ripgrep curl:curl make:make cc:clang pkg-config:pkg-config tar:tar gzip:gzip man:mandoc; do
     program=${pair%%:*}; package=${pair#*:}
     command -v "$program" >/dev/null 2>&1 || missing="$missing $package"
 done
@@ -65,7 +68,7 @@ if [ -n "$missing" ]; then
     # shellcheck disable=SC2086
     pkg install -y $missing || fail "prerequisite installation failed; resolve the pkg error and rerun"
 fi
-for program in bash proot sha256sum cmp rg curl make cc pkg-config tar gzip; do
+for program in bash proot sha256sum cmp rg curl make cc pkg-config tar gzip man; do
     command -v "$program" >/dev/null 2>&1 || fail "required program is missing: $program"
 done
 pkg-config --exists json-c libarchive libcrypto || fail "required C libraries or headers are missing"
@@ -131,5 +134,5 @@ set -- "$source_dir/bin/termux-muscle" bootstrap --source-dir "$source_dir" --bu
 [ -z "$install_root" ] || set -- "$@" --root "$install_root"
 [ -z "$install_prefix" ] || set -- "$@" --prefix "$install_prefix"
 [ "$no_install" -eq 0 ] || set -- "$@" --no-install
-[ "$link_claude" -eq 0 ] || set -- "$@" --link
+[ "$link_claude" -eq 1 ] || set -- "$@" --no-link
 "$termux_prefix/bin/bash" "$@"

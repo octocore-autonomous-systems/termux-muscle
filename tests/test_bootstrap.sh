@@ -33,19 +33,20 @@ case "${0##*/}" in
     pkg)
         printf '%s\n' "$*" > "$MOCK_WORK/pkg.log"
         [[ "${MOCK_PKG_FAIL:-0}" == 0 ]] || exit 1
-        if [[ ${MOCK_MISSING_CMP:-0} == 1 ]]; then cp "$MOCK_CMP" "$MOCK_WORK/bin/cmp"; fi;;
+        if [[ ${MOCK_MISSING_CMP:-0} == 1 ]]; then cp "$MOCK_CMP" "$MOCK_WORK/bin/cmp"; fi
+        if [[ ${MOCK_MISSING_MAN:-0} == 1 ]]; then cp "$MOCK_WORK/mock" "$MOCK_WORK/bin/man"; fi;;
     make)
         source=$2; target=${!#}; printf '%s\n' "$target" >> "$MOCK_WORK/make.log"
         [[ "${MOCK_MAKE_FAIL:-}" != "$target" ]] || exit 47
         mkdir -p "$source/build"
         printf '#!/bin/sh\nexit 0\n' > "$source/build/tm-core"
         chmod +x "$source/build/tm-core";;
-    proot|rg|cc) :;;
+    proot|rg|cc|man) :;;
     *) exit 99;;
 esac
 MOCK
 chmod +x "$work/mock"
-for tool in uname getprop pkg-config curl pkg make proot rg cc; do ln -s "$work/mock" "$mock_bin/$tool"; done
+for tool in uname getprop pkg-config curl pkg make proot rg cc man; do ln -s "$work/mock" "$mock_bin/$tool"; done
 fixture="$work/fixture/termux-muscle-0.1.0"
 mkdir -p "$fixture/bin" "$fixture/src"
 mkdir -p "$fixture/.githooks"
@@ -70,7 +71,7 @@ reset_logs() { rm -f "$work/cli.args" "$work/make.log" "$work/curl.log" "$work/p
 run_install() {
     set +e
     env PATH="$mock_bin" PREFIX="$work/com.termux/files/usr" TMPDIR="$work/tmp space" PROOT_TMP_DIR= \
-        "$sh_path" "$project/install.sh" "$@" > "$work/output" 2> "$work/error"
+        "$sh_path" "$project/install.sh" --version 0.1.0 "$@" > "$work/output" 2> "$work/error"
     status=$?
     set -e
 }
@@ -80,12 +81,26 @@ count=0
 passed() { ((count += 1)); reset_logs; }
 
 root_arg="$work/root ' \$(unexecuted)"
-run_install --root "$root_arg" --prefix "$work/com.termux/files/usr" --no-install --link
+run_install --root "$root_arg" --prefix "$work/com.termux/files/usr" --no-install --no-link
 [[ $status == 0 ]] || fail 'valid source install failed'
 mapfile -d '' -t arguments < "$work/cli.args"
 [[ ${arguments[0]} == bootstrap && ${arguments[1]} == --source-dir && ${arguments[3]} == --build-dir ]] || fail 'wrong bootstrap interface'
-[[ ${arguments[5]} == --root && ${arguments[6]} == "$root_arg" && ${arguments[9]} == --no-install && ${arguments[10]} == --link ]] || fail 'literal arguments not preserved'
+[[ ${arguments[5]} == --root && ${arguments[6]} == "$root_arg" && ${arguments[9]} == --no-install && ${arguments[10]} == --no-link ]] || fail 'literal arguments not preserved'
 [[ $(cat "$work/make.log") == $'all\ncheck' && ! -e "$work/pkg.log" ]] || fail 'build/check order or prerequisite handling incorrect'
+clean; passed
+
+run_install
+[[ $status == 0 ]] || fail 'default installation failed'
+mapfile -d '' -t arguments < "$work/cli.args"
+[[ ${#arguments[@]} == 5 ]] || fail 'default installation unexpectedly opted out of linking'
+clean; passed
+
+rm "$mock_bin/man"
+export MOCK_MISSING_MAN=1
+run_install
+[[ $status == 0 ]] || fail 'missing man viewer was not provisioned'
+grep -q mandoc "$work/pkg.log" || fail 'missing man did not request the real Termux mandoc package'
+unset MOCK_MISSING_MAN
 clean; passed
 
 printf 'unexpected hook\n' > "$fixture/.githooks/post-install"
@@ -190,7 +205,7 @@ unset MOCK_CLI_STATUS; clean; passed
 export MOCK_WAIT=1
 set +e
 env PATH="$mock_bin" PREFIX="$work/com.termux/files/usr" TMPDIR="$work/tmp space" PROOT_TMP_DIR= \
-    timeout --signal=TERM --kill-after=2 2 "$sh_path" "$project/install.sh" > "$work/output" 2> "$work/error"
+    timeout --signal=TERM --kill-after=2 2 "$sh_path" "$project/install.sh" --version 0.1.0 > "$work/output" 2> "$work/error"
 status=$?
 set -e
 unset MOCK_WAIT

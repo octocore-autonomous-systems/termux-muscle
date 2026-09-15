@@ -40,3 +40,11 @@ The build and runtime also depend on the following separately installed software
 See the [Termux package definitions](https://github.com/termux/termux-packages/tree/master/packages) for the exact source, patches and license metadata of each installed package, including Termux tools and termux-exec. These packages are not included in our source-release archive.
 
 Our [LICENSE](LICENSE) is the unmodified Mozilla Public License 2.0 text obtained from [Mozilla](https://www.mozilla.org/media/MPL/2.0/index.txt). All original project source is subject to MPL-2.0. No additional trademark rights or Anthropic endorsement are implied.
+
+## Hero artwork
+
+The README's [Termux Muscle — Exposition workshop](docs/images/termux-muscle-hero.png) illustration was created for the project with OAS / Termux Muscle contributors' art direction and AI-assisted rendering, then selected by the maintainer. The composite artwork is distributed under the **Free Art License 1.3**, separately from the software's MPL-2.0. See the [artwork provenance and attribution](docs/images/README.md) and [complete artwork license](docs/images/FREE-ART-LICENSE-1.3.md).
+
+The illustration adapts the Bash logo (ProspectOne; art direction Justin Dorfman; copyright 2016 Free Software Foundation) and Aurélio A. Heckert's GNU head (copyright 2003 Free Software Foundation), using their Free Art License terms. It also depicts Google's Android robot under CC BY 3.0 and credits Larry Ewing and GIMP for Tux. The C badge is an illustrative language identifier. Original sources, modification notices and component license links accompany the image; no represented project endorses Termux Muscle.
+
+The Android robot is reproduced or modified from work created and shared by Google and used according to terms described in the [Creative Commons 3.0 Attribution License](https://creativecommons.org/licenses/by/3.0/). Android is a trademark of Google LLC.

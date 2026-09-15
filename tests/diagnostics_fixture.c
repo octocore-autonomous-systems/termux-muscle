@@ -165,7 +165,8 @@ static void validate_report(const char *path) {
     json_object *env = tm_json_field(report, "environment", json_type_object);
     assert(!json_object_object_get_ex(env, "serial", NULL));
     json_object *packages = tm_json_field(env, "packages", json_type_object);
-    assert(json_object_object_length(packages) == 18);
+    assert(json_object_object_length(packages) == 19);
+    assert(json_object_object_get_ex(packages, "mandoc", NULL));
     assert(!strstr(json_object_to_json_string(report), "PRIVATE_SECRET"));
     assert(!strstr(json_object_to_json_string(report), "/data/data/"));
     json_object_put(report);

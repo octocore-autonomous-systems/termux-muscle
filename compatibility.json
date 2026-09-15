@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "project_version": "0.1.0",
-  "verified_on": "2026-09-14",
+  "project_version": "0.2.0",
+  "verified_on": "2026-09-15",
   "claude": {
     "version": "2.1.270",
     "package": "@anthropic-ai/claude-code-linux-arm64-musl",
@@ -37,12 +37,11 @@
       }
     ],
     "verified": [
-      "claude-opus-5",
       "claude-sonnet-5"
     ],
-    "availability_note": "Model availability depends on account, provider and organization policy. Documented compatibility is separate from authenticated verification."
+    "availability_note": "Sonnet 5 passed an exact authenticated 0.2.0 tool workflow on 2026-09-15. The separate 2026-09-14 report retains historical 0.1.0 Opus/Sonnet results and mixed Fable observations for the unchanged Claude Code 2.1.270 payload. Model availability depends on account, provider and organization policy; documented compatibility is separate from authenticated verification."
   },
   "reports": [
-    "compatibility/galaxy-s26-ultra-20260914.json"
+    "compatibility/galaxy-s26-ultra-0.2.0-20260915.json"
   ]
 }

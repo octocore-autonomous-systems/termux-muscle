@@ -44,6 +44,11 @@ tm_uninstall() {
     printf '%s\0' "$@" > "$TM_FIXTURE_TRACE/uninstall.argv"
 }
 SH
+cat > "$source_dir/lib/commands.sh" <<'SH'
+tm_default_claude_links() {
+    printf '%s\n' default-claude-links >> "$TM_FIXTURE_TRACE/events"
+}
+SH
 {
     printf '#!%s\n' "$host_bash"
     cat <<'SH'
@@ -126,6 +131,7 @@ for dependency in dirname cat realpath; do
 done
 {
     printf '#!%s\n' "$host_bash"
+    # shellcheck disable=SC2016 # Generate literal fixture script source.
     printf '%s\n' 'printf "%s\n" cache-temp-request >> "$TM_FIXTURE_TRACE/events"' \
         'exec "$TM_FIXTURE_MKTEMP" "$@"'
 } > "$guards/mktemp"
@@ -135,6 +141,7 @@ done
 } > "$guards/uname"
 {
     printf '#!%s\n' "$host_bash"
+    # shellcheck disable=SC2016 # Generate literal fixture script source.
     printf '%s\n' 'printf "%s\n" forbidden-network >> "$TM_FIXTURE_TRACE/events"' 'exit 90'
 } > "$guards/curl"
 chmod 700 "$guards/mktemp" "$guards/uname" "$guards/curl"
@@ -165,6 +172,7 @@ local_cli install --help > "$trace/install-help"
 pass 'vendor help passes through while manager help needs no installation'
 
 reset_trace
+# shellcheck disable=SC2016 # Literal shell syntax must survive as vendor arguments.
 arguments=(auth login --root 'vendor root' --prefix 'vendor prefix' '--model' 'arbitrary/model' \
     'spaces and "quotes"' "single'quote" '*' '$(touch never-run)' '`false`' '' $'line\nbreak' --help)
 local_cli run "${arguments[@]}" >/dev/null
@@ -214,6 +222,7 @@ if TM_FIXTURE_FAIL_PROBE=1 PATH="$guards:$PATH" "$host_bash" "$cli" --root "$roo
     > "$trace/rejected-candidate.out" 2> "$trace/rejected-candidate.err"; then fail 'failed candidate startup returned success'; fi
 has_event acquisition-copy || fail 'failed candidate fixture never reached candidate checks'
 if has_event state-activate; then fail 'candidate activated despite failed startup'; fi
+if has_event default-claude-links; then fail 'failed candidate changed default commands'; fi
 [[ ! -e $trace/active ]] || fail 'failed candidate changed active selection'
 (shopt -s nullglob; leftovers=("$root/cache"/.lifecycle.*); ((${#leftovers[@]} == 0))) || fail 'failed install leaked lifecycle scratch'
 pass 'failed startup prevents activation and cleans transaction scratch'
@@ -223,10 +232,18 @@ TM_FIXTURE_FAIL_CLEANUP=1 PATH="$guards:$PATH" "$host_bash" "$cli" --root "$root
     > "$trace/active.out" 2> "$trace/active.err" || fail 'post-activation cleanup failure masked successful install'
 [[ -s $trace/active ]] || fail 'fixture never activated candidate'
 has_event state-cleanup || fail 'maintenance failure fixture was not exercised'
+has_event default-claude-links || fail 'normal install did not set up default Claude'
+awk '/^state-activate$/ {active=1} /^default-claude-links$/ {if(!active) exit 1; found=1} END {if(!found) exit 1}' "$trace/events" || fail 'command takeover preceded activation'
 grep -Fq -- 'is active' "$trace/active.out" || fail 'successful activation was not reported'
 grep -Eiq -- 'cleanup.*(attention|warning)|warning.*cleanup' "$trace/active.err" || fail 'maintenance failure lacked actionable warning'
 if has_event forbidden-network; then fail 'CLI regression attempted a real download'; fi
 (shopt -s nullglob; leftovers=("$root/cache"/.lifecycle.*); ((${#leftovers[@]} == 0))) || fail 'successful install leaked lifecycle scratch'
 pass 'successful activation survives cleanup failure with a maintenance warning'
+
+reset_trace
+PATH="$guards:$PATH" "$host_bash" "$cli" --root "$root" --prefix "$prefix" install --no-link > "$trace/no-link.out"
+has_event state-activate || fail 'no-link prevented runtime installation'
+if has_event default-claude-links; then fail 'no-link changed command entries'; fi
+pass 'explicit no-link installs a runtime without command takeover'
 
 printf 'PASS: %s CLI behavior groups\n' "$count"

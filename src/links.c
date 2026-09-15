@@ -12,6 +12,7 @@
 #include <unistd.h>
 
 #define LINK_BACKUP_MAX (512ULL * 1024ULL * 1024ULL)
+#define MANUAL_MAX (1024ULL * 1024ULL)
 
 static bool exists(const char *path) {
     struct stat info;
@@ -165,6 +166,52 @@ static char *backup_path(const char *root, json_object *entry) {
     return path;
 }
 
+/* The manual is the sole non-executable source. Its fixed current path stays
+ * in metadata, while publication copies bounded bytes into the manual tree. */
+static bool manual_target(const char *root, const char *target) {
+    char *expected = tm_path(root, "tools/current/docs/man/termux-muscle.1");
+    bool matches = !strcmp(target, expected);
+    free(expected);
+    return matches;
+}
+
+static char *manual_target_validate(const char *root) {
+    char *tools = tm_path(root, "tools"), *current = tm_path(tools, "current");
+    tm_directory(tools, false);
+    struct stat info;
+    if (lstat(current, &info) || !S_ISLNK(info.st_mode) || info.st_uid != getuid())
+        tm_die("invalid_link_target", "The current tooling pointer is not an owned symlink.");
+    char id[128];
+    ssize_t length = readlink(current, id, sizeof id - 1);
+    if (length < 0 || (size_t)length >= sizeof id - 1)
+        tm_die("invalid_link_target", "The current tooling pointer is invalid.");
+    id[length] = 0;
+    if (!tm_release_valid(id))
+        tm_die("invalid_link_target", "The current tooling pointer must name an owned version.");
+    char *release = tm_path(tools, id), *docs = tm_path(release, "docs"),
+         *manuals = tm_path(docs, "man"), *page = tm_path(manuals, "termux-muscle.1");
+    tm_directory(release, false);
+    tm_directory(docs, false);
+    tm_directory(manuals, false);
+    tm_regular(page);
+    if (access(page, R_OK) || lstat(page, &info) || info.st_size <= 0 ||
+        (uintmax_t)info.st_size > MANUAL_MAX)
+        tm_die("invalid_link_target", "The installed manual is unreadable, empty or too large.");
+    free(manuals);
+    free(docs);
+    free(release);
+    free(current);
+    free(tools);
+    return page;
+}
+
+static json_object *installed_snapshot(json_object *entry) {
+    json_object *installed;
+    if (json_object_object_get_ex(entry, "installed", &installed))
+        return json_object_get(installed);
+    return symlink_snapshot(tm_json_string(entry, "target"));
+}
+
 static void entry_validate(const char *root, json_object *entry, const char *key) {
     const char *path = tm_json_string(entry, "path");
     const char *target = tm_json_string(entry, "target");
@@ -176,13 +223,25 @@ static void entry_validate(const char *root, json_object *entry, const char *key
         tm_die("invalid_state", "Command ownership key and path disagree.");
     split_path(target, &parent, &leaf);
     char *bin = tm_path(root, "bin");
-    if (strcmp(parent, bin) || !strcmp(path, target))
-        tm_die(
-            "invalid_link_target",
-            "Command target must be a distinct launcher directly inside the installation bin directory.");
+    if ((!manual_target(root, target) && strcmp(parent, bin)) || !strcmp(path, target))
+        tm_die("invalid_link_target",
+               "Link target must be an owned launcher or the exact installed manual path.");
     free(parent);
     free(leaf);
     free(bin);
+    json_object *installed;
+    if (json_object_object_get_ex(entry, "installed", &installed)) {
+        if (!manual_target(root, target) || !json_object_is_type(installed, json_type_object))
+            tm_die("invalid_state",
+                   "Only the exact manual source can own an installed file snapshot.");
+        snapshot_validate(installed);
+        if (strcmp(tm_json_string(installed, "kind"), "file") ||
+            json_object_get_int64(tm_json_field(installed, "mode", json_type_int)) != 0644 ||
+            json_object_get_int64(tm_json_field(installed, "size", json_type_int)) <= 0 ||
+            (uint64_t)json_object_get_int64(tm_json_field(installed, "size", json_type_int)) >
+                MANUAL_MAX)
+            tm_die("invalid_state", "Installed manual ownership snapshot is invalid.");
+    }
     json_object *original = tm_json_field(entry, "original", json_type_object);
     snapshot_validate(original);
     char *backup = backup_path(root, entry);
@@ -416,7 +475,7 @@ static const char *recover(const char *root) {
     json_object *after = tm_json_field(operation, "after", json_type_object);
     snapshot_validate(before);
     snapshot_validate(after);
-    json_object *expected_link = symlink_snapshot(tm_json_string(entry, "target"));
+    json_object *expected_link = installed_snapshot(entry);
     if ((!strcmp(action, "install") && !json_object_equal(after, expected_link)) ||
         (!strcmp(action, "restore") &&
          (!json_object_equal(before, expected_link) ||
@@ -429,12 +488,11 @@ static const char *recover(const char *root) {
     json_object *entries = tm_json_field(index, "entries", json_type_object);
     const char *result;
     if (json_object_equal(current, after)) {
+        sync_restoration(path, after);
         if (!strcmp(action, "install"))
             json_object_object_add(entries, path, json_object_get(entry));
-        else {
-            sync_restoration(path, after);
+        else
             json_object_object_del(entries, path);
-        }
         char *index_path = tm_path(root, "links.json");
         tm_json_write(index_path, index);
         free(index_path);
@@ -531,7 +589,9 @@ static void replace_entry(const char *root, json_object *operation) {
             tm_die("link_replace_failed", "Cannot stage the command symlink.");
         record_staging(root, operation, directory, temporary);
     } else if (!strcmp(type, "file")) {
-        char *backup = backup_path(root, entry);
+        bool manual_install = !strcmp(tm_json_string(operation, "action"), "install") &&
+                              manual_target(root, tm_json_string(entry, "target"));
+        char *backup = manual_install ? manual_target_validate(root) : backup_path(root, entry);
         if (!backup)
             tm_die("backup_invalid", "Original command backup is unavailable.");
         tm_regular(backup);
@@ -541,7 +601,7 @@ static void replace_entry(const char *root, json_object *operation) {
             tm_die(
                 "backup_invalid",
                 "Original command backup failed integrity validation; the current entry was preserved.");
-        int source = open(backup, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+        int source = open(backup, O_RDONLY | O_NONBLOCK | O_NOFOLLOW | O_CLOEXEC);
         int destination = openat(directory, temporary,
                                  O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
         if (source < 0 || destination < 0)
@@ -607,33 +667,63 @@ static void transaction(const char *root, const char *action, json_object *entry
 }
 
 static const char *install_link(const char *root, const char *path_arg, const char *target_arg,
-                                bool replace) {
+                                bool replace, bool preserve_foreign) {
     recover(root);
     char *path = command_path(path_arg);
-    char *target = command_path(target_arg);
+    char *target =
+        manual_target(root, target_arg) ? tm_strdup(target_arg) : command_path(target_arg);
     char *bin = tm_path(root, "bin");
     tm_directory(bin, false);
     char *parent, *leaf;
     split_path(target, &parent, &leaf);
-    if (strcmp(parent, bin) || !strcmp(path, target))
-        tm_die(
-            "invalid_link_target",
-            "Command target must be a distinct launcher directly inside the installation bin directory.");
-    tm_regular(target);
-    if (access(target, X_OK))
-        tm_die("invalid_link_target", "The installed launcher is not executable.");
+    if ((!manual_target(root, target) && strcmp(parent, bin)) || !strcmp(path, target))
+        tm_die("invalid_link_target",
+               "Link target must be an owned launcher or the exact installed manual path.");
+    bool manual = manual_target(root, target);
+    if (preserve_foreign && !manual)
+        tm_die("invalid_link_target",
+               "install-manual accepts only the exact installed manual source.");
+    char *manual_source = NULL;
+    if (manual)
+        manual_source = manual_target_validate(root);
+    else {
+        tm_regular(target);
+        if (access(target, X_OK))
+            tm_die("invalid_link_target", "The installed launcher is not executable.");
+    }
     free(bin);
     free(parent);
     free(leaf);
-    json_object *before = snapshot(path), *after = symlink_snapshot(target),
+    json_object *before = snapshot(path),
+                *after = manual ? snapshot(manual_source) : symlink_snapshot(target),
                 *index = index_read(root);
+    free(manual_source);
+    if (manual) {
+        if (strcmp(tm_json_string(after, "kind"), "file"))
+            tm_die("invalid_link_target", "The manual source changed during preparation.");
+        json_object_object_add(after, "mode", json_object_new_int64(0644));
+    }
     const char *type = tm_json_string(before, "kind");
-    if (!strcmp(type, "other") || !strcmp(type, "unavailable"))
+    if (!strcmp(type, "other") || !strcmp(type, "unavailable")) {
+        if (preserve_foreign) {
+            json_object_put(before);
+            json_object_put(after);
+            json_object_put(index);
+            free(path);
+            free(target);
+            return "foreign_preserved";
+        }
         tm_die("link_conflict",
                "Existing command is not a replaceable file or symlink; it was preserved.");
+    }
     json_object *entries = tm_json_field(index, "entries", json_type_object), *previous = NULL;
     json_object_object_get_ex(entries, path, &previous);
-    if (previous && json_object_equal(before, after) &&
+    json_object *previous_installed = previous ? installed_snapshot(previous) : NULL;
+    bool previous_owned = previous && !strcmp(tm_json_string(previous, "target"), target) &&
+                          json_object_equal(before, previous_installed);
+    if (previous_installed)
+        json_object_put(previous_installed);
+    if (previous_owned && json_object_equal(before, after) &&
         !strcmp(tm_json_string(previous, "target"), target)) {
         json_object_put(before);
         json_object_put(after);
@@ -642,12 +732,22 @@ static const char *install_link(const char *root, const char *path_arg, const ch
         free(target);
         return "unchanged";
     }
-    if (strcmp(type, "missing") && !json_object_equal(before, after) && !replace)
+    if (strcmp(type, "missing") && !replace &&
+        (manual ? !previous_owned : !json_object_equal(before, after))) {
+        if (preserve_foreign) {
+            json_object_put(before);
+            json_object_put(after);
+            json_object_put(index);
+            free(path);
+            free(target);
+            return "foreign_preserved";
+        }
         tm_die(
             "link_conflict",
-            "Another command already exists. Use --replace explicitly to preserve and replace it.");
+            "Another entry already exists. Use --replace explicitly to preserve and replace it.");
+    }
     json_object *entry;
-    if (previous && !strcmp(type, "missing")) {
+    if (previous && (!strcmp(type, "missing") || (manual && previous_owned))) {
         if (strcmp(tm_json_string(previous, "target"), target))
             tm_die(
                 "link_conflict",
@@ -662,6 +762,8 @@ static const char *install_link(const char *root, const char *path_arg, const ch
         json_object_object_add(entry, "backup", backup ? json_object_new_string(backup) : NULL);
         free(backup);
     }
+    if (manual)
+        json_object_object_add(entry, "installed", json_object_get(after));
     transaction(root, "install", entry, before, after);
     json_object_put(entry);
     json_object_put(before);
@@ -679,8 +781,7 @@ static const char *restore_link(const char *root, const char *path) {
         json_object_put(index);
         return "not_owned";
     }
-    json_object *before = snapshot(path),
-                *expected = symlink_snapshot(tm_json_string(entry, "target"));
+    json_object *before = snapshot(path), *expected = installed_snapshot(entry);
     if (!json_object_equal(before, expected)) {
         json_object_put(before);
         json_object_put(expected);
@@ -696,7 +797,9 @@ static const char *restore_link(const char *root, const char *path) {
 
 int tm_links_main(int argc, char **argv) {
     if (argc < 3)
-        tm_die("usage", "links ROOT install|restore|restore-all|status|recover");
+        tm_die(
+            "usage",
+            "links ROOT install|install-manual|manual-status|restore|restore-all|status|recover");
     char *root = tm_store_root(argv[1]);
     const char *command = argv[2];
     if (!strcmp(command, "status") && argc == 3) {
@@ -704,8 +807,7 @@ int tm_links_main(int argc, char **argv) {
                     *entries = tm_json_field(index, "entries", json_type_object);
         json_object *result = json_object_new_array();
         json_object_object_foreach(entries, path, entry) {
-            json_object *current = snapshot(path),
-                        *expected = symlink_snapshot(tm_json_string(entry, "target"));
+            json_object *current = snapshot(path), *expected = installed_snapshot(entry);
             json_object *row = json_object_new_object();
             json_object_object_add(row, "path", json_object_new_string(path));
             json_object_object_add(row, "owned",
@@ -717,12 +819,29 @@ int tm_links_main(int argc, char **argv) {
         tm_json_print(result);
         json_object_put(result);
         json_object_put(index);
+    } else if (!strcmp(command, "manual-status") && argc == 4) {
+        char *path = command_path(argv[3]);
+        json_object *index = index_read(root),
+                    *entries = tm_json_field(index, "entries", json_type_object), *entry = NULL;
+        const char *result = "not_owned";
+        if (json_object_object_get_ex(entries, path, &entry) &&
+            manual_target(root, tm_json_string(entry, "target"))) {
+            json_object *current = snapshot(path), *expected = installed_snapshot(entry);
+            result = json_object_equal(current, expected) ? "owned" : "changed";
+            json_object_put(current);
+            json_object_put(expected);
+        }
+        puts(result);
+        json_object_put(index);
+        free(path);
     } else {
         tm_store_require_lock(root);
         if (!strcmp(command, "install") && (argc == 5 || argc == 6)) {
             if (argc == 6 && strcmp(argv[5], "--replace"))
                 tm_die("usage", "Unknown link installation option.");
-            puts(install_link(root, argv[3], argv[4], argc == 6));
+            puts(install_link(root, argv[3], argv[4], argc == 6, false));
+        } else if (!strcmp(command, "install-manual") && argc == 5) {
+            puts(install_link(root, argv[3], argv[4], false, true));
         } else if (!strcmp(command, "restore") && argc == 4) {
             recover(root);
             char *path = command_path(argv[3]);

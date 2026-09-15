@@ -389,7 +389,7 @@ static json_object *environment(const char *prefix) {
     const char *names[] = {"bash",       "coreutils", "curl", "ca-certificates", "proot",
                            "ripgrep",    "clang",     "make", "pkg-config",      "json-c",
                            "libarchive", "openssl",   "zlib", "termux-tools",    "termux-exec",
-                           "diffutils",  "tar",       "gzip"};
+                           "diffutils",  "tar",       "gzip", "mandoc"};
     char *dpkg = tm_path(prefix, "bin/dpkg-query");
     for (size_t i = 0; i < sizeof names / sizeof *names; i++) {
         char *args[] = {dpkg, "-W", "-f=${Version}", "--", (char *)names[i], NULL};

@@ -18,6 +18,8 @@ rejects() {
 }
 prefix=$scratch/prefix
 mkdir -p -- "$prefix/bin" "$prefix/tmp" "$scratch/stage/bin" "$scratch/stage/libexec"
+mkdir -p -- "$scratch/stage/docs/man"
+printf '.TH TERMUX-MUSCLE 1\n.SH NAME\ntermux-muscle \\- fixture manual\n' > "$scratch/stage/docs/man/termux-muscle.1"
 ln -s -- "$(command -v bash)" "$prefix/bin/bash"
 stage=$scratch/stage
 cp -- "$core" "$stage/libexec/tm-core"
@@ -250,7 +252,10 @@ pass 'deletion recovery rejects even matching inode records outside owned payloa
 # Exercise the shell hooks with real C ownership and mocked network/build tools.
 mkdir -p "$scratch/mocks" "$scratch/source/build" "$scratch/hook-home/.local/bin" "$scratch/remote"
 cp "$core" "$scratch/source/build/tm-core"
-printf '0.1.0\n' > "$scratch/source/VERSION"
+bootstrap_version=$(cat "$repo/VERSION")
+printf '%s\n' "$bootstrap_version" > "$scratch/source/VERSION"
+cp -R "$stage" "$scratch/bootstrap-stage"
+printf '%s\n' "$bootstrap_version" > "$scratch/bootstrap-stage/VERSION"
 printf '#!%s\n' "$(command -v bash)" > "$scratch/mocks/make"
 cat >> "$scratch/mocks/make" <<'SH'
 set -euo pipefail
@@ -269,39 +274,129 @@ while (($#)); do
     case $1 in --output) output=$2; shift 2 ;; *) url=$1; shift ;; esac
 done
 case $url in
-    */releases/latest) printf '{"tag_name":"v0.1.0"}\n' > "$output" ;;
+    */releases/latest) printf '{"tag_name":"v0.2.0"}\n' > "$output" ;;
     */SHA256SUMS) cp "$TM_TEST_REMOTE/SHA256SUMS" "$output" ;;
     */install.sh) cp "$TM_TEST_REMOTE/install.sh" "$output" ;;
     *) exit 83 ;;
 esac
 SH
+printf '#!%s\n' "$(command -v bash)" > "$scratch/mocks/makewhatis"
+cat >> "$scratch/mocks/makewhatis" <<'SH'
+set -euo pipefail
+[[ $# == 3 && ( $1 == -d || $1 == -u ) && $2 == "$TM_PREFIX/share/man" &&
+   $3 == man1/termux-muscle.1 && -f $2/$3 && ! -L $2/$3 ]] || exit 84
+printf '%s\n' "$1" >> "$TM_TEST_REMOTE/index-calls"
+[[ ${TM_TEST_INDEX_FAIL:-0} != 1 ]]
+SH
 chmod 700 "$scratch/mocks/"*
 cat > "$scratch/hook.sh" <<'SH'
 set -euo pipefail
 tm_error() { printf 'termux-muscle: %s: %s\n' "$1" "$2" >&2; exit 1; }
-tm_install_release() { printf 'runtime-installed\n' >> "$TM_TEST_REMOTE/runtime"; }
+tm_install_release() {
+    [[ ${TM_TEST_RUNTIME_FAIL:-0} != 1 ]] || return 47
+    printf 'runtime-installed\n' >> "$TM_TEST_REMOTE/runtime"
+}
+source "$TM_TEST_COMMANDS"
 source "$TM_TEST_LIB"
+[[ -z ${TM_TEST_STALE_CLAUDE:-} ]] || hash -p "$TM_TEST_STALE_CLAUDE" claude
 operation=$1; shift
 "tm_$operation" "$@"
 SH
-export TM_TEST_LIB=$repo/lib/tooling.sh TM_TEST_STAGE=$stage TM_TEST_REMOTE=$scratch/remote
-export TM_SOURCE=$scratch/source TM_CORE=$core TM_PROJECT_VERSION=0.1.0 TM_PREFIX=$prefix
+export TM_TEST_LIB=$repo/lib/tooling.sh TM_TEST_STAGE=$scratch/bootstrap-stage TM_TEST_REMOTE=$scratch/remote
+export TM_TEST_COMMANDS=$repo/lib/commands.sh
+export TM_SOURCE=$scratch/source TM_CORE=$core TM_PROJECT_VERSION=$bootstrap_version TM_PREFIX=$prefix
 new_case shell-bootstrap
 export TM_ROOT=$root
 hook_home=$scratch/hook-home
+shadow=$scratch/shadow-bin
+mkdir -p "$shadow"
+printf '#!%s\nprintf legacy-shadow\n' "$(command -v bash)" > "$shadow/claude"
+chmod 751 "$shadow/claude"
+printf legacy-home > "$hook_home/.local/bin/claude"
+chmod 700 "$hook_home/.local/bin/claude"
+ln -s "$shadow/claude" "$prefix/bin/claude"
+hook_path=$shadow:$prefix/bin:$scratch/mocks:$PATH
+[[ $(PATH="$hook_path" type -P claude) == "$shadow/claude" ]] || fail 'bootstrap fixture would discover a live host command'
 printf original-manager > "$hook_home/.local/bin/termux-muscle"
 # Model the real prefix fallback even when native Termux exports TMPDIR.
-HOME=$hook_home PATH=$scratch/mocks:$PATH env -u TMPDIR "$core" with-lock "$root" existing -- bash "$scratch/hook.sh" \
+HOME=$hook_home PATH=$hook_path env -u TMPDIR "$core" with-lock "$root" existing -- bash "$scratch/hook.sh" \
     bootstrap --source-dir "$TM_SOURCE" --build-dir "$TM_SOURCE/build" --no-install > "$scratch/hook-output"
 [[ $(cat "$hook_home/.local/bin/termux-muscle") == original-manager && ! -e $scratch/remote/runtime ]] || fail 'foreign manager/default no-install'
+[[ $(readlink "$prefix/bin/claude") == "$shadow/claude" && $(cat "$hook_home/.local/bin/claude") == legacy-home ]] || fail 'tool-only bootstrap changed Claude commands'
+manual=$prefix/share/man/man1/termux-muscle.1
+[[ -f $manual && ! -L $manual && $(stat -c %a "$manual") == 644 ]] || fail 'manual was not installed as a readable regular page'
+cmp "$manual" "$TM_TEST_STAGE/docs/man/termux-muscle.1" || fail 'manual content mismatch'
+[[ $(cat "$scratch/remote/index-calls") == -d && $(readlink "$prefix/bin/termux-muscle") == "$root/bin/termux-muscle" ]] || fail 'manual indexing or prefix manager command missing'
 rm "$hook_home/.local/bin/termux-muscle"
-HOME=$hook_home PATH=$scratch/mocks:$PATH env -u TMPDIR "$core" with-lock "$root" existing -- bash "$scratch/hook.sh" \
-    bootstrap --source-dir "$TM_SOURCE" --build-dir "$TM_SOURCE/build" --link > "$scratch/hook-output"
+HOME=$hook_home PATH=$hook_path env -u TMPDIR "$core" with-lock "$root" existing -- bash "$scratch/hook.sh" \
+    bootstrap --source-dir "$TM_SOURCE" --build-dir "$TM_SOURCE/build" --no-link > "$scratch/hook-output"
+[[ $(readlink "$prefix/bin/claude") == "$shadow/claude" && $(cat "$hook_home/.local/bin/claude") == legacy-home && -s $scratch/remote/runtime ]] || fail 'no-link did not preserve Claude commands'
+pass 'tool-only and no-link bootstrap preserve Claude commands while installing the manual'
+
+rejects_fixture_bootstrap() {
+    if HOME=$hook_home PATH=$hook_path env -u TMPDIR "$core" with-lock "$root" existing -- bash "$scratch/hook.sh" \
+        bootstrap --source-dir "$TM_SOURCE" --build-dir "$TM_SOURCE/build" > "$scratch/hook-output" 2> "$scratch/error"; then
+        fail 'expected bootstrap failure succeeded'
+    fi
+}
+export TM_TEST_RUNTIME_FAIL=1
+rejects_fixture_bootstrap
+unset TM_TEST_RUNTIME_FAIL
+[[ $(readlink "$prefix/bin/claude") == "$shadow/claude" && $(cat "$hook_home/.local/bin/claude") == legacy-home ]] || fail 'failed runtime changed Claude commands'
+pass 'runtime installation failure leaves default Claude entries unchanged'
+
+printf '#!%s\nprintf stale-unrelated\n' "$(command -v bash)" > "$scratch/stale-claude"
+chmod 700 "$scratch/stale-claude"
+export TM_TEST_STALE_CLAUDE=$scratch/stale-claude
+mv "$hook_home/.local/bin/claude" "$scratch/home-original"
+mkdir "$hook_home/.local/bin/claude"
+rejects_fixture_bootstrap
+[[ -d $hook_home/.local/bin/claude && $(readlink "$shadow/claude") == "$root/bin/claude" && $(readlink "$prefix/bin/claude") == "$root/bin/claude" ]] || fail 'later link failure did not preserve the conflicting entry and earlier journals'
+grep -q 'command setup is incomplete' "$scratch/error" || fail 'partial command setup failure lacked recovery guidance'
+rmdir "$hook_home/.local/bin/claude"
+mv "$scratch/home-original" "$hook_home/.local/bin/claude"
+HOME=$hook_home PATH=$hook_path env -u TMPDIR "$core" with-lock "$root" existing -- bash "$scratch/hook.sh" \
+    bootstrap --source-dir "$TM_SOURCE" --build-dir "$TM_SOURCE/build" > "$scratch/hook-output"
 [[ $(readlink "$hook_home/.local/bin/termux-muscle") == "$root/bin/termux-muscle" &&
-   $(readlink "$prefix/bin/claude") == "$root/bin/claude" && -s $scratch/remote/runtime ]] || fail 'shell bootstrap ownership/install/link'
-pass 'shell bootstrap stages locally, preserves foreign commands, registers owned entries and honors no-install'
+   $(readlink "$prefix/bin/claude") == "$root/bin/claude" && $(readlink "$shadow/claude") == "$root/bin/claude" &&
+   $(readlink "$hook_home/.local/bin/claude") == "$root/bin/claude" && -s $scratch/remote/runtime ]] || fail 'shell bootstrap ownership/install/default links'
+grep -q 'Command ownership record:' "$scratch/hook-output" || fail 'default takeover record not explained'
+pass 'default bootstrap owns the PATH winner and standard entries; partial failure can be retried without losing original backups'
+[[ ! -L $scratch/stale-claude && $("$scratch/stale-claude") == stale-unrelated ]] || fail 'stale hash replaced unrelated command'
+unset TM_TEST_STALE_CLAUDE
+pass 'default takeover clears a stale child-shell command hash before selecting the executable PATH winner'
 prefix_scratch=("$prefix/tmp/"*)
 [[ ${#prefix_scratch[@]} == 0 ]] || fail 'bootstrap fallback temporary directory not cleaned'
+
+printf '.SH UPDATED\nNew manual revision.\n' >> "$TM_TEST_STAGE/docs/man/termux-muscle.1"
+HOME=$hook_home PATH=$hook_path "$core" with-lock "$root" existing -- bash "$scratch/hook.sh" bootstrap \
+    --source-dir "$TM_SOURCE" --build-dir "$TM_SOURCE/build" --no-install > "$scratch/hook-output"
+cmp "$manual" "$TM_TEST_STAGE/docs/man/termux-muscle.1" || fail 'owned manual did not refresh'
+pass 'tool-only upgrade refreshes the owned regular manual and its index'
+
+cp "$manual" "$scratch/owned-manual"
+printf 'foreign manual replacement\n' > "$manual"
+before_index=$(wc -l < "$scratch/remote/index-calls")
+HOME=$hook_home PATH=$hook_path "$core" with-lock "$root" existing -- bash "$scratch/hook.sh" bootstrap \
+    --source-dir "$TM_SOURCE" --build-dir "$TM_SOURCE/build" --no-install > "$scratch/hook-output" 2> "$scratch/error"
+[[ $(cat "$manual") == 'foreign manual replacement' && $(wc -l < "$scratch/remote/index-calls") == "$before_index" ]] || fail 'foreign manual or index changed'
+grep -q 'Existing manual preserved' "$scratch/error" || fail 'foreign manual preservation not explained'
+cp "$scratch/owned-manual" "$manual"
+pass 'upgrade preserves a later foreign manual and its index with direct-page guidance'
+
+TM_TEST_INDEX_FAIL=1 HOME=$hook_home PATH=$hook_path "$core" with-lock "$root" existing -- bash "$scratch/hook.sh" bootstrap \
+    --source-dir "$TM_SOURCE" --build-dir "$TM_SOURCE/build" --no-install > "$scratch/hook-output" 2> "$scratch/error"
+grep -q 'Manual index update failed' "$scratch/error" || fail 'index failure not explained'
+[[ -f $manual ]] || fail 'index failure lost the readable page'
+pass 'index failure leaves the installed page usable and explains how to refresh it'
+
+current_tool=$(readlink "$root/tools/current")
+"$core" tooling "$root" run "$current_tool" -- hold "$scratch/ready" & holder=$!
+wait_holder
+rejects busy env HOME="$hook_home" PATH="$hook_path" "$core" with-lock "$root" existing -- bash "$scratch/hook.sh" uninstall
+[[ $(tail -2 "$scratch/remote/index-calls") == $'-u\n-d' && -f $manual ]] || fail 'refused uninstall did not restore manual index'
+stop_holder
+pass 'busy uninstall restores the manual index and leaves the installation intact'
 
 cat > "$scratch/remote/install.sh" <<'SH'
 printf '%s\0' "$@" > "$TM_TEST_REMOTE/executed"
@@ -309,22 +404,26 @@ SH
 (cd "$scratch/remote" && sha256sum install.sh > SHA256SUMS)
 cp "$root/state.json" "$scratch/runtime-before-self-update.json"
 PATH=$scratch/mocks:$PATH env -u TMPDIR bash "$scratch/hook.sh" self_update > "$scratch/hook-output"
-printf '%s\0' --version 0.1.0 --root "$root" --prefix "$prefix" --no-install > "$scratch/expected"
+printf '%s\0' --version 0.2.0 --root "$root" --prefix "$prefix" --no-install > "$scratch/expected"
 cmp "$scratch/remote/executed" "$scratch/expected" || fail 'self-update immutable source forwarding'
 cmp "$root/state.json" "$scratch/runtime-before-self-update.json" || fail 'self-update changed runtime state'
 prefix_scratch=("$prefix/tmp/"*)
 [[ ${#prefix_scratch[@]} == 0 ]] || fail 'self-update fallback temporary directory not cleaned'
 rm "$scratch/remote/executed"
 printf corrupt >> "$scratch/remote/install.sh"
-rejects checksum_failed env PATH="$scratch/mocks:$PATH" bash "$scratch/hook.sh" self_update --version 0.1.0
+rejects checksum_failed env PATH="$scratch/mocks:$PATH" bash "$scratch/hook.sh" self_update --version 0.2.0
 [[ ! -e $scratch/remote/executed ]] || fail 'unverified self-update code executed'
 pass 'self-update resolves an exact tag, verifies installer checksums, cleans the TMPDIR-unset fallback and rejects corruption before execution'
 
 before_calls=$(wc -l < "$scratch/remote/calls")
 rejects invalid_version env PATH="$scratch/mocks:$PATH" bash "$scratch/hook.sh" self_update --version '../../escape'
+rejects incompatible_tooling env PATH="$scratch/mocks:$PATH" bash "$scratch/hook.sh" self_update --version 0.1.0
 [[ $(wc -l < "$scratch/remote/calls") == "$before_calls" ]] || fail 'invalid update version reached network'
-tooling uninstall >/dev/null
-[[ ! -e $root && ! -e $hook_home/.local/bin/termux-muscle && ! -e $prefix/bin/claude ]] || fail 'shell links not cleaned'
+HOME=$hook_home PATH=$hook_path "$core" with-lock "$root" existing -- bash "$scratch/hook.sh" uninstall >/dev/null
+[[ $(tail -1 "$scratch/remote/index-calls") == -u ]] || fail 'uninstall did not remove the owned manual index while page existed'
+[[ ! -e $root && ! -e $hook_home/.local/bin/termux-muscle && ! -e $prefix/bin/termux-muscle && ! -e $manual &&
+   $(readlink "$prefix/bin/claude") == "$shadow/claude" && $(cat "$hook_home/.local/bin/claude") == legacy-home &&
+   $(stat -c %a "$shadow/claude") == 751 && $("$shadow/claude") == legacy-shadow ]] || fail 'default commands were not restored or the manual was not removed'
 pass 'invalid self-update selectors are rejected before network; shell-created entries uninstall cleanly'
 
 shared_shell=''

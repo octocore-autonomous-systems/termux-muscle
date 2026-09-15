@@ -1,0 +1,213 @@
+{
+  "schema": 1,
+  "generated_at": "2026-09-15T03:53:49Z",
+  "project": {
+    "name": "Termux Muscle",
+    "version": "0.2.0"
+  },
+  "claude_code": {
+    "version": "2.1.270",
+    "musl_version": "1.2.6-r2"
+  },
+  "environment": {
+    "manufacturer": "samsung",
+    "model": "SM-S948U",
+    "android_version": "16",
+    "android_api": 36,
+    "abi": "arm64-v8a",
+    "device_name": "Samsung Galaxy S26 Ultra",
+    "kernel": "6.12.30-android16-5-pd30ff70-abogkiS948USQS4AZHL-4k",
+    "page_size": 4096,
+    "termux_version": "0.118.3",
+    "termux_source": "GITHUB",
+    "packages": {
+      "bash": "5.3.15",
+      "coreutils": "9.11-1",
+      "curl": "8.22.0",
+      "ca-certificates": "1:2026.08.13",
+      "proot": "5.1.107.92",
+      "ripgrep": "15.2.0",
+      "clang": "21.1.8-3",
+      "make": "4.4.1-1",
+      "pkg-config": "0.29.2-3",
+      "json-c": "0.19",
+      "libarchive": "3.8.9",
+      "openssl": "1:3.6.3",
+      "zlib": "1.3.2",
+      "termux-tools": "1.46.0+really1.45.0-1",
+      "termux-exec": "1:2.5.0-1",
+      "diffutils": "3.12-2",
+      "tar": "1.35-3",
+      "gzip": "1.14-1",
+      "mandoc": "1.14.6-7"
+    },
+    "android_security_patch": "2026-08-05"
+  },
+  "provenance": "maintainer",
+  "checks": [
+    {
+      "id": "dns_configuration",
+      "status": "PASS",
+      "detail_code": "nameserver_configured"
+    },
+    {
+      "id": "command_links",
+      "status": "PASS",
+      "detail_code": "managed_commands_owned"
+    },
+    {
+      "id": "runtime_integrity",
+      "status": "PASS",
+      "detail_code": "receipt_hashes_match"
+    },
+    {
+      "id": "startup_version",
+      "status": "PASS",
+      "detail_code": "local_probe_passed"
+    },
+    {
+      "id": "startup_help",
+      "status": "PASS",
+      "detail_code": "local_probe_passed"
+    },
+    {
+      "id": "namespace_shell",
+      "status": "PASS",
+      "detail_code": "local_probe_passed"
+    },
+    {
+      "id": "install",
+      "status": "PASS",
+      "detail_code": "local_source_bootstrap_with_private_commands"
+    },
+    {
+      "id": "update",
+      "status": "PASS",
+      "detail_code": "offline_distinct_candidate_activated"
+    },
+    {
+      "id": "rollback",
+      "status": "PASS",
+      "detail_code": "previous_release_restored_offline"
+    },
+    {
+      "id": "uninstall",
+      "status": "PASS",
+      "detail_code": "owned_root_removed_original_commands_restored"
+    },
+    {
+      "id": "shell_tools",
+      "status": "PASS",
+      "detail_code": "authenticated_fixture_observed"
+    },
+    {
+      "id": "interactive",
+      "status": "SKIP",
+      "detail_code": "requires_manual_test"
+    },
+    {
+      "id": "background",
+      "status": "SKIP",
+      "detail_code": "requires_manual_test"
+    },
+    {
+      "id": "screen_off",
+      "status": "SKIP",
+      "detail_code": "requires_manual_test"
+    },
+    {
+      "id": "default_command_takeover",
+      "status": "PASS",
+      "detail_code": "path_winner_prefix_home_entries_owned"
+    },
+    {
+      "id": "native_shell",
+      "status": "PASS",
+      "detail_code": "authenticated_fixture_observed"
+    },
+    {
+      "id": "portable_shebang",
+      "status": "PASS",
+      "detail_code": "authenticated_fixture_observed"
+    },
+    {
+      "id": "ripgrep",
+      "status": "PASS",
+      "detail_code": "authenticated_fixture_observed"
+    },
+    {
+      "id": "manual",
+      "status": "PASS",
+      "detail_code": "indexed_regular_page_rendered_by_name"
+    },
+    {
+      "id": "manual_refresh",
+      "status": "PASS",
+      "detail_code": "tool_only_bootstrap_preserved_runtime"
+    },
+    {
+      "id": "manual_removal",
+      "status": "PASS",
+      "detail_code": "owned_page_index_removed_neighbor_preserved"
+    },
+    {
+      "id": "failed_update",
+      "status": "PASS",
+      "detail_code": "corrupt_cache_preserved_active_state"
+    },
+    {
+      "id": "repair",
+      "status": "PASS",
+      "detail_code": "corrupt_payload_rejected_then_repaired_offline"
+    },
+    {
+      "id": "public_installer",
+      "status": "SKIP",
+      "detail_code": "local_source_bootstrap_only"
+    },
+    {
+      "id": "nested_launcher",
+      "status": "PASS",
+      "detail_code": "authenticated_fixture_observed"
+    }
+  ],
+  "models": [
+    {
+      "requested": "claude-sonnet-5",
+      "status": "PASS",
+      "detail_code": "exact_model_verified",
+      "observed": [
+        "claude-sonnet-5"
+      ]
+    }
+  ],
+  "evidence_notes": "galaxy-s26-ultra-0.2.0-20260915.md",
+  "lifecycle_acceptance": {
+    "scope": "isolated_native_source_bootstrap_with_private_prefix_and_path",
+    "started_at": "2026-09-15T03:44:03Z",
+    "completed_at": "2026-09-15T03:44:22Z",
+    "local_report_generated_at": "2026-09-15T03:44:19Z",
+    "model_requests": false,
+    "live_host_links_changed": false,
+    "public_release_delivery": "not_exercised"
+  },
+  "authenticated_workflow": {
+    "generated_at": "2026-09-15T03:51:30Z",
+    "model_requests": true,
+    "live_host_links_changed": false,
+    "exact_fixture_tool_uses": 1,
+    "matching_successful_tool_results": 1,
+    "final_success": true,
+    "fixture_attestation_matches": true,
+    "helper_sha256": "c754ae0f073df5d79166974efc66d619e61bc46def1a021bb3e9ff27329492c3",
+    "capture": {
+      "exit_code": 0,
+      "timeout": false,
+      "output_limit": false,
+      "elapsed_ms": 4849,
+      "bytes": 5043
+    },
+    "maximum_turns": 2,
+    "maximum_budget_usd": 0.50
+  }
+}

@@ -22,7 +22,7 @@ source_root=$(CDPATH='' cd -- "$source_root" && pwd)
 version=$(cat "$source_root/VERSION")
 [[ "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]] || fail 'VERSION must be a semantic version'
 [[ $(awk -F'"' '/^VERSION="[^"]+"$/ {print $2}' "$source_root/install.sh") == "$version" ]] || fail 'installer VERSION does not match VERSION'
-for file in Makefile LICENSE CREDITS.md compatibility.json bin/termux-muscle; do
+for file in Makefile LICENSE CREDITS.md compatibility.json bin/termux-muscle docs/man/termux-muscle.1; do
     [[ -s "$source_root/$file" && ! -L "$source_root/$file" ]] || fail "missing regular source: $file"
 done
 make -C "$source_root" all >&2
@@ -63,7 +63,7 @@ while IFS= read -r file; do
         .githooks/*) fail "unexpected contributor hook: $file";;
     esac
     case "$file" in
-        *.c|*.h|*.sh|*.md|*.yml|*.yaml|*.json|Makefile|VERSION|LICENSE|.gitignore|.clang-format|.githooks/pre-commit|bin/termux-muscle) ;;
+        *.c|*.h|*.sh|*.md|*.yml|*.yaml|*.json|Makefile|VERSION|LICENSE|.gitignore|.clang-format|.githooks/pre-commit|docs/man/termux-muscle.1|docs/images/termux-muscle-hero.png|bin/termux-muscle) ;;
         *) fail "unexpected source file type (vendor/build artifacts are excluded): $file";;
     esac
     mkdir -p -- "$stage/$(dirname -- "$file")"

@@ -1,6 +1,6 @@
 # Architecture and boundaries
 
-Termux Muscle manages Claude Code on native Android Termux. Version 0.1.0 uses the official Linux ARM64 musl executable with the musl loader in one PRoot namespace. Bash sequences lifecycle commands, and a C helper handles parsing, integrity, owned filesystem state and execution. The helper is compiled on the target device. Vendor payloads are fetched separately with the URLs and digests in `compatibility.json`.
+Termux Muscle manages Claude Code on native Android Termux. Version 0.2.0 retains the official Linux ARM64 musl executable and musl loader used by 0.1.0, inside one PRoot namespace. Bash sequences lifecycle commands, and a C helper handles parsing, integrity, owned filesystem state and execution. The helper is compiled on the target device. Vendor payloads are fetched separately with the URLs and digests in `compatibility.json`. The [fresh 0.2.0 report](../compatibility/galaxy-s26-ultra-0.2.0-20260915.md) records native command/manual and runtime lifecycle acceptance plus a separate authenticated Sonnet tool workflow; older 0.1.0 model observations remain historical evidence.
 
 ## Why installation needs a manager
 
@@ -40,18 +40,36 @@ Management-tool updates are separate from runtime updates. The curl bootstrap fe
 
 Installed Bash entries invoke a stable C dispatcher. It selects and leases a versioned tool directory before starting Bash, so a concurrent self-update cannot remove the code a command is using. Tool publication and removal have recovery journals; current, previous and leased tool versions are retained. Self-update builds and tests the downloaded source before taking the publication lock. Changed entry points and unsupported metadata schemas are preserved with an error instead of being overwritten.
 
+The 0.2.0 self-update command rejects a requested management version below 0.2.0 before invoking its installer: 0.1.x tooling cannot read regular-manual ownership records. This is a guard in the new manager, not a universal minimum-reader enforcement mechanism. Directly executing a retained old installer bypasses it and is unsupported; an old bootstrap can partially publish old tooling before discovering an incompatible record. Recovery uses the newer verified installer, or the current manager's uninstall before intentionally installing an older manager. Claude runtime rollback is separate and remains available when a previous runtime exists.
+
 The C helper links installed json-c, libarchive and OpenSSL libraries. Local compilation adapts our helper to the target compiler, Bionic and Termux prefix. It does not compile Claude Code, supply a missing vendor ABI, or prove compatibility with a different Android kernel. Clang and the build tools add installation footprint; the installer does not remove a user's compiler or shared libraries afterward. Python is not required for installation, execution, builds or mandatory tests.
 
 Checksums detect mismatched or damaged downloads against the published metadata. Because that metadata is fetched from the same release source, it is not an independent signature or protection against a compromised maintainer account.
 
 ## User data and command ownership
 
-Claude Code retains control of its authentication and application data. The manager does not rewrite credentials, Claude settings, projects or shell startup files. It provides a namespaced command and links `claude` only on request. Explicitly replaced links/files have restoration information; uninstall must preserve an entry changed by somebody else after installation.
+Claude Code retains control of its authentication and application data. The manager does not rewrite credentials, Claude settings, projects or shell startup files. Ordinary use is `claude` and `claude auth login`; the manager's `run` command remains available for explicit roots, opt-out installations and diagnosis.
+
+Normal installation first validates and activates the runtime, then registers `$PREFIX/bin/claude`, `$HOME/.local/bin/claude` and the first existing executable `claude` found elsewhere on PATH. A replaced regular file's bytes and mode, or a symlink's literal target, are recorded before replacement. This covers a custom executable that shadows the prefix command. It does not rewrite parent-shell aliases/functions or invalidate that shell's command cache. The installer verifies executable PATH selection and reports affected entries.
+
+Each entry has its own recoverable transaction. Several command entries are not a single atomic filesystem operation: a later conflict can leave earlier entries managed. A reported partial failure therefore requires inspection and retry or owned uninstall, not deletion of restoration records. Subsequent runtime updates do not silently reclaim commands another program has changed.
+
+`--no-link` installs a runtime without changing Claude command entries. Bootstrap `--no-install` installs only the management tool and manual; it never redirects Claude to an installation without a runtime. Management convenience entries in `$PREFIX/bin` and `$HOME/.local/bin` preserve unrelated commands named `termux-muscle`; the full owned manager path remains available when a convenience entry conflicts.
+
+Uninstall restores an original command only while its managed replacement remains unchanged and owned. It preserves later foreign changes and retains their original backups and recovery explanation. Cleanup and uninstall never use command ownership as authority over Claude account data or Termux packages.
 
 A running client, a healthy installation and a working account are separate states. Network/authentication failures do not justify deleting a runtime, replacing a token or claiming that installation failed. Paid model probes are explicit and report the exact model observed.
+
+## One installed manual
+
+The installer obtains Termux's `mandoc` package, which supplies `man`, and installs one manual page at `$PREFIX/share/man/man1/termux-muscle.1`. This is a copied regular file with an ownership snapshot, rather than a symlink into a versioned tool directory. The regular file is discoverable by Termux's manual index. Publication, refresh and removal use targeted index operations for this page.
+
+Self-update refreshes a manual only while its contents and permissions match its recorded owned state. An unrelated pre-existing manual or a later foreign replacement is preserved, and the versioned manual can still be read by its full pathname. The same ownership rules govern removal and eligible restoration. The installer does not rewrite MANPATH or shell startup files, and uninstall leaves `mandoc` and other shared Termux dependencies installed.
 
 ## Scope of support
 
 The compatibility matrix is evidence for named configurations and checks. ARM64 is required by this backend. Android release, kernel, page size, Termux build and vendor restrictions can all affect behavior. Hardware identity provides context; it is not a substitute for these software details.
 
 MCP transports, hooks, terminal behavior, cross-session messaging, Android background-process limits and authenticated tool execution require their own evidence. A successful `--version` proves only that startup path. We add support claims when reproducible tests establish them and keep FAIL and SKIP visible.
+
+`versions` inspects retained runtime releases and `rollback` selects the previous validated one. Arbitrary installed-version selection, persistent kept versions and an upstream version catalog are not implemented by this change.

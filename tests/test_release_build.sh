@@ -6,13 +6,17 @@ project=$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 work=$(mktemp -d "${TMPDIR:-/tmp}/muscle-release-test.XXXXXXXX")
 trap 'rm -rf -- "$work"' EXIT
 source="$work/source"
+fixture_version=$(cat "$project/VERSION")
 mkdir -p "$source/src" "$source/bin" "$source/lib" "$source/tests" "$source/scripts" "$source/docs"
-mkdir -p "$source/.githooks"
+mkdir -p "$source/.githooks" "$source/docs/man" "$source/docs/images"
+# A tiny fixed PNG tests byte preservation, without decoding or editing artwork.
+printf '%s' 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a1XkAAAAASUVORK5CYII=' | base64 --decode > "$source/docs/images/termux-muscle-hero.png"
+printf '.TH TERMUX-MUSCLE 1\n.SH NAME\ntermux-muscle \- fixture manual\n' > "$source/docs/man/termux-muscle.1"
 printf 'BasedOnStyle: LLVM\n' > "$source/.clang-format"
 printf '#!/bin/sh\nexit 0\n' > "$source/.githooks/pre-commit"
 cp "$project/install.sh" "$source/install.sh"
 cp "$project/compatibility.json" "$source/compatibility.json"
-printf '0.1.0\n' > "$source/VERSION"
+printf '%s\n' "$fixture_version" > "$source/VERSION"
 printf 'fixture license\n' > "$source/LICENSE"
 printf 'fixture credits\n' > "$source/CREDITS.md"
 printf 'fixture documentation\n' > "$source/README.md"
@@ -23,7 +27,7 @@ printf '#!%s\n' "$(command -v bash)" > "$source/tests/mock-core.sh"
 cat >> "$source/tests/mock-core.sh" <<'CORE'
 case "$1" in
     release-check) [[ -f "$2/compatibility/approved.json" ]] || { printf 'release evidence missing\n' >&2; exit 42; };;
-    release-notes) printf '# Termux Muscle 0.1.0\n\nClaude Code: 2.1.270. Fixture release notes.\n';;
+    release-notes) printf '# Termux Muscle %s\n\nClaude Code: 2.1.270. Fixture release notes.\n' "$(cat "$2/VERSION")";;
     *) exit 99;;
 esac
 CORE
@@ -44,12 +48,18 @@ run_build() {
 passed() { ((count += 1)); }
 run_build
 [[ $status == 0 ]] || fail 'development build failed'
-asset=termux-muscle-0.1.0.tar.gz
+asset="termux-muscle-$fixture_version.tar.gz"
 (cd "$work/dist" && sha256sum -c SHA256SUMS >/dev/null) || fail 'published hashes are invalid'
 grep -q 'Development build' "$work/dist/RELEASE_NOTES.md" || fail 'development build claimed verification'
 tar -tzf "$work/dist/$asset" > "$work/names"
 grep -q 'src/example.c' "$work/names" || fail 'source omitted'
 grep -q 'LICENSE' "$work/names" || fail 'license omitted'
+grep -q '/docs/man/termux-muscle.1$' "$work/names" || fail 'manual omitted'
+tar -xOzf "$work/dist/$asset" "termux-muscle-$fixture_version/docs/man/termux-muscle.1" > "$work/manual"
+cmp "$work/manual" "$source/docs/man/termux-muscle.1" || fail 'manual bytes changed'
+grep -q '/docs/images/termux-muscle-hero.png$' "$work/names" || fail 'approved hero image omitted'
+tar -xOzf "$work/dist/$asset" "termux-muscle-$fixture_version/docs/images/termux-muscle-hero.png" > "$work/hero.png"
+cmp "$work/hero.png" "$source/docs/images/termux-muscle-hero.png" || fail 'hero image bytes changed'
 grep -q '/.clang-format$' "$work/names" || fail 'formatter configuration omitted'
 grep -q '/.githooks/pre-commit$' "$work/names" || fail 'contributor hook omitted'
 tar -tvzf "$work/dist/$asset" > "$work/modes"
@@ -88,14 +98,14 @@ run_build --release
 if grep -q 'Development build' "$work/dist/RELEASE_NOTES.md"; then fail 'accepted release incorrectly marked development'; fi
 passed
 
-printf '0.2.0\n' > "$source/VERSION"
+printf '%s+fixture-mismatch\n' "${fixture_version%%+*}" > "$source/VERSION"
 run_build
 [[ $status != 0 ]] || fail 'installer/source version mismatch accepted'
 grep -q 'VERSION does not match' "$work/error" || fail 'wrong mismatch diagnostic'
-printf '0.1.0\n' > "$source/VERSION"
+printf '%s\n' "$fixture_version" > "$source/VERSION"
 passed
 
-for file in LICENSE CREDITS.md; do
+for file in LICENSE CREDITS.md docs/man/termux-muscle.1; do
     mv "$source/$file" "$work/saved"
     run_build
     [[ $status != 0 ]] || fail "missing $file accepted"
@@ -107,6 +117,22 @@ printf 'not a distributable vendor binary\n' > "$source/src/vendor.so"
 run_build
 [[ $status != 0 ]] || fail 'unexpected binary source accepted'
 rm "$source/src/vendor.so"
+passed
+
+for unexpected in "$source/docs/man/foreign.1" "$source/src/payload.1"; do
+    printf 'unexpected manual-shaped payload\n' > "$unexpected"
+    run_build
+    [[ $status != 0 ]] || fail 'non-allowlisted manual path accepted'
+    rm "$unexpected"
+done
+passed
+
+for unexpected in "$source/docs/images/foreign.png" "$source/src/termux-muscle-hero.png"; do
+    cp "$source/docs/images/termux-muscle-hero.png" "$unexpected"
+    run_build
+    [[ $status != 0 ]] || fail 'non-allowlisted PNG path accepted'
+    rm "$unexpected"
+done
 passed
 
 ln -s /etc/passwd "$source/src/secret.c"
@@ -134,9 +160,12 @@ printf '/* empty fixture header */\n' > "$make_source/src/tm.h"
 printf 'int main(void) { return 0; }\n' > "$make_source/src/main.c"
 cp "$source/bin/termux-muscle" "$make_source/bin/termux-muscle"
 cp "$source/lib/fixture.sh" "$make_source/lib/fixture.sh"
+mkdir -p "$make_source/docs/man"
+cp "$source/docs/man/termux-muscle.1" "$make_source/docs/man/termux-muscle.1"
 destination="$work/stage ' literal \$(unexecuted)"
 make -C "$make_source" stage "DESTDIR=$destination" > "$work/output" 2> "$work/error" || fail 'make staging failed with literal path'
 [[ -x "$destination/libexec/tm-core" && -f "$destination/bin/termux-muscle" ]] || fail 'make expanded literal destination characters'
+cmp "$destination/docs/man/termux-muscle.1" "$source/docs/man/termux-muscle.1" || fail 'make staging omitted or changed manual'
 set +e
 make -C "$make_source" stage "DESTDIR=$destination" > "$work/output" 2> "$work/error"
 status=$?

@@ -15,6 +15,7 @@ TM_ROOT=${XDG_DATA_HOME:-$HOME/.local/share}/termux-muscle
 TM_PREFIX=${PREFIX:-/data/data/com.termux/files/usr}
 TM_PROJECT_VERSION=$(cat -- "$TM_SOURCE/VERSION")
 source "$TM_SOURCE/lib/acquire.sh"
+source "$TM_SOURCE/lib/commands.sh"
 
 tm_error() { printf 'termux-muscle: %s: %s\n' "$1" "$2" >&2; exit 1; }
 tm_help() {
@@ -23,7 +24,7 @@ Termux Muscle — install, run and maintain Claude Code on Termux
 
 Usage: termux-muscle [--root DIR] [--prefix TERMUX_PREFIX] COMMAND [OPTIONS]
 
-  install                      Install the project's pinned Claude Code version
+  install [--no-link]          Install pinned Claude Code and set up claude on PATH
   run [--] CLAUDE_ARGUMENTS     Run Claude with its ordinary authentication/settings
   update                       Validate a candidate before changing the active release
   rollback                     Restore the previous validated release, without a download
@@ -38,6 +39,8 @@ Usage: termux-muscle [--root DIR] [--prefix TERMUX_PREFIX] COMMAND [OPTIONS]
 
 Install/update: --claude-version X.Y.Z|latest --allow-unverified requests an
 upstream release beyond the project pin. It still must pass local startup checks.
+Install sets up claude automatically and saves replaced commands for restoration.
+Use --no-link to preserve Claude command entries. Full manual: man termux-muscle.
 Repair/update: --offline uses only verified cached artifacts.
 Test: --model MODEL_ID explicitly permits an authenticated model request and usage.
 
@@ -79,13 +82,14 @@ tm_probe_candidate() (
 tm_install_release() (
     set -euo pipefail
     local operation=$1; shift
-    local selector=pinned policy=pinned offline=false arg manifest=$TM_SOURCE/compatibility.json
+    local selector=pinned policy=pinned offline=false no_link=false arg manifest=$TM_SOURCE/compatibility.json
     while (($#)); do
         arg=$1; shift
         case $arg in
             --claude-version) (($#)) || tm_error usage '--claude-version needs a value.'; selector=$1; shift ;;
             --allow-unverified) policy=allow-unverified ;;
             --offline) offline=true ;;
+            --no-link) [[ $operation == install ]] || tm_error usage '--no-link applies to install only.'; no_link=true ;;
             *) tm_error usage "Unknown $operation option: $arg" ;;
         esac
     done
@@ -114,6 +118,7 @@ tm_install_release() (
     else
         printf 'Claude Code %s is active (unverified upstream version; local startup checks passed).\n' "$version"
     fi
+    if [[ $operation == install && $no_link == false ]]; then tm_default_claude_links; fi
     if ! "$TM_CORE" state "$TM_ROOT" cleanup 2 >/dev/null; then
         printf '%s\n' 'Claude Code is active, but old-release cleanup needs attention. Run termux-muscle cleanup.' >&2
     fi

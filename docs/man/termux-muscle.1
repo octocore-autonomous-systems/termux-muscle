@@ -1,0 +1,525 @@
+.\" SPDX-License-Identifier: MPL-2.0
+.TH TERMUX-MUSCLE 1 "2026-09-14" "Termux Muscle 0.2.0" "User Commands"
+.SH NAME
+termux-muscle \- install, run, diagnose and maintain Claude Code on Android
+Termux
+.SH SYNOPSIS
+.B termux-muscle
+.RB [ \-\-root " DIR" ]
+.RB [ \-\-prefix " TERMUX_PREFIX" ]
+.I COMMAND
+.RI [ OPTIONS ]
+.PP
+.B termux-muscle run
+.RB [ \-\- ]
+.RI [ CLAUDE_ARGUMENTS ...]
+.PP
+.B claude
+.RI [ CLAUDE_ARGUMENTS ...]
+.SH DESCRIPTION
+Termux Muscle manages Claude Code in native Android Termux on ARM64.
+It uses the official, unmodified Linux ARM64 musl executable and an Alpine
+musl loader in a small PRoot namespace.
+Its management tool is Bash plus a C helper compiled on the device.
+It does not compile or modify the Claude Code executable.
+.PP
+Runtime installation, update and repair verify source archives and selected
+files before testing a candidate's version and help output.
+Only an accepted candidate becomes current.
+The previous release remains available for rollback, and running sessions
+hold leases that protect their files from cleanup.
+.PP
+An ordinary run preserves the caller's arguments, working directory and
+Claude account configuration.
+Authentication, account entitlements and model safeguards remain controlled
+by the upstream service.
+A successful local startup does not prove that a particular model, tool,
+background workflow or Android configuration works.
+.PP
+Termux Muscle is an independent Octocore Autonomous Systems community project.
+It is not affiliated with or authorized by Anthropic.
+.SH GLOBAL OPTIONS
+.TP
+.BI \-\-root " DIR"
+Select a separate managed installation.
+The default is
+.I $XDG_DATA_HOME/termux-muscle
+when XDG_DATA_HOME is set, or
+.I $HOME/.local/share/termux-muscle
+otherwise.
+An arbitrary directory is never treated as an owned installation to delete.
+.TP
+.BI \-\-prefix " DIR"
+Select the native Termux package prefix containing Bash, PRoot, ripgrep,
+certificates and other dependencies.
+The default is PREFIX, or
+.I /data/data/com.termux/files/usr
+when PREFIX is unset.
+This option does not provide another architecture or Linux distribution.
+.TP
+.B \-\-version
+Print the Termux Muscle project version.
+To print the separate Claude Code version, use
+.BR "termux-muscle run -- --version" .
+.TP
+.BR help ", " \-h ", " \-\-help
+Print the command overview.
+.PP
+Put global path options before the command for clarity.
+Arguments after
+.B run
+belong to Claude Code; place manager path options before
+.BR run .
+.SH COMMANDS
+.TP
+.BR install " [" OPTIONS "]"
+Install the project's pinned Claude Code version.
+If an owned installation already exists, prepare and validate a candidate
+before selecting it.
+The default pin and source digests come from the installed project's
+.I compatibility.json
+file.
+After activation, installation normally manages the Claude convenience entries,
+backing up an existing command before replacing it.
+.B \-\-no-link
+preserves those command entries for an isolated or custom installation.
+The legacy
+.B \-\-link
+option explicitly requests the same default linking behavior.
+See VERSION SELECTION for the shared install/update options.
+.TP
+.BR run " [\-\-] [" CLAUDE_ARGUMENTS "...]"
+Start the current Claude Code release with ordinary authentication and settings.
+No model request is implied by the manager itself; the forwarded Claude
+arguments and interactive actions determine what Claude does.
+For example,
+.B termux-muscle run -- auth login
+starts the upstream authentication flow.
+.PP
+.RS
+The managed
+.B claude
+entry is a convenience launcher for this command.
+Leading upstream
+.B update
+or
+.B upgrade
+commands are redirected to the manager's runtime update operation.
+A leading upstream
+.B install
+command prints a managed-installation notice.
+Claude's unmanaged background updater is disabled for this backend.
+.RE
+.TP
+.BR update " [" OPTIONS "]"
+Prepare, verify and probe a runtime candidate before changing the active
+release.
+Without a version selector, use the project pin; this does not automatically
+select every new upstream release.
+A failed download or candidate probe leaves the current release selected.
+Update Termux Muscle itself with
+.BR self-update .
+.TP
+.B rollback
+Probe and restore the previous validated local runtime, without downloading it.
+Fail if no previous release is available or it no longer passes validation.
+This restores the Claude Code runtime, not an older Termux Muscle project
+release.
+.TP
+.BR repair " [\-\-offline]"
+Rebuild the current runtime from its recorded original sources and digests,
+then validate and activate the replacement.
+Preserve its exact version and pinned/unverified provenance.
+Repair does not silently select latest, change credentials or repair account
+access.
+Offline repair requires the necessary verified cached archives.
+.TP
+.BR versions " [\-\-json]"
+Print current, previous and retained Claude Code versions with their source
+policy.
+.B \-\-json
+prints the managed state record, including release identifiers.
+This is distinct from the allowlisted public diagnostic report and can contain
+local lifecycle metadata.
+.TP
+.BR doctor " [\-\-output FILE]"
+Check local resolver configuration, managed link ownership, runtime integrity,
+version/help startup and the mapped shell namespace.
+No model request, installation, update, link repair or upload is performed.
+Print JSON to standard output by default.
+See DIAGNOSTIC REPORTS for output-file behavior and limitations.
+.TP
+.BR test " [\-\-output FILE] [\-\-model MODEL_ID ...]"
+Collect a sanitized device and installation report using the same safe local
+checks by default.
+Each explicit
+.BI \-\-model " MODEL_ID"
+permits an authenticated probe of that exact model and may consume account
+usage.
+Repeat the option to request several model checks.
+The report distinguishes requested and actually observed model IDs;
+fallback is not reported as success for the requested model.
+.B doctor
+never accepts model checks.
+.TP
+.BR link " [\-\-replace] [\-\-path PATH]"
+Manage a Claude convenience entry, normally
+.IR $PREFIX/bin/claude .
+A missing entry can be created and an unchanged owned entry reused.
+An unrelated existing entry is preserved unless
+.B \-\-replace
+is explicitly supplied.
+Replacement preserves the original regular-file bytes and permissions, or
+the original literal symlink target, for eligible restoration on uninstall.
+.BI \-\-path " PATH"
+selects another entry; its parent directory must already exist.
+.PP
+.RS
+If another installer or the user later changes the managed entry,
+uninstall preserves that replacement and retains restoration evidence.
+Use
+.B doctor
+to detect drift and
+.B termux-muscle run
+to run the managed runtime directly while investigating.
+.RE
+.TP
+.BR cleanup " [\-\-keep N] [\-\-dry-run]"
+Remove owned, inactive runtime releases outside the retention set.
+The default retention count is 2; N must be at least 2.
+Current, previous and leased releases remain protected.
+.B \-\-dry-run
+reports eligible release identifiers without deleting them.
+This command does not remove account data or uninstall Termux packages.
+.TP
+.BR self-update " [\-\-version X.Y.Z]"
+Download a published Termux Muscle source release, verify its checksums,
+compile it locally and run its offline mandatory tests before publishing the
+new management tool.
+Without
+.BR \-\-version ,
+resolve the latest published project release.
+This command leaves the current Claude Code runtime selected.
+An in-place downgrade to older management releases that cannot read the
+current ownership records is rejected.
+This guard applies to the new self-update command.
+Do not rerun an old immutable installer over a newer installation:
+older installers cannot read the new manual ownership record and can partially
+downgrade the tool before failing.
+Recover such an attempt by rerunning the newer verified installer.
+If a management downgrade is necessary, uninstall with the current manager
+before using the older installer.
+Management files are versioned and leased; publication selects the new
+version atomically and retains the previous tooling version.
+.TP
+.B uninstall
+Remove owned runtime and management files and restore eligible managed entries.
+Close other running managed sessions first; active leases prevent removal.
+Unrelated files, externally changed entries, Claude credentials, settings,
+sessions and projects are preserved.
+Installed Termux dependencies, including the manual viewer, remain installed.
+.PP
+.RS
+When safe removal needs to retain changed entries or recovery evidence,
+the command reports this and leaves
+.I UNINSTALL-RECOVERY.txt
+inside the remaining installation root.
+Inspect that evidence instead of deleting ownership records to force cleanup.
+.RE
+.SH VERSION SELECTION
+The following options apply to
+.B install
+and
+.BR update :
+.TP
+.BI \-\-claude-version " X.Y.Z|latest"
+Select an exact upstream release or resolve upstream latest.
+An exact project-pinned version retains pinned status.
+A different upstream selection requires
+.BR \-\-allow-unverified .
+.TP
+.B \-\-allow-unverified
+Explicitly permit an upstream runtime beyond this project's compatibility pin.
+Source integrity and local candidate startup checks still apply.
+The receipt and version display retain an unverified label.
+This flag does not establish full device/workflow compatibility or grant
+account/model access.
+.TP
+.B \-\-offline
+Use only verified cached artifacts.
+No missing metadata or archive is downloaded.
+It cannot resolve upstream latest without the required source information.
+It is also accepted by
+.BR repair .
+.SH INSTALLATION AND MANUAL
+The versioned source installer obtains missing native Termux prerequisites
+with the Termux package manager, builds the helper and runs offline tests.
+It installs the management tool, normally installs the pinned runtime, and
+provides this manual page for
+.BR "man termux-muscle" .
+The Termux package supplying
+.B man
+is
+.BR mandoc ;
+no separate groff installation is required.
+.PP
+The manual entry is normally
+.I $PREFIX/share/man/man1/termux-muscle.1
+and is an owned regular file, so the Termux manual index can find it.
+Management self-update refreshes it from the new tool version only when its
+contents and permissions still match the ownership record.
+An unrelated pre-existing manual entry is preserved and reported.
+The installed owned copy can still be read directly with
+.B man
+followed by its full pathname.
+The manager does not change MANPATH or shell startup files.
+.PP
+Normal installation manages
+.I $PREFIX/bin/claude
+and
+.IR $HOME/.local/bin/claude ,
+plus the first existing executable claude on PATH when it is elsewhere.
+Existing commands are backed up before takeover and the affected paths are
+reported.
+An existing shell alias or function may still take precedence over PATH;
+shell aliases, functions and startup files are not rewritten.
+.B \-\-no-link
+preserves these Claude command entries.
+.B \-\-link
+remains an explicit synonym for the default behavior.
+.PP
+For a locally built checkout, the source bootstrap entry point is:
+.PP
+.nf
+  bash bin/termux-muscle bootstrap \
+    --source-dir "$PWD" --build-dir "$PWD/build"
+.fi
+.PP
+.B \-\-no-install
+installs only the management tool and manual, without downloading a runtime
+or taking over Claude command entries.
+Use the normal published installer for its prerequisite, source-verification,
+local-build and test sequence.
+.SH DIAGNOSTIC REPORTS
+A default report contains the project and Claude Code versions, musl version,
+manufacturer/model, Android release and API, ABI, kernel, memory page size,
+Termux version/source, relevant package versions and check outcomes.
+It omits authentication secrets, complete settings/environment dumps, serial
+numbers, network addresses, private prompts and raw session output.
+.PP
+Each check is
+.BR PASS ,
+.BR FAIL " or " SKIP .
+Checks not actually performed remain SKIP.
+Local version/help/namespace checks do not automatically mark installation,
+update, rollback, uninstall or authenticated Claude tool workflows PASS.
+DNS configuration checks inspect the selected resolver file; they make no
+DNS query and do not prove external network reachability.
+.PP
+With
+.BI \-\-output " FILE",
+the parent directory must already exist and FILE must be a new path.
+Existing files and symlinks are not overwritten.
+Publication is atomic and uses private mode 0600.
+A valid report may still be written when checks fail; the command returns
+failure.
+Without the option, JSON goes to standard output.
+.PP
+Reports are never uploaded automatically.
+Review a saved report, then attach it voluntarily to an issue in the project
+repository with the exact failing command and observed behavior.
+.SH ENVIRONMENT
+.TP
+.B HOME
+Used to locate the default installation root and the ordinary Claude account
+data.
+.TP
+.B XDG_DATA_HOME
+When set, selects the base of the default managed data directory.
+An explicit
+.B \-\-root
+overrides it.
+.TP
+.B PREFIX
+The Termux package prefix; overridden by
+.BR \-\-prefix .
+.TP
+.B TM_RESOLV_CONF
+Select a readable resolver configuration file instead of
+.IR $PREFIX/etc/resolv.conf .
+The runtime maps the selected live file into its PRoot namespace.
+Valid resolver symlinks are supported.
+The manager does not replace it with a public DNS service.
+.TP
+.B SSL_CERT_FILE
+Select a readable TLS certificate bundle instead of
+.IR $PREFIX/etc/tls/cert.pem .
+.TP
+.B PATH
+Used for ordinary command lookup.
+The installer does not edit shell startup files to change PATH.
+It reports the owned management command path if a convenience entry is
+unavailable.
+.TP
+.B TMPDIR
+Selects temporary storage for management operations where applicable.
+Inside a Claude runtime, temporary files use that release's private runtime
+directory.
+.PP
+The launcher clears incompatible LD_PRELOAD and LD_LIBRARY_PATH values for the
+vendor process, disables the unmanaged updater and selects native Termux
+ripgrep.
+Ordinary Claude environment and account settings otherwise remain under the
+user's control.
+Internal TM_* lease/context variables are not a public configuration interface.
+.SH FILES
+All paths below ROOT are managed implementation state, not files to edit
+manually.
+.TP
+.I ROOT/installation.json
+Installation identity.
+.TP
+.I ROOT/state.json
+Current/previous runtime selection and lifecycle state.
+.TP
+.I ROOT/releases/RELEASE_ID/
+Owned executable, loader, receipt, runtime context and private temporary files.
+.TP
+.I ROOT/releases/RELEASE_ID/payload.json
+Recorded source identities, file hashes, version and compatibility provenance.
+.TP
+.I ROOT/cache/
+Content-addressed archives, reverified before reuse.
+.TP
+.I ROOT/tools/current
+Atomic symlink selecting the active management-tool directory.
+.TP
+.I ROOT/tools/TOOL_ID/docs/man/termux-muscle.1
+This manual as shipped with that tool version.
+.TP
+.I ROOT/tooling.json
+Tooling publication state and owned stable-entry information.
+.TP
+.I ROOT/links.json
+Ownership and restoration records for managed external entries.
+.TP
+.I ROOT/backups/
+Original files and retained recovery evidence.
+.TP
+.I ROOT/bin/termux-muscle
+Owned management launcher.
+.TP
+.I ROOT/bin/claude
+Owned convenience launcher for the current runtime.
+.TP
+.I ROOT/UNINSTALL-RECOVERY.txt
+Explanation left when removal preserves conflict or recovery information.
+.PP
+A remaining lock file alone does not prove that maintenance is running.
+The operating system releases the process-held mutation lock after process exit.
+Do not delete ownership metadata to bypass an error.
+.SH EXIT STATUS
+Management commands return 0 on success and nonzero on an error.
+The text diagnostic includes a category describing the failing boundary.
+.B doctor
+and
+.B test
+return nonzero if any reported check/model result is FAIL.
+A SKIP alone is not a failure and is not evidence of success.
+.B run
+forwards execution to the upstream runtime; its exit behavior follows that
+process.
+.SH EXAMPLES
+Inspect the manager and runtime versions:
+.PP
+.nf
+  termux-muscle --version
+  termux-muscle versions
+  termux-muscle run -- --version
+.fi
+.PP
+Start Claude or authenticate through its own flow:
+.PP
+.nf
+  claude
+  claude auth login
+.fi
+.PP
+Check health and save a report without model usage:
+.PP
+.nf
+  termux-muscle doctor
+  termux-muscle test --output report.json
+.fi
+.PP
+Explicitly probe a model available to the account:
+.PP
+.nf
+  termux-muscle test --model MODEL_ID --output model-report.json
+.fi
+.PP
+Maintain the pinned runtime and recover locally:
+.PP
+.nf
+  termux-muscle update
+  termux-muscle rollback
+  termux-muscle repair --offline
+  termux-muscle cleanup --dry-run
+.fi
+.PP
+Opt into testing a newer upstream version:
+.PP
+.nf
+  termux-muscle update --claude-version latest --allow-unverified
+.fi
+.PP
+Upgrade the management tool separately:
+.PP
+.nf
+  termux-muscle self-update
+.fi
+.PP
+Select an independent installation without changing account settings:
+.PP
+.nf
+  termux-muscle --root "$HOME/test-runtime" install
+  termux-muscle --root "$HOME/test-runtime" run -- --help
+.fi
+.SH TROUBLESHOOTING
+If a command named claude reports a missing native binary, compare
+.B command -v claude
+with
+.BR "termux-muscle run -- --version" .
+A different npm wrapper may still own that command.
+Use the manager directly and inspect link ownership before requesting
+replacement.
+.PP
+An integrity failure is different from a DNS/TLS failure or rejected login.
+Start with
+.B doctor
+and the exact error category.
+Account authentication should use the upstream login flow; reinstalling a
+runtime does not refresh an OAuth token or grant access to a model.
+.PP
+Run maintenance from a fresh native Termux shell when an existing PRoot
+session is pinned to another release or installation.
+Android background-process limits, vendor restrictions, cross-session messaging,
+MCP transports, hooks and authenticated tool workflows require separate tests.
+.SH SEE ALSO
+.BR man (1),
+.BR mandoc (1),
+.BR proot (1),
+.BR bash (1)
+.PP
+Project, device reports and issue templates:
+.br
+https://github.com/octocore-autonomous-systems/termux-muscle
+.PP
+The repository's architecture, testing, troubleshooting and release
+documentation
+provide compatibility evidence and contributor procedures.
+.SH AUTHORS
+Octocore Autonomous Systems and community contributors.
+.SH COPYRIGHT
+Termux Muscle source and this manual are licensed under MPL-2.0.
+Claude Code and other dependencies retain their respective upstream licenses.

@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: MPL-2.0
+# shellcheck shell=bash
 # Reports never upload automatically. Even failed checks produce reviewable JSON.
 tm_diagnostics() (
     set -euo pipefail
     umask 077
-    local mode=${1:?} output= status=0 temporary= parent= filename= probe_pid=
+    local mode=${1:?} output='' status=0 temporary='' parent='' filename='' probe_pid=''
     shift
     local -a model_args=()
     while (($#)); do
@@ -18,10 +19,10 @@ tm_diagnostics() (
         esac
     done
     [[ $mode == doctor || $mode == test ]] || exit 1
-    local command=report
-    [[ $mode != doctor ]] || command=doctor
+    local diagnostic_command=report
+    [[ $mode != doctor ]] || diagnostic_command=doctor
     if [[ -z $output ]]; then
-        exec "$TM_CORE" "$command" "$TM_ROOT" "$TM_PREFIX" "$TM_SOURCE" "${model_args[@]}"
+        exec "$TM_CORE" "$diagnostic_command" "$TM_ROOT" "$TM_PREFIX" "$TM_SOURCE" "${model_args[@]}"
     fi
     [[ ! -e $output && ! -L $output ]] || { printf '%s\n' 'Report output must be a new file; existing files are preserved.' >&2; exit 1; }
     parent=$(dirname -- "$output") || exit 1
@@ -30,6 +31,7 @@ tm_diagnostics() (
     parent=$(cd -- "$parent" && pwd -P) || exit 1
     output=$parent/$filename
     temporary=$(mktemp "$parent/.termux-muscle-report.XXXXXXXX") || exit 1
+    # shellcheck disable=SC2329 # Invoked by the EXIT trap below.
     tm_diagnostics_cleanup() {
         if [[ -n $probe_pid ]]; then
             kill -TERM "$probe_pid" 2>/dev/null || :
@@ -43,7 +45,7 @@ tm_diagnostics() (
     trap 'exit 143' TERM
     # A shell waiting on a foreground command defers traps. The wait builtin
     # wakes for signals so EXIT cleanup can stop the owned C probe promptly.
-    "$TM_CORE" "$command" "$TM_ROOT" "$TM_PREFIX" "$TM_SOURCE" "${model_args[@]}" >"$temporary" &
+    "$TM_CORE" "$diagnostic_command" "$TM_ROOT" "$TM_PREFIX" "$TM_SOURCE" "${model_args[@]}" >"$temporary" &
     probe_pid=$!
     wait "$probe_pid" || status=$?
     probe_pid=

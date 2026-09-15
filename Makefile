@@ -23,7 +23,7 @@ check-deps:
 	@command -v $(CC) >/dev/null || { echo 'A C11 compiler is required (Termux package: clang).' >&2; exit 1; }
 	@$(PKG_CONFIG) --exists json-c libarchive libcrypto || { echo 'Install json-c, libarchive, openssl and pkg-config development files.' >&2; exit 1; }
 
-build/%.o: src/%.c src/tm.h | check-deps
+build/%.o: src/%.c src/tm.h VERSION | check-deps
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) -MMD -MP -c $< -o $@
 
@@ -31,7 +31,7 @@ build/tm-core: $(OBJECTS) | check-deps
 	@mkdir -p build
 	$(CC) $(CFLAGS) $(LDFLAGS) $(OBJECTS) $(LDLIBS) -o $@
 
-build/tests/%: tests/%.c $(LIB_OBJECTS) src/tm.h | check-deps
+build/tests/%: tests/%.c $(LIB_OBJECTS) src/tm.h VERSION | check-deps
 	@mkdir -p build/tests
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) $< $(LIB_OBJECTS) $(LDLIBS) -o $@
 

@@ -1,9 +1,19 @@
 # SPDX-License-Identifier: MPL-2.0
+# shellcheck shell=bash
 # Bash lifecycle hooks; C owns identities, publication journals and leases.
+
+tm_manual_index() {
+    local operation=$1 manual=$TM_PREFIX/share/man/man1/termux-muscle.1
+    command -v makewhatis >/dev/null || return 0
+    if ! timeout --kill-after=5 30 makewhatis "$operation" "$TM_PREFIX/share/man" man1/termux-muscle.1; then
+        printf 'Manual index update failed for %s. Rerun setup to refresh it; the page can be read directly with man %s.\n' "$manual" "$manual" >&2
+        return 1
+    fi
+}
 
 tm_bootstrap() (
     set -euo pipefail
-    local source_dir='' build_dir='' no_install=false link_claude=false
+    local source_dir='' build_dir='' no_install=false link_claude=true
     while (($#)); do
         case $1 in
             --source-dir|--build-dir)
@@ -12,6 +22,7 @@ tm_bootstrap() (
                 shift 2 ;;
             --no-install) no_install=true; shift ;;
             --link) link_claude=true; shift ;;
+            --no-link) link_claude=false; shift ;;
             *) tm_error usage "Unknown bootstrap option: $1" ;;
         esac
     done
@@ -29,29 +40,58 @@ tm_bootstrap() (
     trap 'rm -rf -- "$work"' EXIT
     timeout --kill-after=5 120 make -C "$source_dir" stage "DESTDIR=$work/stage" >&2
     id=$("$TM_CORE" tooling "$TM_ROOT" publish "$work/stage" "$TM_PROJECT_VERSION" "$TM_PREFIX")
-    manager_path=$HOME/.local/bin/termux-muscle
     mkdir -p -- "$HOME/.local/bin"
     # Expected foreign commands are preserved; errors in existing ownership
     # metadata are still fatal when the links helper attempts a managed repair.
-    if [[ ( -e $manager_path || -L $manager_path ) &&
-          ( ! -L $manager_path || $(readlink -- "$manager_path") != "$TM_ROOT/bin/termux-muscle" ) ]]; then
-        printf 'Existing command preserved: %s\nUse the owned command: %s\n' "$manager_path" "$TM_ROOT/bin/termux-muscle" >&2
+    for manager_path in "$TM_PREFIX/bin/termux-muscle" "$HOME/.local/bin/termux-muscle"; do
+        if [[ ${manager_path%/*} -ef $TM_ROOT/bin ]]; then continue; fi
+        if [[ ( -e $manager_path || -L $manager_path ) &&
+              ( ! -L $manager_path || $(readlink -- "$manager_path") != "$TM_ROOT/bin/termux-muscle" ) ]]; then
+            printf 'Existing command preserved: %s\nUse the owned command: %s\n' "$manager_path" "$TM_ROOT/bin/termux-muscle" >&2
+        else
+            "$TM_CORE" links "$TM_ROOT" install "$manager_path" "$TM_ROOT/bin/termux-muscle" >/dev/null
+        fi
+    done
+    local manual_path=$TM_PREFIX/share/man/man1/termux-muscle.1
+    local manual_target=$TM_ROOT/tools/current/docs/man/termux-muscle.1
+    mkdir -p -- "$TM_PREFIX/share/man/man1"
+    local manual_result
+    manual_result=$("$TM_CORE" links "$TM_ROOT" install-manual "$manual_path" "$manual_target")
+    if [[ $manual_result == foreign_preserved ]]; then
+        printf 'Existing manual preserved: %s\nRead the installed manual with: man %s\n' "$manual_path" "$manual_target" >&2
     else
-        "$TM_CORE" links "$TM_ROOT" install "$manager_path" "$TM_ROOT/bin/termux-muscle" >/dev/null
+        tm_manual_index -d || :
+        printf 'Manual installed: %s (man termux-muscle)\n' "$manual_path"
     fi
-    if [[ $link_claude == true ]]; then
-        "$TM_CORE" links "$TM_ROOT" install "$TM_PREFIX/bin/claude" "$TM_ROOT/bin/claude" >/dev/null
+    if [[ $no_install == false ]]; then
+        tm_install_release install --no-link
+        if [[ $link_claude == true ]]; then tm_default_claude_links; fi
     fi
-    if [[ $no_install == false ]]; then tm_install_release install; fi
     "$TM_CORE" tooling "$TM_ROOT" cleanup
     printf 'Termux Muscle %s installed from locally built source (%s).\n' "$TM_PROJECT_VERSION" "$id"
     printf 'Command: %s\n' "$TM_ROOT/bin/termux-muscle"
-    case :$PATH: in *:"$HOME/.local/bin":*) ;; *) printf 'Add %s to PATH to use termux-muscle by name.\n' "$HOME/.local/bin" ;; esac
+    if [[ ! $(type -P termux-muscle || :) -ef $TM_ROOT/bin/termux-muscle ]]; then
+        printf 'PATH does not select the managed termux-muscle command; use %s.\n' "$TM_ROOT/bin/termux-muscle" >&2
+    fi
 )
 
 tm_uninstall() {
     (($# == 0)) || tm_error usage 'uninstall takes no arguments.'
-    "$TM_CORE" tooling "$TM_ROOT" uninstall
+    local manual=$TM_PREFIX/share/man/man1/termux-muscle.1 indexed=false status result=0
+    if [[ -f $manual && ! -L $manual ]]; then
+        status=$("$TM_CORE" links "$TM_ROOT" manual-status "$manual") || return
+        if [[ $status == owned ]]; then
+            # mandoc needs the page to exist when removing its index entry.
+            # If C refuses removal or restores an original, rebuild that entry.
+            indexed=true
+            tm_manual_index -u || :
+        fi
+    fi
+    "$TM_CORE" tooling "$TM_ROOT" uninstall || result=$?
+    if [[ $indexed == true && ( -e $manual || -L $manual ) ]]; then
+        tm_manual_index -d || :
+    fi
+    return "$result"
 }
 
 tm_self_update() (
@@ -64,6 +104,14 @@ tm_self_update() (
         esac
     done
     [[ -z $version ]] || "$TM_CORE" version-check "$version"
+    # v0.1.x cannot read regular manual-file ownership records. Reject before
+    # running its installer, which could otherwise publish old tooling first.
+    tm_check_tooling_compatibility() {
+        if [[ $1 =~ ^0\.(0|1)\. ]]; then
+            tm_error incompatible_tooling 'In-place downgrade below 0.2.0 is unsupported. The current installation was preserved; use the current manager to uninstall before intentionally installing an older manager.'
+        fi
+    }
+    [[ -z $version ]] || tm_check_tooling_compatibility "$version"
     work=$(mktemp -d "${TMPDIR:-$TM_PREFIX/tmp}/termux-muscle-self-update.XXXXXXXX")
     trap 'rm -rf -- "$work"' EXIT
     tm_fetch_project() {
@@ -79,6 +127,7 @@ tm_self_update() (
         version=${version#v}
         "$TM_CORE" version-check "$version"
     fi
+    tm_check_tooling_compatibility "$version"
     base=https://github.com/$repository/releases/download/v$version
     tm_fetch_project "$base/SHA256SUMS" "$work/SHA256SUMS" 65536 || tm_error download_failed 'Cannot download project checksums.'
     tm_fetch_project "$base/install.sh" "$work/install.sh" 262144 || tm_error download_failed 'Cannot download the versioned source installer.'

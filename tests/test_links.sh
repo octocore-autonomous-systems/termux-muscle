@@ -53,24 +53,48 @@ int main(int argc, char **argv) {
         int result = json_object_to_file_ext(index_path, index, JSON_C_TO_STRING_PRETTY);
         json_object_put(index); return result ? 86 : 0;
     }
+    if (!strcmp(argv[1], "legacy-manual")) {
+        json_object_object_del(entry, "installed");
+        int result = json_object_to_file_ext(index_path, index, JSON_C_TO_STRING_PRETTY);
+        json_object_put(index); return result ? 90 : 0;
+    }
+    if (!strcmp(argv[1], "bad-installed")) {
+        json_object_object_add(field(entry, "installed"), "mode", json_object_new_int(0600));
+        int result = json_object_to_file_ext(index_path, index, JSON_C_TO_STRING_PRETTY);
+        json_object_put(index); return result ? 91 : 0;
+    }
     int restore = !strcmp(argv[1], "pending-restore");
-    if (!restore && strcmp(argv[1], "pending-install")) return 87;
+    int update = !strcmp(argv[1], "pending-update");
+    if (!restore && !update && strcmp(argv[1], "pending-install")) return 87;
     json_object *operation = json_object_new_object(), *link = json_object_new_object();
     json_object_object_add(link, "kind", json_object_new_string("symlink"));
     json_object_object_add(link, "target", json_object_get(field(entry, "target")));
+    json_object *installed = NULL;
+    if (json_object_object_get_ex(entry, "installed", &installed)) {
+        json_object_put(link); link = json_object_get(installed);
+    }
     json_object_object_add(operation, "schema", json_object_new_int(1));
     json_object_object_add(operation, "installation_id", json_object_get(field(index, "installation_id")));
     json_object_object_add(operation, "action", json_object_new_string(restore ? "restore" : "install"));
     json_object_object_add(operation, "entry", json_object_get(entry));
     json_object_object_add(operation, "before", json_object_get(restore ? link : field(entry, "original")));
     json_object_object_add(operation, "after", json_object_get(restore ? field(entry, "original") : link));
+    if (update) {
+        char old_path[4096];
+        snprintf(old_path, sizeof old_path, "%s/test-old-links.json", argv[2]);
+        json_object *old_index = json_object_from_file(old_path);
+        json_object *old_entry = field(field(old_index, "entries"), argv[3]);
+        json_object_object_add(operation, "before", json_object_get(field(old_entry, "installed")));
+        json_object_put(index); index = old_index;
+    }
     if (json_object_to_file_ext(pending_path, operation, JSON_C_TO_STRING_PRETTY)) return 88;
-    if (!restore) json_object_object_del(entries, argv[3]);
+    if (!restore && !update) json_object_object_del(entries, argv[3]);
     int result = json_object_to_file_ext(index_path, index, JSON_C_TO_STRING_PRETTY);
     json_object_put(operation); json_object_put(link); json_object_put(index);
     return result ? 89 : 0;
 }
 C
+# shellcheck disable=SC2046 # pkg-config deliberately supplies compiler arguments.
 "${CC:-cc}" -std=c11 -Wall -Wextra -Werror $(pkg-config --cflags json-c) \
     "$scratch/fixture.c" $(pkg-config --libs json-c) -o "$scratch/fixture"
 
@@ -81,6 +105,7 @@ new_case() {
     root="$scratch/$1 installation"
     commands="$scratch/$1 commands"
     mkdir -p -- "$commands"
+    # shellcheck disable=SC2016 # The child Bash expands its own positional argument.
     "$core" with-lock "$root" create -- bash -c 'printf "#!/bin/sh\nexit 0\n" > "$1/bin/launcher"; chmod 700 "$1/bin/launcher"' fixture "$root"
     target="$root/bin/launcher"
     command_path="$commands/claude"
@@ -298,5 +323,158 @@ links install "$commands/second" "$target" >/dev/null
 links restore-all > "$scratch/restored-all"
 [[ $(cat "$command_path") == 'original launcher' && ! -L $commands/second ]] || fail 'restore-all behavior'
 pass 'restore-all restores originals and removes newly created aliases'
+
+# Manuals are copied as owned regular files so mandoc can index them. Updating
+# a tool refreshes only matching owned bytes, retaining the original backup.
+manual_fixture() {
+    local id=$1 contents=$2
+    mkdir -p -- "$root/tools/$id/docs/man"
+    printf '%s\n' "$contents" > "$root/tools/$id/docs/man/termux-muscle.1"
+    chmod 600 "$root/tools/$id/docs/man/termux-muscle.1"
+    ln -s -- "$id" "$root/tools/.manual-next"
+    mv -T -- "$root/tools/.manual-next" "$root/tools/current"
+    manual_target="$root/tools/current/docs/man/termux-muscle.1"
+    manual_path="$commands/termux-muscle.1"
+}
+new_case manual
+manual_fixture 0.1.0-aaaaaaaaaaaa 'manual version one'
+[[ $(links install-manual "$manual_path" "$manual_target") == installed ]] || fail 'manual was not installed'
+[[ ! -L $manual_path && $(stat -c %a "$manual_path") == 644 && $(cat "$manual_path") == 'manual version one' ]] || fail 'manual is not the expected regular public file'
+manual_fixture 0.1.1-bbbbbbbbbbbb 'manual version two'
+[[ $(cat "$manual_path") == 'manual version one' ]] || fail 'source change modified published manual prematurely'
+[[ $(links install-manual "$manual_path" "$manual_target") == installed && $(cat "$manual_path") == 'manual version two' ]] || fail 'owned manual did not update'
+[[ $(links install-manual "$manual_path" "$manual_target") == unchanged ]] || fail 'manual update changed ownership'
+links restore-all > /dev/null
+[[ ! -e $manual_path && ! -L $manual_path && -d $commands ]] || fail 'manual uninstall changed parent or left owned link'
+pass 'regular mode0644 manual updates owned bytes and removal preserves its directory'
+
+new_case manual_foreign
+manual_fixture 0.1.0-aaaaaaaaaaaa 'owned manual'
+printf 'foreign existing manual\n' > "$manual_path"
+chmod 640 "$manual_path"
+[[ $(links install-manual "$manual_path" "$manual_target") == foreign_preserved ]] || fail 'automatic manual install did not report foreign preservation'
+rejects link_conflict links install "$manual_path" "$manual_target"
+[[ ! -L $manual_path && $(cat "$manual_path") == 'foreign existing manual' && $(stat -c %a "$manual_path") == 640 ]] || fail 'unrequested manual replacement'
+links install "$manual_path" "$manual_target" --replace > /dev/null
+backup=$("$scratch/fixture" backup "$root" "$manual_path")
+manual_fixture 0.1.1-bbbbbbbbbbbb 'new owned manual'
+links install-manual "$manual_path" "$manual_target" > /dev/null
+[[ $("$scratch/fixture" backup "$root" "$manual_path") == "$backup" ]] || fail 'manual update replaced the original backup record'
+links restore-all > /dev/null
+[[ ! -L $manual_path && $(cat "$manual_path") == 'foreign existing manual' && $(stat -c %a "$manual_path") == 640 && ! -e $root/backups/$backup ]] || fail 'manual original or permissions were not restored'
+pass 'foreign manual is preserved by default; explicit replacement restores original bytes and mode'
+
+new_case manual_drift
+manual_fixture 0.1.0-aaaaaaaaaaaa 'owned manual'
+links install "$manual_path" "$manual_target" > /dev/null
+rm -- "$manual_path"; printf 'later foreign manual\n' > "$manual_path"
+[[ $(links restore "$manual_path") == foreign_change_preserved && $(cat "$manual_path") == 'later foreign manual' ]] || fail 'manual drift was overwritten'
+pass 'manual changed after installation is preserved with ownership evidence'
+
+new_case manual_removed_target
+manual_fixture 0.1.0-aaaaaaaaaaaa 'owned manual'
+links install "$manual_path" "$manual_target" > /dev/null
+rm -- "$root/tools/current"
+links restore-all > /dev/null
+[[ ! -e $manual_path && ! -L $manual_path ]] || fail 'manual restore required a surviving target'
+pass 'interrupted uninstall can restore a manual entry after its target disappears'
+
+new_case manual_scope
+manual_fixture 0.1.0-aaaaaaaaaaaa 'owned manual'
+printf 'unrelated text\n' > "$root/tools/0.1.0-aaaaaaaaaaaa/docs/man/other.1"
+rejects invalid_link_target links install "$manual_path" "$root/tools/current/docs/man/other.1"
+rejects invalid_link_target links install "$manual_path" "$root/tools/0.1.0-aaaaaaaaaaaa/docs/man/termux-muscle.1"
+rm -- "$root/tools/current"
+ln -s -- ../../external "$root/tools/current"
+rejects invalid_link_target links install "$manual_path" "$manual_target"
+[[ ! -e $manual_path && ! -L $manual_path ]] || fail 'invalid manual source created entry'
+pass 'manual exception rejects arbitrary targets and a foreign current pointer'
+
+new_case manual_legacy
+manual_fixture 0.1.0-aaaaaaaaaaaa 'legacy manual migration'
+links install-manual "$manual_path" "$manual_target" > /dev/null
+"$scratch/fixture" legacy-manual "$root" "$manual_path"
+rm -- "$manual_path"; ln -s -- "$manual_target" "$manual_path"
+[[ $("$core" links "$root" manual-status "$manual_path") == owned ]] || fail 'legacy owned manual status'
+[[ $(links install-manual "$manual_path" "$manual_target") == installed && ! -L $manual_path ]] || fail 'owned legacy manual symlink was not migrated'
+links restore-all > /dev/null
+[[ ! -e $manual_path ]] || fail 'migrated manual lost removal metadata'
+pass 'an owned legacy manual symlink migrates to an indexable regular file'
+
+for phase in before after foreign; do
+    new_case "manual-interruption-$phase"
+    manual_fixture 0.1.0-aaaaaaaaaaaa 'first managed manual'
+    printf 'original manual\n' > "$manual_path"; chmod 640 "$manual_path"
+    links install "$manual_path" "$manual_target" --replace > /dev/null
+    backup=$("$scratch/fixture" backup "$root" "$manual_path")
+    cp "$root/links.json" "$root/test-old-links.json"
+    cp "$manual_path" "$scratch/old-manual"
+    manual_fixture 0.1.1-bbbbbbbbbbbb 'updated managed manual'
+    links install-manual "$manual_path" "$manual_target" > /dev/null
+    "$scratch/fixture" pending-update "$root" "$manual_path"
+    if [[ $phase == before ]]; then
+        cp "$scratch/old-manual" "$manual_path"; chmod 644 "$manual_path"
+        "$scratch/fixture" stage "$root" "$manual_path"
+        [[ $(links recover) == not_applied && $(cat "$manual_path") == 'first managed manual' ]] || fail 'interrupted manual update before publication'
+        [[ ! -e $commands/.tm-link-0123456789abcdef01234567.tmp ]] || fail 'manual interrupted stage left residue'
+        links install-manual "$manual_path" "$manual_target" > /dev/null
+    elif [[ $phase == after ]]; then
+        [[ $(links recover) == committed && $(cat "$manual_path") == 'updated managed manual' ]] || fail 'interrupted manual update after publication'
+    else
+        printf 'foreign manual after interruption\n' > "$manual_path"
+        [[ $(links recover) == foreign_change_preserved && $(cat "$manual_path") == 'foreign manual after interruption' ]] || fail 'interrupted foreign manual overwritten'
+        [[ $(cat "$root/backups/$backup") == 'original manual' ]] || fail 'interrupted foreign manual lost original backup'
+        pass 'manual update interruption preserves a later foreign edit and original backup'
+        continue
+    fi
+    links restore-all > /dev/null
+    [[ $(cat "$manual_path") == 'original manual' && $(stat -c %a "$manual_path") == 640 && ! -e $root/backups/$backup ]] || fail 'manual interrupted update lost original restoration'
+    pass "manual update interruption $phase publication retains original restoration and recovers"
+done
+
+new_case manual_invalid_record
+manual_fixture 0.1.0-aaaaaaaaaaaa 'managed manual'
+links install-manual "$manual_path" "$manual_target" > /dev/null
+"$scratch/fixture" bad-installed "$root" "$manual_path"
+rejects invalid_state links install-manual "$manual_path" "$manual_target"
+rejects invalid_state "$core" links "$root" manual-status "$manual_path"
+[[ $(cat "$manual_path") == 'managed manual' ]] || fail 'malformed ownership changed manual'
+pass 'malformed manual ownership remains fatal and preserves the file'
+
+new_case manual_source_paths
+manual_fixture 0.1.0-aaaaaaaaaaaa 'safe manual'
+mkdir -p "$scratch/outside-docs/man"
+printf 'outside sentinel\n' > "$scratch/outside-docs/man/termux-muscle.1"
+mv "$root/tools/0.1.0-aaaaaaaaaaaa/docs" "$root/tools/0.1.0-aaaaaaaaaaaa/saved-docs"
+ln -s "$scratch/outside-docs" "$root/tools/0.1.0-aaaaaaaaaaaa/docs"
+rejects unsafe_path links install-manual "$manual_path" "$manual_target"
+[[ $(cat "$scratch/outside-docs/man/termux-muscle.1") == 'outside sentinel' && ! -e $manual_path ]] || fail 'manual source ancestor escaped'
+rm "$root/tools/0.1.0-aaaaaaaaaaaa/docs"
+mv "$root/tools/0.1.0-aaaaaaaaaaaa/saved-docs" "$root/tools/0.1.0-aaaaaaaaaaaa/docs"
+rm "$root/tools/0.1.0-aaaaaaaaaaaa/docs/man/termux-muscle.1"
+ln -s "$scratch/outside-docs/man/termux-muscle.1" "$root/tools/0.1.0-aaaaaaaaaaaa/docs/man/termux-muscle.1"
+rejects unsafe_path links install-manual "$manual_path" "$manual_target"
+pass 'manual source rejects ancestor and final-file symlinks without touching outside data'
+
+new_case manual_source_bound
+manual_fixture 0.1.0-aaaaaaaaaaaa 'safe manual'
+truncate -s 1048577 "$root/tools/0.1.0-aaaaaaaaaaaa/docs/man/termux-muscle.1"
+rejects invalid_link_target links install-manual "$manual_path" "$manual_target"
+[[ ! -e $manual_path && ! -e $root/links-pending.json ]] || fail 'oversized manual reached publication'
+pass 'manual acquisition is bounded before journaling or publication'
+
+new_case manual_status
+manual_fixture 0.1.0-aaaaaaaaaaaa 'managed status manual'
+[[ $("$core" links "$root" manual-status "$manual_path") == not_owned ]] || fail 'untracked manual status'
+links install "$command_path" "$target" > /dev/null
+[[ $("$core" links "$root" manual-status "$command_path") == not_owned ]] || fail 'command link treated as a manual'
+links install-manual "$manual_path" "$manual_target" > /dev/null
+before_status=$(sha256sum "$root/links.json")
+[[ $("$core" links "$root" manual-status "$manual_path") == owned ]] || fail 'regular owned manual status'
+printf 'foreign edited manual\n' > "$manual_path"
+[[ $("$core" links "$root" manual-status "$manual_path") == changed && $(cat "$manual_path") == 'foreign edited manual' ]] || fail 'changed manual status'
+rm "$manual_path"
+[[ $("$core" links "$root" manual-status "$manual_path") == changed && $(sha256sum "$root/links.json") == "$before_status" ]] || fail 'status changed ownership metadata'
+pass 'read-only manual status distinguishes owned, changed, missing and unrelated entries'
 
 printf 'PASS: %s launcher ownership behavior groups\n' "$count"
