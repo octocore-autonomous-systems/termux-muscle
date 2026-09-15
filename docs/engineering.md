@@ -1,8 +1,6 @@
 # Engineering record
 
-This project grew out of repeated Claude Code failures on one Android host. OAS uses ELO to organize the work into small seeds with explicit acceptance criteria, record decisions and preserve test evidence. The public value is an inspectable chain from defect to correction to regression test.
-
-ELO is not required to install, run, update or contribute to Termux Muscle. This project does not claim that using ELO makes a release reliable by itself. Reliability claims need the same reproducible tests and device reports whether a contributor uses ELO, GitHub issues or another workflow.
+This project grew out of repeated Claude Code failures on one Android host. This record connects those defects to design decisions, corrections and regression tests. Reliability claims depend on reproducible tests and device reports.
 
 ## Defects that shaped the design
 
@@ -33,11 +31,3 @@ That message listed possible causes; it did not establish which one occurred. Th
 The runtime uses an unmodified official musl payload and narrowly scoped PRoot mappings. This follows existing musl prior art while choosing a different packaging and lifecycle implementation. We do not claim to have invented musl-on-Termux, staging or rollback. The [credits](../CREDITS.md) identify the repositories and article that informed the work; [architecture.md](architecture.md) explains the current choices and limits.
 
 The initial supported-configuration claim must come from this project's own acceptance on a Samsung Galaxy S26 Ultra, with the exact Android, Termux, runtime and dependency versions. Earlier experiments on the host are useful research but do not count as a passed release test.
-
-## How ELO and this project can reinforce each other
-
-ELO helps maintainers keep bug investigation, implementation, tests, documentation and publication as distinct pieces of work with explicit closeout evidence. This repository can publish sanitized decision summaries and release reports without exposing private orchestration state, credentials or working sessions.
-
-If an ELO hook is used in a real Claude Code workflow, it can become one named integration test: record the ELO version, harmless fixture, expected hook event and actual result. That demonstrates the specific integration tested. It does not make ELO a dependency or claim all hooks and workflows are compatible.
-
-Contributors may submit ordinary GitHub PRs. Maintainers can translate accepted issues and evidence into ELO seeds internally. The honest relationship is useful engineering work made inspectable, with no required signup, runtime branding injection or unsupported endorsement claim.

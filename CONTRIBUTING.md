@@ -1,6 +1,6 @@
 # Contributing
 
-Help is welcome with device tests, reproducible bug reports, documentation and code. You do not need an ELO account or installation. First read the [architecture](docs/architecture.md) and [testing guide](docs/testing.md) for the behavior a change must preserve.
+Help is welcome with device tests, reproducible bug reports, documentation and code. First read the [architecture](docs/architecture.md) and [testing guide](docs/testing.md) for the behavior a change must preserve.
 
 ## Report a device or bug
 

@@ -111,6 +111,6 @@ Model documentation was checked **2026-09-14** against [Anthropic's model config
 
 ## Help build something dependable
 
-Bug reports, device evidence and small fixes are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) explains branch names, tests and pull requests. The [engineering record](docs/engineering.md) describes how we use ELO to connect decisions, defects and acceptance evidence. ELO is optional for contributors and is not an installation or runtime dependency.
+Bug reports, device evidence and small fixes are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) explains branch names, tests and pull requests. The [engineering record](docs/engineering.md) connects the defects we encountered with design decisions and acceptance evidence.
 
 Our source is [MPL-2.0](LICENSE). Claude Code and separately downloaded dependencies retain their own licenses and terms. We learned from several existing Termux projects and the musl approach documented by Khronos31; see [CREDITS.md](CREDITS.md).

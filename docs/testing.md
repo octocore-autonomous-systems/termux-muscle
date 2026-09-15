@@ -47,7 +47,7 @@ termux-muscle test --model claude-fable-5-1 --output report.json
 
 This explicitly permits a model request and may incur usage on your account. The result must identify the requested and observed model. Documented model availability is distinct from a successful authenticated check. Never add OAuth tokens or API keys to a public report.
 
-Interactive TUI, terminal resizing, hooks, nested invocations, MCP transports and custom workflows should be reported separately with exact steps. Describe hooks and servers with harmless fixtures rather than publishing production configuration. An optional ELO hook check can demonstrate a concrete local hook invocation; ELO is not needed for general compatibility testing.
+Interactive TUI, terminal resizing, hooks, nested invocations, MCP transports and custom workflows should be reported separately with exact steps. Describe hooks and servers with harmless fixtures rather than publishing production configuration. Record each integration's version, expected event and actual result; a passing fixture demonstrates only the integration exercised.
 
 ## Deterministic tests for contributors
 

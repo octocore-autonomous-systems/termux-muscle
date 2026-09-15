@@ -35,4 +35,4 @@ Cross-session messaging was disabled by the vendor's default socket ownership/UI
 
 An initial interactive test showed a blank terminal because GNU `timeout` created a background process group and terminal job control stopped the client. Repeating it with `timeout --foreground` rendered the same runtime normally. The test command was corrected; no runtime change was needed. Use a foreground-aware deadline when testing interactive terminal programs.
 
-Raw session streams, identifiers, account configuration and private paths are excluded. The private ELO session retains exact commands and detailed provenance; contributors do not need ELO to reproduce the public checks in [testing.md](../docs/testing.md).
+Raw session streams, identifiers, account configuration and private paths are excluded. Maintainer records retain exact commands and detailed provenance. Contributors can reproduce the public checks in [testing.md](../docs/testing.md).

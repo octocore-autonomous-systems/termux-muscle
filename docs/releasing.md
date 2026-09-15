@@ -50,4 +50,4 @@ Prefer a tested upstream pin to an unattended upgrade that silently changes comp
 
 If an upstream release changes package format, loader requirements, subprocess behavior or model selection, add a regression and fresh device evidence before calling it supported. Explicit experimental-version installation remains labeled as such. An urgent fix still needs evidence for the behavior it changes.
 
-Maintainers record release decisions and acceptance evidence through ELO. Public engineering records are sanitized summaries; ELO does not need to run on contributor machines or user devices.
+Record release decisions and acceptance evidence in the project's engineering records. Publish sanitized summaries that omit credentials, private paths and raw conversations.
