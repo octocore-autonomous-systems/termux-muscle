@@ -40,7 +40,7 @@ static int open_private(const char *path, bool directory) {
         errno = EINVAL;
         return -1;
     }
-    int fd = open(path[0] == '/' ? "/" : ".", O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    int fd = open(path[0] == '/' ? "/" : ".", O_PATH | O_DIRECTORY | O_CLOEXEC);
     if (fd < 0)
         return -1;
     char *copy = tm_strdup(path), *save = NULL;
@@ -48,7 +48,12 @@ static int open_private(const char *path, bool directory) {
     while (part) {
         char *next = strtok_r(NULL, "/", &save);
         int flags = O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK;
-        if (next || directory)
+        /* Android allows app traversal through ancestors such as /data but
+         * not directory listing. O_PATH needs search permission only; retain
+         * O_RDONLY for the final file or directory we actually inspect. */
+        if (next)
+            flags = O_PATH | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW;
+        else if (directory)
             flags |= O_DIRECTORY;
         int child = openat(fd, part, flags);
         int error = errno;

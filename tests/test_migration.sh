@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MPL-2.0
 set -euo pipefail
 repo=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
-core="$repo/build/tm-core"
+core="${TM_CORE:-$repo/build/tm-core}"
 scratch=$(mktemp -d "${TMPDIR:-/tmp}/tm-migration-test.XXXXXXXX")
 trap 'rm -rf -- "$scratch"' EXIT
 root="$scratch/install"
@@ -120,3 +120,14 @@ mkfifo "$config/projects/private-secret-marker/private-transcript.jsonl"
 check
 has private_session_history_not_scanned
 printf 'PASS migration: historical transcripts are outside the scan\n'
+
+# Android application directories can be searchable but not listable. Inspect
+# known files through those ancestors without requesting directory read access.
+mkdir -p "$scratch/traverse-only/config"
+printf '%s\n' '{"env":{"LD_PRELOAD":"private-secret-marker"}}' > "$scratch/traverse-only/config/settings.json"
+chmod 111 "$scratch/traverse-only"
+CLAUDE_CONFIG_DIR="$scratch/traverse-only/config" "$core" migration "$root" "$prefix" > "$scratch/report"
+chmod 700 "$scratch/traverse-only"
+has settings_loader_override_found
+has selected_settings_inspected
+printf 'PASS migration: searchable non-listable ancestors remain inspectable without following links\n'
