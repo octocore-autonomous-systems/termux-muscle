@@ -59,17 +59,32 @@ tm_preflight() {
 tm_probe_candidate() (
     set -euo pipefail
     local id=$1 version=$2 release=$TM_ROOT/releases/$1
-    local scratch
+    local scratch probe_pid='' status=0
     scratch=$(mktemp -d "$release/.startup.XXXXXXXX")
-    trap 'rm -rf -- "$scratch"' EXIT
+    # shellcheck disable=SC2329 # Invoked by the EXIT trap.
+    tm_candidate_cleanup() {
+        if [[ -n $probe_pid ]]; then
+            kill -TERM "$probe_pid" 2>/dev/null || :
+            wait "$probe_pid" 2>/dev/null || :
+        fi
+        rm -rf -- "$scratch"
+    }
+    trap tm_candidate_cleanup EXIT
+    trap 'exit 129' HUP
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
     # The helper bounds execution/output and clears inherited account settings.
     # Empty HOME/config/cwd and disabled customizations prevent migration state
     # from contaminating acceptance; normal launches keep the user's settings.
     "$TM_CORE" startup-check "$TM_ROOT" "$TM_PREFIX" "$id" "$version" "$scratch" \
-        > "$release/candidate-acceptance.json" || {
+        > "$release/candidate-acceptance.json" &
+    probe_pid=$!
+    wait "$probe_pid" || status=$?
+    probe_pid=
+    if ((status != 0)); then
         printf '%s\n' 'termux-muscle: startup_failed: Isolated candidate initialization failed; current release was preserved. Inspect candidate-acceptance.json for the sanitized check result.' >&2
         exit 1
-    }
+    fi
     "$TM_CORE" state "$TM_ROOT" validate "$id" "$release/candidate-acceptance.json"
 )
 tm_install_release() (

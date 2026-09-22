@@ -118,6 +118,10 @@ case $1 in
         ;;
     startup-check)
         printf '%s\n' isolated-startup >> "$TM_FIXTURE_TRACE/events"
+        if [[ ${TM_FIXTURE_HANG_PROBE:-0} == 1 ]]; then
+            printf '%s %s\n' "$$" "$PPID" > "$TM_FIXTURE_TRACE/startup.pid"
+            while :; do sleep 1; done
+        fi
         [[ ${TM_FIXTURE_FAIL_PROBE:-0} != 1 ]] || { printf '%s\n' '{"status":"FAIL","checks":[{"id":"startup_init","status":"FAIL"}]}'; exit 29; }
         printf '%s\n' '{"status":"PASS","version":"2.1.270","checks":[{"id":"startup_init","status":"PASS"}]}'
         ;;
@@ -251,5 +255,36 @@ PATH="$guards:$PATH" "$host_bash" "$cli" --root "$root" --prefix "$prefix" insta
 has_event state-activate || fail 'no-link prevented runtime installation'
 if has_event default-claude-links; then fail 'no-link changed command entries'; fi
 pass 'explicit no-link installs a runtime without command takeover'
+
+# Reset inherited ignored SIGINT before starting the async test controller.
+"${CC:-cc}" -x c -o "$scratch/reset-signals" - <<'C'
+#include <signal.h>
+#include <unistd.h>
+int main(int argc, char **argv) {
+    if (argc < 2) return 2;
+    signal(SIGINT, SIG_DFL); signal(SIGQUIT, SIG_DFL);
+    execv(argv[1], argv + 1); return 127;
+}
+C
+for signal in HUP INT TERM; do
+    reset_trace
+    TM_FIXTURE_HANG_PROBE=1 PATH="$guards:$PATH" "$scratch/reset-signals" \
+        "$(command -v timeout)" --kill-after=1 10 "$host_bash" "$cli" \
+        --root "$root" --prefix "$prefix" install > "$trace/signal.out" 2> "$trace/signal.err" &
+    controller=$!
+    for ((attempt=0; attempt<200; attempt++)); do
+        [[ -s $trace/startup.pid ]] && break
+        sleep 0.01
+    done
+    read -r probe_pid wrapper_pid < "$trace/startup.pid"
+    kill -s "$signal" "$wrapper_pid"
+    status=0
+    wait "$controller" || status=$?
+    case $signal in HUP) [[ $status == 129 ]];; INT) [[ $status == 130 ]];; TERM) [[ $status == 143 ]];; esac
+    if kill -0 "$probe_pid" 2>/dev/null; then fail 'interrupted candidate helper survived'; fi
+    if has_event state-activate || has_event default-claude-links; then fail 'interrupted candidate activated'; fi
+    (shopt -s nullglob; leftovers=("$root/releases"/*/.startup.*); ((${#leftovers[@]} == 0))) || fail 'interruption leaked candidate config'
+done
+pass 'wrapper-only HUP/INT/TERM reaps startup helper before scratch removal; no activation or command takeover'
 
 printf 'PASS: %s CLI behavior groups\n' "$count"
