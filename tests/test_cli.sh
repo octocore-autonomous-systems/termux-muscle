@@ -116,6 +116,11 @@ case $1 in
             *) printf 'Unexpected fixture JSON field: %s\n' "$3" >&2; exit 83 ;;
         esac
         ;;
+    startup-check)
+        printf '%s\n' isolated-startup >> "$TM_FIXTURE_TRACE/events"
+        [[ ${TM_FIXTURE_FAIL_PROBE:-0} != 1 ]] || { printf '%s\n' '{"status":"FAIL","checks":[{"id":"startup_init","status":"FAIL"}]}'; exit 29; }
+        printf '%s\n' '{"status":"PASS","version":"2.1.270","checks":[{"id":"startup_init","status":"PASS"}]}'
+        ;;
     context) : ;;
     links) printf '%s\0' "$@" > "$TM_FIXTURE_TRACE/links.argv" ;;
     *) printf 'Unexpected fixture helper operation: %s\n' "$1" >&2; exit 84 ;;
@@ -225,6 +230,7 @@ if has_event state-activate; then fail 'candidate activated despite failed start
 if has_event default-claude-links; then fail 'failed candidate changed default commands'; fi
 [[ ! -e $trace/active ]] || fail 'failed candidate changed active selection'
 (shopt -s nullglob; leftovers=("$root/cache"/.lifecycle.*); ((${#leftovers[@]} == 0))) || fail 'failed install leaked lifecycle scratch'
+(shopt -s nullglob; leftovers=("$root/releases"/*/.startup.*); ((${#leftovers[@]} == 0))) || fail 'failed startup leaked private configuration'
 pass 'failed startup prevents activation and cleans transaction scratch'
 
 reset_trace

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: MPL-2.0
 set -euo pipefail
+ulimit -c 0
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
 repository=$PWD
 temporary=$(mktemp -d)
@@ -119,3 +120,26 @@ journal_digest=$("$TM_CORE" sha256 "$link_root/links.json")
 "$temporary/fixture" links-check "$link_root" FAIL command_ownership_invalid
 [[ $("$TM_CORE" sha256 "$link_root/links.json") == "$journal_digest" && ! -e $command_dir/claude ]]
 printf '%s\n' 'PASS command-link ownership, npm replacement and missing-command detection, empty-index SKIP, malformed journal rejection and redaction; fixtures preserved'
+
+# Even when version/help succeed, full initialization can fail. Exercise the
+# real bounded C gate with a fake vendor process; no account or network access.
+mkdir -p "$temporary/startup-prefix/bin"
+for scenario in pass fail signal flood timeout; do
+    printf %s "$scenario" > "$temporary/startup-prefix/scenario"
+    mkdir "$temporary/startup-$scenario"
+    status=FAIL detail=probe_failed
+    case $scenario in
+        pass) status=PASS detail=isolated_initialization_passed ;;
+        flood) detail=probe_output_limit ;;
+        timeout) detail=probe_timeout ;;
+    esac
+    env ANTHROPIC_API_KEY=PRIVATE_SECRET CLAUDE_CODE_OAUTH_TOKEN=PRIVATE_SECRET \
+        NODE_OPTIONS=PRIVATE_SECRET BUN_OPTIONS=PRIVATE_SECRET \
+        BASH_ENV=PRIVATE_SECRET ENV=PRIVATE_SECRET PROOT_TMP_DIR=PRIVATE_SECRET \
+        CLAUDE_CONFIG_DIR=PRIVATE_SECRET CLAUDE_CODE_SIMPLE=1 TM_PRIVATE_SECRET=PRIVATE_SECRET \
+        "$temporary/fixture" startup "$temporary/PRIVATE_SECRET-root" "$temporary/startup-prefix" \
+        2.1.270-0123456789abcdef01234567 "$temporary/startup-$scenario" "$status" "$detail" \
+        > "$temporary/startup-result-$scenario.json"
+    if grep -q PRIVATE_SECRET "$temporary/startup-result-$scenario.json"; then exit 1; fi
+done
+printf '%s\n' 'PASS isolated startup: hostile environment stripped, private config/cwd, version/help alone insufficient, init exit/signal/flood/timeout captured without secrets'

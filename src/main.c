@@ -63,9 +63,12 @@ int main(int argc, char **argv) {
         return tm_acquire_main(argc, argv);
     if (!strcmp(argv[0], "links"))
         return tm_links_main(argc, argv);
+    if (!strcmp(argv[0], "migration"))
+        return tm_migration_main(argc, argv);
     if (!strcmp(argv[0], "tooling"))
         return tm_tooling_main(argc, argv);
-    if (!strcmp(argv[0], "report") || !strcmp(argv[0], "doctor"))
+    if (!strcmp(argv[0], "report") || !strcmp(argv[0], "doctor") ||
+        !strcmp(argv[0], "startup-check"))
         return tm_report_main(argc, argv);
     if (!strcmp(argv[0], "release-check") || !strcmp(argv[0], "release-notes"))
         return tm_release_main(argc, argv);

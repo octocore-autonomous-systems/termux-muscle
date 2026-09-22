@@ -82,3 +82,41 @@ Management self-update must preserve the runtime state bytes. A 0.2.0 `self-upda
 The release gate requires a matching maintainer report with PASS for `install`, `startup_version`, `startup_help`, `shell_tools`, `update`, `rollback` and `uninstall`, plus exact platform/software metadata. It rejects stale project/runtime versions and missing, skipped or failed required checks. Release assertions remain the maintainer's responsibility: a JSON label cannot replace the actual test run.
 
 The manifest references only the matching 0.2.0 report; the retained 0.1.0 report cannot satisfy a new release's required checks. A namespace probe must not turn `shell_tools` into PASS: the recorded 0.2.0 PASS comes from the separate actual Sonnet-issued tool call and independently checked result. Prior Opus and mixed Fable observations remain dated historical evidence and are not relabeled as new model checks.
+
+## Isolated startup acceptance
+
+Unreleased source adds `startup_init` alongside `startup_version` and `startup_help`.
+Install, update, repair and rollback require all three before activation; doctor/test use
+these same checks. Historical 0.1.0/0.2.0 reports are not retroactively upgraded.
+
+The helper runs the verified vendor payload with an allowlisted environment, private HOME,
+CLAUDE_CONFIG_DIR/XDG directories and working directory. Resolver and certificate overrides
+are retained, but credentials, shell injection, loader workarounds and provider overrides
+are not. Initialization uses `--init-only`, safe mode, empty setting sources and MCP config,
+disabled hooks and tools, and no prompt. The [upstream CLI reference](https://code.claude.com/docs/en/cli-reference)
+defines init-only as exiting without a conversation. Unsupported flags fail closed rather
+than silently weakening the check. Help does not list every supported flag.
+
+Safe mode still honors managed hooks. Presence of `/etc/claude-code` (including inaccessible
+or linked entries) therefore rejects automatic acceptance with `managed_policy_requires_review`.
+The manager does not remove or bypass an organization's policy. This guard applies to
+acceptance checks, not ordinary launches of an already installed runtime.
+
+Each probe has a 30-second deadline and 64 KiB captured-output limit, with null stdin and
+discarded stderr. Reports contain fixed result codes, never raw startup output. No paid model
+request is made. This is configuration isolation, **not a network or filesystem sandbox**.
+The payload can still use its release-owned runtime temporary directory. Candidate scratch
+is removed by the lifecycle shell trap; interrupted doctor probes or forced SIGKILL may leave
+private scratch under the selected prefix's temporary directory. Normal cleanup removes only
+the freshly allocated probe tree.
+
+A PASS demonstrates isolated non-conversational initialization on this configuration, not
+normal user hooks/settings, full interactive operation, DNS reachability, authenticated tools,
+MCP calls, background survival or another device. Use the separate `migration` advisory command
+for existing configuration conflicts. Existing core state receipts remain readable; do not use
+internal `state` commands to bypass the public candidate gate.
+
+Regression fixtures cover successful version/help followed by failed init, signals, timeout,
+output overflow, inherited secret/configuration stripping and current-state/command preservation.
+Device acceptance must additionally execute the original pinned payload and verify that fixture
+hooks and MCP commands in the caller's configuration were not invoked.

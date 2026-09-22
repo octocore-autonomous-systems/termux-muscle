@@ -172,6 +172,100 @@ static void validate_report(const char *path) {
     json_object_put(report);
 }
 int main(int argc, char **argv) {
+    if (argc == 8 && !strcmp(argv[1], "startup")) {
+        json_object *result =
+            startup_acceptance(argv[0], argv[2], argv[3], argv[4], "2.1.270", argv[5], NULL);
+        assert(!strcmp(string_value(result, "status"), argv[6]));
+        json_object *checks = tm_json_field(result, "checks", json_type_array);
+        assert(json_object_array_length(checks) == 3);
+        json_object *last = json_object_array_get_idx(checks, 2);
+        assert(!strcmp(string_value(last, "id"), "startup_init"));
+        assert(!strcmp(string_value(last, "detail_code"), argv[7]));
+        const char *text = json_object_to_json_string(result);
+        assert(!strstr(text, "PRIVATE_SECRET"));
+        assert(!strstr(text, argv[5]));
+        tm_json_print(result);
+        json_object_put(result);
+        return 0;
+    }
+    if (argc >= 8 && !strcmp(argv[1], "run")) {
+        const char *blocked[] = {"ANTHROPIC_API_KEY",
+                                 "CLAUDE_CODE_OAUTH_TOKEN",
+                                 "CLAUDE_CODE_SIMPLE",
+                                 "BASH_ENV",
+                                 "ENV",
+                                 "NODE_OPTIONS",
+                                 "BUN_OPTIONS",
+                                 "PROOT_TMP_DIR",
+                                 "LD_PRELOAD",
+                                 "LD_LIBRARY_PATH",
+                                 "TM_PRIVATE_SECRET"};
+        for (size_t i = 0; i < sizeof blocked / sizeof *blocked; i++)
+            assert(!getenv(blocked[i]));
+        char cwd[4096];
+        assert(getcwd(cwd, sizeof cwd));
+        assert(strstr(cwd, "/work") && strcmp(cwd, argv[2]));
+        const char *home = getenv("HOME"), *config = getenv("CLAUDE_CONFIG_DIR");
+        assert(home && config && strcmp(home, config));
+        assert(!strcmp(getenv("XDG_CONFIG_HOME"), config));
+        assert(!strcmp(getenv("XDG_CACHE_HOME"), home));
+        assert(!strcmp(getenv("DISABLE_AUTOUPDATER"), "1"));
+        assert(!strcmp(getenv("CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"), "1"));
+        assert(!strcmp(getenv("CLAUDE_CODE_SKIP_PROMPT_HISTORY"), "1"));
+        assert(!strcmp(argv[5], "probe") && !strcmp(argv[6], "--"));
+        char expected_path[4096];
+        snprintf(expected_path, sizeof expected_path, "%s/bin", argv[3]);
+        assert(!strcmp(getenv("PATH"), expected_path));
+        if (!strcmp(argv[7], "--version")) {
+            puts("2.1.270 (Claude Code)");
+            return 0;
+        }
+        if (!strcmp(argv[7], "--help")) {
+            puts("Usage: claude [options] --model MODEL");
+            return 0;
+        }
+        const char *flags[] = {"--init-only",
+                               "--safe-mode",
+                               "--setting-sources",
+                               "",
+                               "--settings",
+                               "{\"disableAllHooks\":true}",
+                               "--strict-mcp-config",
+                               "--mcp-config",
+                               "{\"mcpServers\":{}}",
+                               "--no-chrome",
+                               "--disable-slash-commands",
+                               "--tools",
+                               ""};
+        assert(argc == 7 + sizeof flags / sizeof *flags);
+        for (size_t i = 0; i < sizeof flags / sizeof *flags; i++)
+            assert(!strcmp(argv[7 + i], flags[i]));
+        char *scenario_path = tm_path(argv[3], "scenario");
+        size_t size;
+        char *scenario = tm_read_file(scenario_path, 128, &size);
+        free(scenario_path);
+        if (!strcmp(scenario, "fail")) {
+            fputs("PRIVATE_SECRET unsupported option", stderr);
+            return 9;
+        }
+        if (!strcmp(scenario, "signal")) {
+            raise(SIGSEGV);
+            return 9;
+        }
+        if (!strcmp(scenario, "timeout")) {
+            for (;;)
+                pause();
+        }
+        if (!strcmp(scenario, "flood")) {
+            char block[8192];
+            memset(block, 'x', sizeof block);
+            for (;;)
+                tm_write_all(1, block, sizeof block);
+        }
+        assert(!strcmp(scenario, "pass"));
+        free(scenario);
+        return 0;
+    }
     if (argc == 5 && !strcmp(argv[1], "links-check")) {
         json_object *checks = json_object_new_array();
         command_links_check(checks, argv[2]);

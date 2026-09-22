@@ -300,6 +300,16 @@ installs only the management tool and manual, without downloading a runtime
 or taking over Claude command entries.
 Use the normal published installer for its prerequisite, source-verification,
 local-build and test sequence.
+.SH MIGRATION PREFLIGHT (UNRELEASED SOURCE)
+Run
+.B termux-muscle migration
+from the affected project for sanitized JSON advisories about old settings loader
+overrides, plugin/worktree path hints and executable PATH shadowing.
+It reads bounded metadata only; it never rewrites configuration, scans transcripts,
+executes hooks or makes network/model requests.
+WARN means manual review, not necessarily a broken installation; advisories exit 0.
+Parent-shell aliases/functions and caches cannot be inspected by a child process.
+Use type -a claude in the same interactive shell.
 .SH DIAGNOSTIC REPORTS
 A default report contains the project and Claude Code versions, musl version,
 manufacturer/model, Android release and API, ABI, kernel, memory page size,
@@ -311,7 +321,13 @@ Each check is
 .BR PASS ,
 .BR FAIL " or " SKIP .
 Checks not actually performed remain SKIP.
-Local version/help/namespace checks do not automatically mark installation,
+Unreleased source also checks isolated non-conversational initialization before
+activation. Fresh HOME/config/cwd and disabled customizations isolate user settings;
+system managed-policy presence blocks automatic probes rather than running hooks.
+Each startup probe is bounded to 30 seconds and 64 KiB captured output.
+Only fixed result codes are retained.
+.PP
+Local version/help/initialization/namespace checks do not automatically mark installation,
 update, rollback, uninstall or authenticated Claude tool workflows PASS.
 DNS configuration checks inspect the selected resolver file; they make no
 DNS query and do not prove external network reachability.
