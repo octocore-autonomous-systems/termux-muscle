@@ -62,6 +62,9 @@ jobs:
           bash tests/dev/check_format.sh
       - name: Build C helper
         run: make -j2 CFLAGS='-std=c11 -Wall -Wextra -Wpedantic -Werror -O2 -g'
+      - name: Test maintainer release tracking offline
+        if: matrix.compiler == 'gcc'
+        run: python3 -B -m unittest discover -s tests/dev -p 'test_track_upstream.py' -v
       - name: Run offline unit and regression tests
         run: make check
       - name: Build source assets twice and verify reproducibility

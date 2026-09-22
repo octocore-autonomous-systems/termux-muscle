@@ -46,6 +46,12 @@ Inspect the public repository visibility, tag, release notes and downloaded asse
 
 ## Maintenance policy
 
+The [upstream release tracker](release-tracking.md) checks npm every six hours
+and proposes newer observed releases through deduplicated testing issues. These
+contain registry metadata, not compatibility approval. Resolve candidates through
+the existing device-evidence and release gates; the tracker never advances the
+pin or publishes a release.
+
 Prefer a tested upstream pin to an unattended upgrade that silently changes compatibility. Candidate checks must run before activation. Preserve a rollback option and bound retained storage without deleting a leased release. A failed check is a reason to keep the working runtime, not to lower the gate.
 
 If an upstream release changes package format, loader requirements, subprocess behavior or model selection, add a regression and fresh device evidence before calling it supported. Explicit experimental-version installation remains labeled as such. An urgent fix still needs evidence for the behavior it changes.

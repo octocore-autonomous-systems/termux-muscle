@@ -9,6 +9,9 @@ source="$work/source"
 fixture_version=$(cat "$project/VERSION")
 mkdir -p "$source/src" "$source/bin" "$source/lib" "$source/tests" "$source/scripts" "$source/docs"
 mkdir -p "$source/.githooks" "$source/docs/man" "$source/docs/images"
+mkdir -p "$source/tests/dev"
+printf '# maintainer tracker fixture\n' > "$source/scripts/track_upstream.py"
+printf '# maintainer tracker test fixture\n' > "$source/tests/dev/test_track_upstream.py"
 # A tiny fixed PNG tests byte preservation, without decoding or editing artwork.
 printf '%s' 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a1XkAAAAASUVORK5CYII=' | base64 --decode > "$source/docs/images/termux-muscle-hero.png"
 printf '.TH TERMUX-MUSCLE 1\n.SH NAME\ntermux-muscle \- fixture manual\n' > "$source/docs/man/termux-muscle.1"
@@ -64,7 +67,11 @@ grep -q '/.clang-format$' "$work/names" || fail 'formatter configuration omitted
 grep -q '/.githooks/pre-commit$' "$work/names" || fail 'contributor hook omitted'
 tar -tvzf "$work/dist/$asset" > "$work/modes"
 grep -Eq '^-rwxr-xr-x .*[/]\.githooks/pre-commit$' "$work/modes" || fail 'contributor hook is not executable'
-if grep -Eq '/build/|\.pyz$|\.py$|tm-core$' "$work/names"; then fail 'archive included compiler output or Python'; fi
+if grep -Eq '/build/|\.pyz$|\.pyc$|tm-core$' "$work/names"; then fail 'archive included compiler output or bytecode'; fi
+for approved in scripts/track_upstream.py tests/dev/test_track_upstream.py; do
+    tar -xOzf "$work/dist/$asset" "termux-muscle-$fixture_version/$approved" > "$work/python-source"
+    cmp "$work/python-source" "$source/$approved" || fail 'maintainer Python source omitted or changed'
+done
 passed
 
 printf '# unapproved hook\n' > "$source/.githooks/other.sh"
@@ -117,6 +124,14 @@ printf 'not a distributable vendor binary\n' > "$source/src/vendor.so"
 run_build
 [[ $status != 0 ]] || fail 'unexpected binary source accepted'
 rm "$source/src/vendor.so"
+passed
+
+for unexpected in "$source/scripts/foreign.py" "$source/tests/dev/foreign.py" "$source/scripts/track_upstream.pyc"; do
+    printf 'unexpected source or bytecode\n' > "$unexpected"
+    run_build
+    [[ $status != 0 ]] || fail 'non-allowlisted Python source or bytecode accepted'
+    rm "$unexpected"
+done
 passed
 
 for unexpected in "$source/docs/man/foreign.1" "$source/src/payload.1"; do

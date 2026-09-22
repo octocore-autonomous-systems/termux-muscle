@@ -87,6 +87,16 @@ Default updates stay with the project's compatibility pin. An explicitly request
 
 `rollback` restores a previous **Claude Code runtime**. Management-tool self-update is separate: 0.2.0 rejects `self-update --version` requests below 0.2.0 because older managers cannot read the new manual ownership records. Do not run an old installer over a newer installation. An intentional manager downgrade requires uninstalling with the current manager first.
 
+## Upstream release tracking
+
+The repository's scheduled tracker checks Anthropic's ARM64 musl package every
+six hours and opens a deduplicated compatibility-testing issue when it observes
+a version newer than the project pin. Discovery does not approve compatibility
+or update installations. Maintainers still test and publish a verified pin;
+users then run `termux-muscle self-update` followed by `termux-muscle update`.
+See [release tracking](docs/release-tracking.md) for activation, manual checks,
+failure visibility and scheduling limits.
+
 ## Device compatibility
 
 A configuration is **device + Android/API + Termux build**, with ABI, kernel, page size and dependency versions in its report. Android version affects available system interfaces; hardware and vendor firmware can change the kernel and process behavior. Neither dimension alone proves compatibility.
