@@ -31,6 +31,7 @@ Usage: termux-muscle [--root DIR] [--prefix TERMUX_PREFIX] COMMAND [OPTIONS]
   repair [--offline]           Rebuild from verified original artifacts
   versions                     Show active, previous and retained release identifiers
   doctor                       Check local installation health; no model requests
+  migration                    Read-only settings/path advisories as sanitized JSON
   test --output FILE           Write a sanitized local device report; no uploads
   link [--replace] [--path P]  Own a Claude entry; preserve or back up an existing command
   cleanup [--keep N]           Remove inactive releases; keep active sessions protected
@@ -58,25 +59,32 @@ tm_preflight() {
 tm_probe_candidate() (
     set -euo pipefail
     local id=$1 version=$2 release=$TM_ROOT/releases/$1
-    local output expected
-    expected="$version (Claude Code)"
-    # Bound both execution time and diagnostic file growth. A failed candidate
-    # remains owned but inactive; the current state is never changed here.
-    (
-        ulimit -f 2048
-        timeout --kill-after=3 30 "$TM_CORE" run "$TM_ROOT" "$TM_PREFIX" "$id" probe -- --version \
-            > "$release/probe-version.txt" 2> "$release/probe-version.err"
-    ) || { printf '%s\n' 'termux-muscle: startup_failed: Candidate cannot start; current release was preserved. Run doctor from a native Termux shell.' >&2; exit 1; }
-    output=$(cat -- "$release/probe-version.txt")
-    [[ $output == "$expected" ]] || { printf '%s\n' 'termux-muscle: version_mismatch: Candidate reported an unexpected version; current release was preserved.' >&2; exit 1; }
-    (
-        ulimit -f 2048
-        timeout --kill-after=3 30 "$TM_CORE" run "$TM_ROOT" "$TM_PREFIX" "$id" probe -- --help \
-            > "$release/probe-help.txt" 2> "$release/probe-help.err"
-    ) || { printf '%s\n' 'termux-muscle: startup_failed: Candidate help initialization failed; current release was preserved.' >&2; exit 1; }
-    [[ -s $release/probe-help.txt ]] || { printf '%s\n' 'termux-muscle: startup_failed: Candidate help output was empty.' >&2; exit 1; }
-    printf '{"status":"PASS","version":"%s","checks":[{"id":"startup_version","status":"PASS"},{"id":"startup_help","status":"PASS"}]}\n' \
-        "$version" > "$release/candidate-acceptance.json"
+    local scratch probe_pid='' status=0
+    scratch=$(mktemp -d "$release/.startup.XXXXXXXX")
+    # shellcheck disable=SC2329 # Invoked by the EXIT trap.
+    tm_candidate_cleanup() {
+        if [[ -n $probe_pid ]]; then
+            kill -TERM "$probe_pid" 2>/dev/null || :
+            wait "$probe_pid" 2>/dev/null || :
+        fi
+        rm -rf -- "$scratch"
+    }
+    trap tm_candidate_cleanup EXIT
+    trap 'exit 129' HUP
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+    # The helper bounds execution/output and clears inherited account settings.
+    # Empty HOME/config/cwd and disabled customizations prevent migration state
+    # from contaminating acceptance; normal launches keep the user's settings.
+    "$TM_CORE" startup-check "$TM_ROOT" "$TM_PREFIX" "$id" "$version" "$scratch" \
+        > "$release/candidate-acceptance.json" &
+    probe_pid=$!
+    wait "$probe_pid" || status=$?
+    probe_pid=
+    if ((status != 0)); then
+        printf '%s\n' 'termux-muscle: startup_failed: Isolated candidate initialization failed; current release was preserved. Inspect candidate-acceptance.json for the sanitized check result.' >&2
+        exit 1
+    fi
     "$TM_CORE" state "$TM_ROOT" validate "$id" "$release/candidate-acceptance.json"
 )
 tm_install_release() (
@@ -209,6 +217,10 @@ case $command in
         if (($# == 0)); then exec "$TM_CORE" state "$TM_ROOT" versions; fi
         [[ $# == 1 && $1 == --json ]] || tm_error usage 'Use versions or versions --json.'
         exec "$TM_CORE" state "$TM_ROOT" show
+        ;;
+    migration)
+        (($# == 0)) || tm_error usage 'migration takes no arguments; run it from the affected project.'
+        exec "$TM_CORE" migration "$TM_ROOT" "$TM_PREFIX"
         ;;
     doctor|test) source "$TM_SOURCE/lib/diagnostics.sh"; tm_diagnostics "$command" "$@"; exit ;;
     self-update) source "$TM_SOURCE/lib/tooling.sh"; tm_self_update "$@"; exit ;;

@@ -617,6 +617,143 @@ static probe_result runtime_probe(const char *self, const char *root, const char
     argv[n] = NULL;
     return capture(argv, cwd, timeout, 2U * TM_METADATA_MAX, NULL, NULL);
 }
+/* Initialization never inherits account/provider settings, injected shell code,
+ * user HOME, project discovery or loader workarounds. This is configuration
+ * isolation, not a filesystem/network sandbox for the verified vendor binary. */
+typedef struct {
+    char *const *argv;
+    const char *prefix, *home, *config, *work, *resolver, *certificate;
+} startup_context;
+static void startup_environment(void *opaque) {
+    startup_context *context = opaque;
+    if (clearenv())
+        _exit(125);
+    char *path = tm_path(context->prefix, "bin");
+    const char *names[] = {"HOME",
+                           "CLAUDE_CONFIG_DIR",
+                           "PATH",
+                           "PREFIX",
+                           "TMPDIR",
+                           "DISABLE_AUTOUPDATER",
+                           "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+                           "CLAUDE_CODE_SKIP_PROMPT_HISTORY",
+                           "TERM",
+                           "LANG",
+                           "XDG_CONFIG_HOME",
+                           "XDG_CACHE_HOME"};
+    const char *values[] = {
+        context->home, context->config, path, context->prefix, context->work, "1", "1",
+        "1",           "dumb",          "C",  context->config, context->home};
+    for (size_t i = 0; i < sizeof names / sizeof *names; i++)
+        if (setenv(names[i], values[i], 1))
+            _exit(125);
+    if (context->resolver && setenv("TM_RESOLV_CONF", context->resolver, 1))
+        _exit(125);
+    if (context->certificate && setenv("SSL_CERT_FILE", context->certificate, 1))
+        _exit(125);
+    execv(context->argv[0], context->argv);
+    _exit(127);
+}
+static bool managed_policy_present(void) {
+    /* Safe mode still honors managed hooks. Do not bypass enterprise policy or
+     * run it inside an automatic acceptance probe. A fresh private HOME cannot
+     * isolate this Linux system path. Include inaccessible paths fail-closed. */
+    struct stat info;
+    return !lstat("/etc/claude-code", &info) || errno != ENOENT;
+}
+static json_object *startup_acceptance(const char *self, const char *root, const char *prefix,
+                                       const char *id, const char *version, const char *scratch,
+                                       bool *model_flags) {
+    if (model_flags)
+        *model_flags = false;
+    json_object *acceptance = json_object_new_object(), *checks = json_object_new_array();
+    addstr(acceptance, "version", version);
+    json_object_object_add(acceptance, "checks", checks);
+    if (managed_policy_present()) {
+        check(checks, "startup_init", "FAIL", "managed_policy_requires_review");
+        addstr(acceptance, "status", "FAIL");
+        return acceptance;
+    }
+    char *home = tm_path(scratch, "home"), *config = tm_path(scratch, "config"),
+         *work = tm_path(scratch, "work");
+    tm_directory(scratch, false);
+    if (mkdir(home, 0700) || mkdir(config, 0700) || mkdir(work, 0700))
+        tm_die("startup_isolation_failed",
+               "Startup checks need a fresh private scratch directory.");
+    startup_context context = {.prefix = prefix,
+                               .home = home,
+                               .config = config,
+                               .work = work,
+                               .resolver = getenv("TM_RESOLV_CONF"),
+                               .certificate = getenv("SSL_CERT_FILE")};
+    const char *ids[] = {"startup_version", "startup_help", "startup_init"};
+    bool passed = true;
+    for (size_t i = 0; i < 3; i++) {
+        if (!passed) {
+            check(checks, ids[i], "SKIP", "prerequisite_failed");
+            continue;
+        }
+        char *args[40] = {(char *)self, "run",   (char *)root, (char *)prefix,
+                          (char *)id,   "probe", "--"};
+        size_t n = 7;
+        if (i < 2) {
+            args[n++] = i == 0 ? "--version" : "--help";
+        } else {
+            char *flags[] = {"--init-only",
+                             "--safe-mode",
+                             "--setting-sources",
+                             "",
+                             "--settings",
+                             "{\"disableAllHooks\":true}",
+                             "--strict-mcp-config",
+                             "--mcp-config",
+                             "{\"mcpServers\":{}}",
+                             "--no-chrome",
+                             "--disable-slash-commands",
+                             "--tools",
+                             ""};
+            for (size_t j = 0; j < sizeof flags / sizeof *flags; j++)
+                args[n++] = flags[j];
+        }
+        args[n] = NULL;
+        context.argv = args;
+        probe_result probe = capture(NULL, work, 30000, 65536, startup_environment, &context);
+        passed = probe_ok(&probe);
+        const char *detail = passed ? "isolated_initialization_passed" : probe_detail(&probe);
+        if (passed && i == 0) {
+            char expected[128];
+            snprintf(expected, sizeof expected, "%s (Claude Code)", version);
+            passed = !strcmp(trim(&probe), expected);
+            detail = passed ? "isolated_version_passed" : "runtime_version_mismatch";
+        } else if (passed && i == 1) {
+            passed = strstr(probe.text, "Usage:") && strstr(probe.text, "--model");
+            detail = passed ? "isolated_help_passed" : "help_output_unrecognized";
+            if (model_flags) {
+                const char *required[] = {"--safe-mode",
+                                          "--tools",
+                                          "--strict-mcp-config",
+                                          "--mcp-config",
+                                          "--setting-sources",
+                                          "--settings",
+                                          "--no-session-persistence",
+                                          "--disable-slash-commands",
+                                          "--no-chrome",
+                                          "--output-format",
+                                          "--verbose"};
+                *model_flags = passed;
+                for (size_t j = 0; j < sizeof required / sizeof *required; j++)
+                    *model_flags = *model_flags && strstr(probe.text, required[j]);
+            }
+        }
+        check(checks, ids[i], passed ? "PASS" : "FAIL", detail);
+        free(probe.text);
+    }
+    addstr(acceptance, "status", passed ? "PASS" : "FAIL");
+    free(home);
+    free(config);
+    free(work);
+    return acceptance;
+}
 static json_object *collect_report(const char *root, const char *prefix, const char *source,
                                    size_t model_count, char **models) {
     (void)source;
@@ -656,59 +793,29 @@ static json_object *collect_report(const char *root, const char *prefix, const c
     if (valid) {
         addstr(client, "version", version);
         addstr(client, "musl_version", musl);
-        const char *check_ids[] = {"startup_version", "startup_help", "namespace_shell"};
-        for (size_t i = 0; i < 3; i++) {
-            if (!temporary_ready) {
-                check(checks, check_ids[i], "FAIL", "temporary_directory_unavailable");
-                continue;
-            }
-            probe_result probe;
-            if (i < 2) {
-                char *args[] = {i == 0 ? "--version" : "--help", NULL};
-                probe = runtime_probe(self, root, prefix, id, temporary, args, 30000);
-            } else {
-                char *args[] = {self,           "shell-probe", (char *)root,
-                                (char *)prefix, (char *)id,    NULL};
-                probe = capture(args, temporary, 30000, 4096, NULL, NULL);
-            }
-            bool passed = probe_ok(&probe);
-            const char *detail = passed ? "local_probe_passed" : probe_detail(&probe);
-            if (passed && !i) {
-                char expected[128];
-                snprintf(expected, sizeof expected, "%s (Claude Code)", version);
-                passed = !strcmp(trim(&probe), expected);
-                if (!passed)
-                    detail = "runtime_version_mismatch";
-            } else if (passed && i == 1) {
-                passed = strstr(probe.text, "Usage:") && strstr(probe.text, "--model");
-                if (!passed)
-                    detail = "help_output_unrecognized";
-                const char *required[] = {"--safe-mode",
-                                          "--tools",
-                                          "--strict-mcp-config",
-                                          "--mcp-config",
-                                          "--setting-sources",
-                                          "--settings",
-                                          "--no-session-persistence",
-                                          "--disable-slash-commands",
-                                          "--no-chrome",
-                                          "--output-format",
-                                          "--verbose"};
-                model_flags_ready = passed;
-                for (size_t j = 0; j < sizeof required / sizeof *required; j++)
-                    model_flags_ready = model_flags_ready && strstr(probe.text, required[j]);
-            } else if (passed && i == 2) {
-                passed = !strcmp(trim(&probe), "namespace_shell:PASS");
-                if (!passed)
-                    detail = "namespace_probe_unrecognized";
-            }
+        if (temporary_ready) {
+            json_object *startup =
+                startup_acceptance(self, root, prefix, id, version, temporary, &model_flags_ready);
+            json_object *startup_checks = tm_json_field(startup, "checks", json_type_array);
+            for (size_t i = 0; i < json_object_array_length(startup_checks); i++)
+                json_object_array_add(
+                    checks, json_object_get(json_object_array_get_idx(startup_checks, i)));
+            local_ready = local_ready && !strcmp(string_value(startup, "status"), "PASS");
+            json_object_put(startup);
+            char *args[] = {self, "shell-probe", (char *)root, (char *)prefix, (char *)id, NULL};
+            probe_result probe = capture(args, temporary, 30000, 4096, NULL, NULL);
+            bool passed = probe_ok(&probe) && !strcmp(trim(&probe), "namespace_shell:PASS");
+            check(checks, "namespace_shell", passed ? "PASS" : "FAIL",
+                  passed ? "local_probe_passed" : probe_detail(&probe));
             local_ready = local_ready && passed;
-            check(checks, check_ids[i], passed ? "PASS" : "FAIL", detail);
             free(probe.text);
+        } else {
+            check(checks, "startup_init", "FAIL", "temporary_directory_unavailable");
         }
     } else {
         check(checks, "startup_version", "SKIP", "runtime_unavailable");
         check(checks, "startup_help", "SKIP", "runtime_unavailable");
+        check(checks, "startup_init", "SKIP", "runtime_unavailable");
         check(checks, "namespace_shell", "SKIP", "runtime_unavailable");
     }
     const char *lifecycle[] = {"install", "update", "rollback", "uninstall"};
@@ -754,8 +861,15 @@ static json_object *collect_report(const char *root, const char *prefix, const c
         json_object_array_add(model_results, model_result(models[i], &probe));
         free(probe.text);
     }
-    if (temporary_ready)
-        (void)rmdir(temporary);
+    if (temporary_ready) {
+        char *rm = tm_path(prefix, "bin/rm");
+        char *args[] = {rm, "-rf", "--", temporary, NULL};
+        probe_result cleanup = capture(args, NULL, 5000, 128, NULL, NULL);
+        if (!probe_ok(&cleanup))
+            check(checks, "probe_cleanup", "FAIL", "private_probe_cleanup_failed");
+        free(cleanup.text);
+        free(rm);
+    }
     free(temporary);
     free(self);
     free(metadata.text);
@@ -826,6 +940,18 @@ static int publish_report(const char *temporary, const char *destination) {
     return 0;
 }
 int tm_report_main(int argc, char **argv) {
+    if (argc == 6 && !strcmp(argv[0], "startup-check")) {
+        if (!tm_release_valid(argv[3]) || !tm_version_valid(argv[4]))
+            tm_die("usage", "Startup checks require a release ID and exact version.");
+        char *self = self_executable();
+        json_object *result =
+            startup_acceptance(self, argv[1], argv[2], argv[3], argv[4], argv[5], NULL);
+        bool passed = !strcmp(string_value(result, "status"), "PASS");
+        tm_json_print(result);
+        json_object_put(result);
+        free(self);
+        return passed ? 0 : 1;
+    }
     if (argc == 4 && !strcmp(argv[0], "report") && !strcmp(argv[1], "--publish"))
         return publish_report(argv[2], argv[3]);
     if (argc < 4)

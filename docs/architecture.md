@@ -30,6 +30,15 @@ Nested execution recognizes a context bound inside the existing namespace and ke
 
 PRoot is part of this design. The project does not claim zero overhead, root-level isolation, universal Android compatibility or equivalence to a supported desktop installation. Ordinary sessions and bounded test probes have different process-lifetime requirements; terminating a health probe must not imply killing legitimate background work in ordinary use.
 
+## Isolated startup gate (unreleased source)
+
+Before promotion, the same bounded checker used by doctor runs version, help and `--init-only`
+with private HOME/config/cwd and a clean allowlisted environment. It disables customizations,
+hooks, MCP and tools and passes no prompt. System managed-policy presence blocks this automatic
+probe rather than executing mandatory hooks. Candidate failure leaves current selection and
+command ownership unchanged. Normal launches continue to preserve user configuration; the
+separate [migration scan](migration.md) is advisory and never rewrites it.
+
 ## Installation and update transactions
 
 An installation has a private identity and an atomic state record. New candidates are prepared at permanent release paths. Promotion changes the state record after checks pass, keeping the prior working release available. Shared leases protect releases in use; an exclusive maintenance lock prevents concurrent mutations and is released by the operating system after process death.

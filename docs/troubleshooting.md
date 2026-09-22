@@ -23,6 +23,18 @@ Start with `termux-muscle doctor`, `termux-muscle versions` and `man termux-musc
 | Android kills a long session or background process | OS/vendor process and battery restrictions may apply. | Record the Android/kernel/device configuration and exact scenario. Do not infer that a passing startup test guarantees background survival. |
 | Cross-session messaging is disabled by a UID-mapping check | Claude cannot validate its default inbox ownership in this PRoot environment. | Single-session workflows can continue. See the dated [0.1.0 device report](../compatibility/galaxy-s26-ultra-20260914.md); no new messaging or background-agent support is claimed by 0.2.0. |
 
+## Migration and initialization checks (unreleased source)
+
+Run `termux-muscle migration` from the affected project for read-only advisories about old
+loader settings, plugin/worktree paths and executable PATH selection. See the
+[migration guide](migration.md); historical session files are never scanned or rewritten.
+
+If `startup_init` fails, the candidate is not activated. Keep the existing runtime and inspect
+the fixed detail code in its `candidate-acceptance.json`; no private startup output is saved.
+`managed_policy_requires_review` means automatic checks could execute mandatory system hooks,
+so the manager refuses to run them. Do not remove organizational policy to force acceptance.
+Timeouts and unsupported options require diagnosis, not bypassing the gate.
+
 ## Command selection and recovery
 
 Normal installation takes over the executable `claude` selected from PATH, plus the Termux prefix and home-bin entries, only after the runtime passes validation. It backs up original commands. An installation made with `--no-link` deliberately leaves them unchanged; `--no-install` provides only the manager and manual.

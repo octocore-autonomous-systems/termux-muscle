@@ -55,6 +55,17 @@ An unrelated existing command named `termux-muscle` or an unrelated manual is pr
 
 For a custom setup, pass `--no-link` to install the runtime while preserving Claude command entries. Pass `--no-install` to install only the management tool and manual, without downloading or redirecting Claude. To inspect the bootstrap or supply these options, download the same `install.sh` URL to a file, read it, then run `sh install.sh --no-link` or `sh install.sh --no-install`.
 
+## Existing installations and development preflight
+
+The unreleased source adds `termux-muscle migration`: run it from the affected project
+before moving an existing setup. It reports old loader settings, legacy plugin/worktree
+path hints, and executable shadowing without changing configuration or reading transcripts.
+See the [migration guide](docs/migration.md). This command is not in the published 0.2.0 installer yet.
+
+Development candidate checks now require isolated non-conversational initialization as well
+as version/help. They do not use your Claude account, hooks, plugins or MCP configuration;
+normal launches still do. See [startup acceptance](docs/testing.md#isolated-startup-acceptance).
+
 ## Everyday use
 
 | Task | Command |
