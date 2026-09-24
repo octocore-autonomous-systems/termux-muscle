@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "project_version": "0.3.1",
+  "project_version": "0.3.2",
   "verified_on": "2026-09-24",
   "claude": {
     "version": "2.1.270",
@@ -39,9 +39,9 @@
     "verified": [
       "claude-sonnet-5"
     ],
-    "availability_note": "Sonnet 5 passed an exact authenticated Bash-tool workflow on 2026-09-24 with 0.3.1 on the reported Galaxy S26 Ultra. Dated 0.3.0 and 0.2.0 Sonnet checks and 0.1.0 Opus/Sonnet and mixed Fable observations remain historical. Model availability depends on account, provider and organization policy."
+    "availability_note": "Sonnet 5 passed an exact authenticated Bash-tool workflow on 2026-09-24 with 0.3.2 on the reported Galaxy S26 Ultra. Dated 0.3.1, 0.3.0 and 0.2.0 Sonnet checks and 0.1.0 Opus/Sonnet and mixed Fable observations remain historical. Model availability depends on account, provider and organization policy."
   },
   "reports": [
-    "compatibility/galaxy-s26-ultra-0.3.1-20260924.json"
+    "compatibility/galaxy-s26-ultra-0.3.2-20260924.json"
   ]
 }
