@@ -8,7 +8,7 @@
 
 An independent community project from [Octocore Autonomous Systems](https://github.com/octocore-autonomous-systems) (OAS). **Not affiliated with, endorsed by, sponsored by, or authorized by Anthropic.** Claude and Claude Code are Anthropic products; your use of them remains subject to Anthropic's terms and account access.
 
-> **0.3.0 pins Claude Code 2.1.270** on Android **ARM64 / aarch64**. Private source installation, startup, update, rollback, removal and an authenticated Sonnet 5 tool workflow passed on **Samsung Galaxy S26 Ultra, Android 16, Termux 0.118.3 (GitHub)**. See the scoped [0.3.0 report](compatibility/galaxy-s26-ultra-0.3.0-20260924.md); other configurations need volunteer evidence.
+> **0.3.1 pins Claude Code 2.1.270** on Android **ARM64 / aarch64**. Private source installation, startup, update, rollback, removal and an authenticated Sonnet 5 tool workflow passed on **Samsung Galaxy S26 Ultra, Android 16, Termux 0.118.3 (GitHub)**. See the scoped [0.3.1 report](compatibility/galaxy-s26-ultra-0.3.1-20260924.md); other configurations need volunteer evidence.
 
 [Install](#install) · [Commands](#everyday-use) · [Device matrix](#device-compatibility) · [Troubleshooting](docs/troubleshooting.md) · [Contribute](CONTRIBUTING.md)
 
@@ -30,7 +30,7 @@ This is a **Claude Code lifecycle manager**, not a general agent runtime. It doe
 Run this in a **native Termux shell on an ARM64 Android device**:
 
 ```sh
-curl -fsSL https://github.com/octocore-autonomous-systems/termux-muscle/releases/download/v0.3.0/install.sh | sh
+curl -fsSL https://github.com/octocore-autonomous-systems/termux-muscle/releases/download/v0.3.1/install.sh | sh
 ```
 
 The installer adds missing Termux prerequisites with `pkg`, verifies the release's source archive, builds the C helper locally and runs its offline tests before installation. Bash manages the lifecycle; the helper uses json-c, libarchive and OpenSSL. Build and test tools are Clang, make, pkg-config and diffutils; tar and gzip unpack the source. Runtime tools are Bash, PRoot, coreutils, ripgrep, curl and CA certificates. Termux's `mandoc` package provides the manual viewer. The project requires no Python, npm or Ubuntu installation.
@@ -84,7 +84,7 @@ normal launches still do. See [startup acceptance](docs/testing.md#isolated-star
 
 Default updates stay with the project's compatibility pin. An explicitly requested upstream version is experimental until tested on your device; see `update --help`. Installation and ordinary health checks make no paid model requests. Uninstall restores replaced commands only while their installed entries remain unchanged and owned; it preserves later foreign changes and keeps the recovery evidence. Claude account data, settings, sessions, projects and installed Termux packages remain intact.
 
-`rollback` restores a previous **Claude Code runtime**. Management-tool self-update is separate: the 0.3.0 manager skips an equal or older published version with a notice; `-f` or `--force` deliberately reinstalls a compatible version after the normal integrity checks. In-place updates below 0.2.0 remain incompatible even with `--force`, because those managers cannot read the manual ownership records. Do not run an old installer over a newer installation. An intentional downgrade below 0.2.0 requires uninstalling with the current manager first.
+`rollback` restores a previous **Claude Code runtime**. Management-tool self-update is separate: the 0.3.1 manager skips an equal or older published version with a notice; `-f` or `--force` deliberately reinstalls a compatible version after the normal integrity checks. In-place updates below 0.2.0 remain incompatible even with `--force`, because those managers cannot read the manual ownership records. Do not run an old installer over a newer installation. An intentional downgrade below 0.2.0 requires uninstalling with the current manager first.
 
 ## Device compatibility
 
@@ -94,9 +94,12 @@ The capability matrix grows only when someone supplies a report. **PASS** means 
 
 | Tested configuration | Install | Start | Shell namespace | Claude tools | Manual | Update | Rollback | Removal | Evidence |
 | --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | --- |
+| **0.3.1, 2026-09-24 UTC** · Samsung Galaxy S26 Ultra · SM-S948U · Android 16 / API 36 · Termux 0.118.3 (GitHub) | PASS³ | PASS | PASS | PASS | — | PASS | PASS | PASS | [Maintainer report](compatibility/galaxy-s26-ultra-0.3.1-20260924.md) · [JSON](compatibility/galaxy-s26-ultra-0.3.1-20260924.json) |
 | **0.3.0, 2026-09-24 UTC** · Samsung Galaxy S26 Ultra · SM-S948U · Android 16 / API 36 · Termux 0.118.3 (GitHub) | PASS² | PASS | PASS | PASS | — | PASS | PASS | PASS | [Maintainer report](compatibility/galaxy-s26-ultra-0.3.0-20260924.md) · [JSON](compatibility/galaxy-s26-ultra-0.3.0-20260924.json) |
 | **0.2.0, 2026-09-15 UTC** · Samsung Galaxy S26 Ultra · SM-S948U · Android 16 / API 36 · Termux 0.118.3 (GitHub) | PASS¹ | PASS | PASS | PASS | PASS | PASS | PASS | PASS | [Maintainer report](compatibility/galaxy-s26-ultra-0.2.0-20260915.md) · [JSON](compatibility/galaxy-s26-ultra-0.2.0-20260915.json) |
 | **0.1.0, 2026-09-14** · Samsung Galaxy S26 Ultra · SM-S948U · Android 16 / API 36 · Termux 0.118.3 (GitHub) | PASS | PASS | PASS | PASS | — | PASS | PASS | PASS | [Historical report](compatibility/galaxy-s26-ultra-20260914.md) · [JSON](compatibility/galaxy-s26-ultra-20260914.json) |
+
+³ Version 0.3.1 corrects the installer test helper selection when self-updating from an older manager. The 0.3.0 self-update from 0.2.0 stopped before installation because its migration test selected the old helper. The published 0.3.0 files are preserved.
 
 ² The fresh **0.3.0** source installation used a private root and `--no-link`. It passed a separate authenticated Sonnet 5 shell-tool fixture. Command takeover, indexed manual discovery and public HTTPS delivery were not retested for 0.3.0.
 
@@ -112,7 +115,7 @@ Review the local JSON, then [open a Device compatibility issue](https://github.c
 
 ## Claude Code and models
 
-Project versions and Claude Code versions are separate. **0.3.0** retains **Claude Code 2.1.270** and musl **1.2.6-r2**, unchanged from 0.1.0. [compatibility.json](compatibility.json) is the machine-readable record; each published release includes matching notes and checksums. This manager update does not add a new model or account entitlement.
+Project versions and Claude Code versions are separate. **0.3.1** retains **Claude Code 2.1.270** and musl **1.2.6-r2**, unchanged from 0.1.0. [compatibility.json](compatibility.json) is the machine-readable record; each published release includes matching notes and checksums. This manager update does not add a new model or account entitlement.
 
 | Documented model | Model ID | Minimum Claude Code |
 | --- | --- | --- |
@@ -120,7 +123,7 @@ Project versions and Claude Code versions are separate. **0.3.0** retains **Clau
 | Opus 5 | `claude-opus-5` | 2.1.219 |
 | Sonnet 5 | `claude-sonnet-5` | 2.1.197 |
 
-Model documentation was checked **2026-09-14** against [Anthropic's model configuration documentation](https://code.claude.com/docs/en/model-config). **Sonnet 5 passed exact authenticated tool acceptance with 0.3.0 on 2026-09-24 UTC and with 0.2.0 on 2026-09-15 UTC.** The dated **0.1.0** report separately retains Opus 5/Sonnet 5 PASS results and a direct Fable 5.1 response with automated upstream fallback/refusal; those observations remain visible in the [historical report](compatibility/galaxy-s26-ultra-20260914.md#model-observations). Opus and Fable were not newly verified for 0.3.0. Availability depends on your account, provider and organization policy; no Opus 5.1 identifier was established by the evidence.
+Model documentation was checked **2026-09-14** against [Anthropic's model configuration documentation](https://code.claude.com/docs/en/model-config). **Sonnet 5 passed exact authenticated tool acceptance with 0.3.1 and 0.3.0 on 2026-09-24 UTC, and with 0.2.0 on 2026-09-15 UTC.** The dated **0.1.0** report separately retains Opus 5/Sonnet 5 PASS results and a direct Fable 5.1 response with automated upstream fallback/refusal; those observations remain visible in the [historical report](compatibility/galaxy-s26-ultra-20260914.md#model-observations). Opus and Fable were not newly verified for 0.3.1. Availability depends on your account, provider and organization policy; no Opus 5.1 identifier was established by the evidence.
 
 ## Help build something dependable
 

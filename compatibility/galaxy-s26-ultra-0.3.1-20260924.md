@@ -1,0 +1,11 @@
+# Galaxy S26 Ultra acceptance: Termux Muscle 0.3.1
+
+Verified 2026-09-24 UTC on Samsung Galaxy S26 Ultra (SM-S948U), Android 16 / API 36, Termux 0.118.3 from GitHub. The [JSON report](galaxy-s26-ultra-0.3.1-20260924.json) records exact kernel, page size, security patch, package versions, check results and sanitized workflow metadata. The unmodified payload is Claude Code 2.1.270 with musl 1.2.6-r2.
+
+A private source installation with `--no-link` passed on an offline retry. The first attempt rejected isolated `--init-only` with sanitized `probe_failed` and made no active promotion; the next attempt passed version, help and initialization and activated the candidate. The failure and successful retry logs are retained privately. An offline update activated a retained candidate, rollback restored the previous one, the local report passed runtime integrity, DNS configuration, isolated startup and namespace checks, and uninstall removed the owned private root. Live Claude command links were unchanged.
+
+The test runner was separately exercised with an inherited `TM_CORE` value, matching the environment of `self-update` from an older manager. It selected the 0.3.1 checkout's newly built helper. The full native C/Bash suite passed. This addresses the 0.3.0 public installer failure, where the migration test selected the installed 0.2.0 helper and stopped before publication.
+
+A bounded authenticated run used the 0.3.1 helper and private runtime. Sonnet 5 made exactly one preallowed `Bash(./verify-runtime.sh)` call. An independent checker correlated its successful result, final result, exact model identity and fixture attestation for native shell, portable shebang, ripgrep, nested launcher and shell tools. The capture exited 0 in 4947 ms without timeout or output overflow, capped at two turns and USD 0.50. Raw events with session identifiers remain private.
+
+This source acceptance did not test ordinary `claude` command takeover or indexed manual discovery. Published HTTPS installer delivery is a separate post-publication check. Interactive UI, background/screen-off operation, custom hooks, MCP tool calls and other models were not exercised for 0.3.1. Earlier reports remain dated evidence with their own scope.

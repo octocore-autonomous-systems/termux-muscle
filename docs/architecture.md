@@ -1,6 +1,6 @@
 # Architecture and boundaries
 
-Termux Muscle manages Claude Code on native Android Termux. Version 0.3.0 retains the official Linux ARM64 musl executable and musl loader used by 0.1.0, inside one PRoot namespace. Bash sequences lifecycle commands, and a C helper handles parsing, integrity, owned filesystem state and execution. The helper is compiled on the target device. Vendor payloads are fetched separately with the URLs and digests in `compatibility.json`. The [fresh 0.3.0 report](../compatibility/galaxy-s26-ultra-0.3.0-20260924.md) records private source lifecycle and authenticated Sonnet tool acceptance; 0.2.0 command/manual and older 0.1.0 model observations remain historical evidence.
+Termux Muscle manages Claude Code on native Android Termux. Version 0.3.1 retains the official Linux ARM64 musl executable and musl loader used by 0.1.0, inside one PRoot namespace. Bash sequences lifecycle commands, and a C helper handles parsing, integrity, owned filesystem state and execution. The helper is compiled on the target device. Vendor payloads are fetched separately with the URLs and digests in `compatibility.json`. The [fresh 0.3.1 report](../compatibility/galaxy-s26-ultra-0.3.1-20260924.md) records private source lifecycle and authenticated Sonnet tool acceptance; 0.2.0 command/manual and older 0.1.0 model observations remain historical evidence.
 
 ## Why installation needs a manager
 

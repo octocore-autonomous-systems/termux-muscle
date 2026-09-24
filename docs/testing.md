@@ -2,7 +2,7 @@
 
 There are three different kinds of evidence: deterministic regression tests, device checks and authenticated model/workflow tests. Keep them separate in issues, PRs and release notes.
 
-The [0.3.0 Samsung Galaxy S26 Ultra report](../compatibility/galaxy-s26-ultra-0.3.0-20260924.md) adds fresh isolated startup, private source lifecycle and authenticated Sonnet tool evidence. It does not reverify command takeover or manual discovery. The [0.2.0 Samsung Galaxy S26 Ultra report](../compatibility/galaxy-s26-ultra-0.2.0-20260915.md) contains fresh native command/manual and runtime lifecycle observations plus a separate authenticated Sonnet tool workflow. It distinguishes that actual Claude tool evidence from the local namespace probe, and source bootstrap from public installer delivery. The unchanged 2026-09-14 report identifies project 0.1.0 and retains that release's paid workflow/model observations.
+The [0.3.1 Samsung Galaxy S26 Ultra report](../compatibility/galaxy-s26-ultra-0.3.1-20260924.md) records fresh private source and authenticated tool checks, including an isolated startup retry. The [0.3.0 Samsung Galaxy S26 Ultra report](../compatibility/galaxy-s26-ultra-0.3.0-20260924.md) adds fresh isolated startup, private source lifecycle and authenticated Sonnet tool evidence. It does not reverify command takeover or manual discovery. The [0.2.0 Samsung Galaxy S26 Ultra report](../compatibility/galaxy-s26-ultra-0.2.0-20260915.md) contains fresh native command/manual and runtime lifecycle observations plus a separate authenticated Sonnet tool workflow. It distinguishes that actual Claude tool evidence from the local namespace probe, and source bootstrap from public installer delivery. The unchanged 2026-09-14 report identifies project 0.1.0 and retains that release's paid workflow/model observations.
 
 ## One-command volunteer report
 
@@ -81,7 +81,7 @@ Management self-update must preserve the runtime state bytes. Test that equal an
 
 The release gate requires a matching maintainer report with PASS for `install`, `startup_version`, `startup_help`, `shell_tools`, `update`, `rollback` and `uninstall`, plus exact platform/software metadata. It rejects stale project/runtime versions and missing, skipped or failed required checks. Release assertions remain the maintainer's responsibility: a JSON label cannot replace the actual test run.
 
-The 0.3.0 manifest references only its matching report. Earlier reports cannot satisfy a new release's required checks. A namespace probe must not turn `shell_tools` into PASS: the 0.3.0 result comes from a separate Sonnet-issued tool call and independently checked result. Prior Opus and mixed Fable observations remain dated historical evidence and are not relabeled as new model checks.
+The 0.3.1 manifest references only its matching report. Earlier reports cannot satisfy a new release's required checks. A namespace probe must not turn `shell_tools` into PASS: the 0.3.1 result comes from a separate Sonnet-issued tool call and independently checked result. Prior Opus and mixed Fable observations remain dated historical evidence and are not relabeled as new model checks.
 
 ## Isolated startup acceptance
 

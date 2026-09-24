@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Start with `termux-muscle doctor`, `termux-muscle versions` and `man termux-muscle`. Keep the error category and exact versions. This page describes 0.3.0; its [device report](../compatibility/galaxy-s26-ultra-0.3.0-20260924.md) distinguishes native lifecycle checks from authenticated workflows and public delivery. If you report a problem, use the [bug form](https://github.com/octocore-autonomous-systems/termux-muscle/issues/new?template=bug-report.yml) and attach a reviewed `termux-muscle test --output report.json` report.
+Start with `termux-muscle doctor`, `termux-muscle versions` and `man termux-muscle`. Keep the error category and exact versions. This page describes 0.3.1; its [device report](../compatibility/galaxy-s26-ultra-0.3.1-20260924.md) distinguishes native lifecycle checks from authenticated workflows and public delivery. If you report a problem, use the [bug form](https://github.com/octocore-autonomous-systems/termux-muscle/issues/new?template=bug-report.yml) and attach a reviewed `termux-muscle test --output report.json` report.
 
 | Symptom | Likely boundary | Next action |
 | --- | --- | --- |
@@ -18,6 +18,7 @@ Start with `termux-muscle doctor`, `termux-muscle versions` and `man termux-musc
 | Already traced / conflicting namespace | The command is inside an unrelated PRoot or a session pinned to another installation. | Start a fresh native Termux shell for maintenance. |
 | Another maintenance operation is running | A process holds the mutation lock. | Let that operation finish, then retry. A leftover lock file by itself is not evidence of a live owner. |
 | Bad behavior after an update | A newly selected runtime may be incompatible with your workflow. | Run `termux-muscle rollback`, preserve a report, and open an issue. |
+| Self-update from 0.2.0 to 0.3.0 stops in `test_migration.sh` | The 0.3.0 installer inherited the older manager helper path. | Use `termux-muscle self-update --version 0.3.1`. The failed 0.3.0 attempt leaves the installed manager and Claude runtime unchanged. |
 | `self-update` reports that the release is not newer | The latest or requested manager version is equal to or older than the installed version. | No installer ran. Use `-f` or `--force` only for an intentional compatible reinstall or downgrade. |
 | `self-update --force --version 0.1.x` is rejected | 0.1.x managers cannot read 0.2.0 manual ownership records. | Keep the current manager. For an intentional management downgrade below 0.2.0, uninstall with the current manager before installing the older version; this is separate from Claude runtime rollback. |
 | Upstream install/update tries to replace the managed executable | Claude's own installer does not manage this backend. | Use `termux-muscle update` for the runtime and `termux-muscle self-update` for this tool. |
