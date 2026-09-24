@@ -5,7 +5,7 @@ set -eu
 # Archive validation must not inherit options from unrelated shell customizations.
 unset TAR_OPTIONS GZIP
 REPOSITORY="octocore-autonomous-systems/termux-muscle"
-VERSION="0.2.0"
+VERSION="0.3.0"
 
 fail() { printf '%s\n' "termux-muscle: $*" >&2; exit 1; }
 usage() {

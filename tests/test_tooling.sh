@@ -403,42 +403,43 @@ printf '%s\0' "$@" > "$TM_TEST_REMOTE/executed"
 SH
 (cd "$scratch/remote" && sha256sum install.sh > SHA256SUMS)
 cp "$root/state.json" "$scratch/runtime-before-self-update.json"
+next_version=${bootstrap_version%.*}.$(( ${bootstrap_version##*.} + 1 ))
 PATH=$scratch/mocks:$PATH bash "$scratch/hook.sh" project_version_newer 0.10.0 0.9.999 || fail 'numeric component length comparison'
 PATH=$scratch/mocks:$PATH bash "$scratch/hook.sh" project_version_newer 999999999999999999999.0.0 999999999999999999998.99.99 || fail 'large component comparison'
 if PATH=$scratch/mocks:$PATH bash "$scratch/hook.sh" project_version_newer 0.2.0 0.2.0; then fail 'equal version compared as newer'; fi
 if PATH=$scratch/mocks:$PATH bash "$scratch/hook.sh" project_version_newer 0.2.9 0.3.0; then fail 'older minor version compared as newer'; fi
 : > "$scratch/remote/calls"
 before_calls=$(wc -l < "$scratch/remote/calls")
-PATH=$scratch/mocks:$PATH env -u TMPDIR bash "$scratch/hook.sh" self_update > "$scratch/hook-output"
-grep -q '0.2.0 is not newer. No update performed.' "$scratch/hook-output" || fail 'latest equal version lacked no-op notice'
+PATH=$scratch/mocks:$PATH TM_TEST_LATEST_VERSION=$bootstrap_version env -u TMPDIR bash "$scratch/hook.sh" self_update > "$scratch/hook-output"
+grep -q "$bootstrap_version is not newer. No update performed." "$scratch/hook-output" || fail 'latest equal version lacked no-op notice'
 [[ ! -e $scratch/remote/executed && $(wc -l < "$scratch/remote/calls") == $((before_calls + 1)) ]] || fail 'latest equal version fetched installer or executed it'
 prefix_scratch=("$prefix/tmp/"*)
 [[ ${#prefix_scratch[@]} == 0 ]] || fail 'equal-version fallback temporary directory not cleaned'
 before_calls=$(wc -l < "$scratch/remote/calls")
-PATH=$scratch/mocks:$PATH bash "$scratch/hook.sh" self_update --version 0.2.0 > "$scratch/hook-output"
+PATH=$scratch/mocks:$PATH bash "$scratch/hook.sh" self_update --version "$bootstrap_version" > "$scratch/hook-output"
 grep -q 'No update performed.' "$scratch/hook-output" || fail 'explicit equal version lacked no-op notice'
 [[ ! -e $scratch/remote/executed && $(wc -l < "$scratch/remote/calls") == "$before_calls" ]] || fail 'explicit equal version reached network'
-TM_PROJECT_VERSION=0.2.1 PATH=$scratch/mocks:$PATH bash "$scratch/hook.sh" self_update --version 0.2.0 > "$scratch/hook-output"
-grep -q '0.2.0 is not newer. No update performed.' "$scratch/hook-output" || fail 'older version lacked no-op notice'
+TM_PROJECT_VERSION=$next_version PATH=$scratch/mocks:$PATH bash "$scratch/hook.sh" self_update --version "$bootstrap_version" > "$scratch/hook-output"
+grep -q "$bootstrap_version is not newer. No update performed." "$scratch/hook-output" || fail 'older version lacked no-op notice'
 [[ $(wc -l < "$scratch/remote/calls") == "$before_calls" ]] || fail 'explicit older version reached network'
 pass 'equal and older manager versions skip installation with a notice before installer download'
 
-PATH=$scratch/mocks:$PATH TM_TEST_LATEST_VERSION=0.2.1 env -u TMPDIR bash "$scratch/hook.sh" self_update > "$scratch/hook-output"
-printf '%s\0' --version 0.2.1 --root "$root" --prefix "$prefix" --no-install > "$scratch/expected"
+PATH=$scratch/mocks:$PATH TM_TEST_LATEST_VERSION=$next_version env -u TMPDIR bash "$scratch/hook.sh" self_update > "$scratch/hook-output"
+printf '%s\0' --version "$next_version" --root "$root" --prefix "$prefix" --no-install > "$scratch/expected"
 cmp "$scratch/remote/executed" "$scratch/expected" || fail 'self-update immutable source forwarding'
 cmp "$root/state.json" "$scratch/runtime-before-self-update.json" || fail 'self-update changed runtime state'
 prefix_scratch=("$prefix/tmp/"*)
 [[ ${#prefix_scratch[@]} == 0 ]] || fail 'self-update fallback temporary directory not cleaned'
 rm "$scratch/remote/executed"
-PATH=$scratch/mocks:$PATH bash "$scratch/hook.sh" self_update --force --version 0.2.0 > "$scratch/hook-output"
-printf '%s\0' --version 0.2.0 --root "$root" --prefix "$prefix" --no-install > "$scratch/expected"
+PATH=$scratch/mocks:$PATH bash "$scratch/hook.sh" self_update --force --version "$bootstrap_version" > "$scratch/hook-output"
+printf '%s\0' --version "$bootstrap_version" --root "$root" --prefix "$prefix" --no-install > "$scratch/expected"
 cmp "$scratch/remote/executed" "$scratch/expected" || fail '--force did not reinstall equal version'
 rm "$scratch/remote/executed"
-TM_PROJECT_VERSION=0.2.1 PATH=$scratch/mocks:$PATH bash "$scratch/hook.sh" self_update -f --version 0.2.0 > "$scratch/hook-output"
+TM_PROJECT_VERSION=$next_version PATH=$scratch/mocks:$PATH bash "$scratch/hook.sh" self_update -f --version "$bootstrap_version" > "$scratch/hook-output"
 cmp "$scratch/remote/executed" "$scratch/expected" || fail '-f did not permit compatible older version'
 rm "$scratch/remote/executed"
 printf corrupt >> "$scratch/remote/install.sh"
-rejects checksum_failed env PATH="$scratch/mocks:$PATH" bash "$scratch/hook.sh" self_update --version 0.2.1
+rejects checksum_failed env PATH="$scratch/mocks:$PATH" bash "$scratch/hook.sh" self_update --version "$next_version"
 [[ ! -e $scratch/remote/executed ]] || fail 'unverified self-update code executed'
 pass 'newer and forced compatible self-update verify installer checksums, clean scratch and preserve runtime'
 

@@ -2,9 +2,14 @@
 
 ## Unreleased
 
+## 0.3.0
+
 - Add read-only `migration` advisories for settings loader overrides, legacy plugin/worktree paths, and executable PATH shadowing. Keep private values out of output and leave all user files unchanged.
 - Require isolated version, help and non-conversational `--init-only` checks before runtime activation, update or rollback. Doctor uses the same startup checks. Strip inherited account/loader settings, use fresh HOME/config/cwd, disable user customizations, and reject system managed-policy presence rather than executing policy hooks.
 - Bound startup time and captured output; retain only sanitized acceptance codes. A failed initialization preserves the active runtime and command links. These checks do not establish authenticated tools, networking, performance or background survival.
+- Make `self-update` announce and skip equal or older management versions. `-f` and `--force` permit an intentional compatible reinstall or downgrade; integrity and ownership checks still apply.
+
+This version retains Claude Code **2.1.270** and musl **1.2.6-r2**. [Fresh Galaxy S26 Ultra evidence from 2026-09-24 UTC](compatibility/galaxy-s26-ultra-0.3.0-20260924.md) verifies private source installation, isolated startup, offline update and rollback, removal, and one bounded authenticated Sonnet 5 Bash-tool workflow. It does not reverify ordinary command takeover, indexed manual discovery, public HTTPS delivery, interactive use, background operation or MCP tool calls. The 0.2.0 and 0.1.0 reports remain dated historical evidence.
 
 ## 0.2.0
 
