@@ -200,7 +200,10 @@ Without
 .BR \-\-version ,
 resolve the latest published project release.
 If the resolved version is equal to or older than the installed manager,
-print a notice and exit successfully without downloading the installer.
+print a notice without downloading the installer. An equal version exits 2
+with category already_current; an older target exits 3 with category
+target_older. Exit 0 means the update or forced reinstall completed; other
+update failures exit 1. Signal interruption may use the shell's signal status.
 .BR \-f " or " \-\-force
 permits an intentional reinstall or compatible downgrade, while retaining
 the normal checksum, build, test and ownership checks.

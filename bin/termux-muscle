@@ -45,8 +45,9 @@ Install sets up claude automatically and saves replaced commands for restoration
 Use --no-link to preserve Claude command entries. Full manual: man termux-muscle.
 Repair/update: --offline uses only verified cached artifacts.
 Test: --model MODEL_ID explicitly permits an authenticated model request and usage.
-Self-update skips equal or older manager versions with a notice; --force permits
-a compatible reinstall or downgrade after normal integrity checks.
+Self-update: status 0 means installed; 2 means already current; 3 means
+the target is older; 1 means update failure. --force permits a compatible
+reinstall or downgrade after normal integrity checks.
 
 This independent OAS project is not affiliated with or authorized by Anthropic.
 EOF
