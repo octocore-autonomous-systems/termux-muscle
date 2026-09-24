@@ -1,6 +1,6 @@
 # Architecture and boundaries
 
-Termux Muscle manages Claude Code on native Android Termux. Version 0.2.0 retains the official Linux ARM64 musl executable and musl loader used by 0.1.0, inside one PRoot namespace. Bash sequences lifecycle commands, and a C helper handles parsing, integrity, owned filesystem state and execution. The helper is compiled on the target device. Vendor payloads are fetched separately with the URLs and digests in `compatibility.json`. The [fresh 0.2.0 report](../compatibility/galaxy-s26-ultra-0.2.0-20260915.md) records native command/manual and runtime lifecycle acceptance plus a separate authenticated Sonnet tool workflow; older 0.1.0 model observations remain historical evidence.
+Termux Muscle manages Claude Code on native Android Termux. Version 0.3.0 retains the official Linux ARM64 musl executable and musl loader used by 0.1.0, inside one PRoot namespace. Bash sequences lifecycle commands, and a C helper handles parsing, integrity, owned filesystem state and execution. The helper is compiled on the target device. Vendor payloads are fetched separately with the URLs and digests in `compatibility.json`. The [fresh 0.3.0 report](../compatibility/galaxy-s26-ultra-0.3.0-20260924.md) records private source lifecycle and authenticated Sonnet tool acceptance; 0.2.0 command/manual and older 0.1.0 model observations remain historical evidence.
 
 ## Why installation needs a manager
 
@@ -30,7 +30,7 @@ Nested execution recognizes a context bound inside the existing namespace and ke
 
 PRoot is part of this design. The project does not claim zero overhead, root-level isolation, universal Android compatibility or equivalence to a supported desktop installation. Ordinary sessions and bounded test probes have different process-lifetime requirements; terminating a health probe must not imply killing legitimate background work in ordinary use.
 
-## Isolated startup gate (unreleased source)
+## Isolated startup gate
 
 Before promotion, the same bounded checker used by doctor runs version, help and `--init-only`
 with private HOME/config/cwd and a clean allowlisted environment. It disables customizations,

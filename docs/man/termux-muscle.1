@@ -1,5 +1,5 @@
 .\" SPDX-License-Identifier: MPL-2.0
-.TH TERMUX-MUSCLE 1 "2026-09-14" "Termux Muscle 0.2.0" "User Commands"
+.TH TERMUX-MUSCLE 1 "2026-09-24" "Termux Muscle 0.3.0" "User Commands"
 .SH NAME
 termux-muscle \- install, run, diagnose and maintain Claude Code on Android
 Termux
@@ -326,7 +326,7 @@ Each check is
 .BR PASS ,
 .BR FAIL " or " SKIP .
 Checks not actually performed remain SKIP.
-Unreleased source also checks isolated non-conversational initialization before
+Version 0.3.0 also checks isolated non-conversational initialization before
 activation. Fresh HOME/config/cwd and disabled customizations isolate user settings;
 system managed-policy presence blocks automatic probes rather than running hooks.
 Each startup probe is bounded to 30 seconds and 64 KiB captured output.
