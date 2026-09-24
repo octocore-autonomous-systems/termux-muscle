@@ -110,6 +110,17 @@ tm_project_version_newer() {
     return 1
 }
 
+tm_self_update_version_gate() {
+    local candidate=$1 installed=$2
+    if tm_project_version_newer "$candidate" "$installed"; then return 0; fi
+    if tm_project_version_newer "$installed" "$candidate"; then
+        printf 'termux-muscle: target_older: %s is installed; %s is older. No update performed. Use --force for a compatible downgrade.\n' "$installed" "$candidate" >&2
+        return 3
+    fi
+    printf 'termux-muscle: already_current: Termux Muscle %s is already installed. No update performed. Use --force to reinstall.\n' "$installed" >&2
+    return 2
+}
+
 tm_self_update() (
     set -euo pipefail
     local version='' force=false repository=octocore-autonomous-systems/termux-muscle work expected base
@@ -120,12 +131,11 @@ tm_self_update() (
             *) tm_error usage "Unknown self-update option: $1" ;;
         esac
     done
-    "$TM_CORE" version-check "$TM_PROJECT_VERSION"
+    "$TM_CORE" version-check "$TM_PROJECT_VERSION" || tm_error invalid_version 'Installed manager version is invalid.'
     if [[ -n $version ]]; then
-        "$TM_CORE" version-check "$version"
-        if [[ $force == false ]] && ! tm_project_version_newer "$version" "$TM_PROJECT_VERSION"; then
-            printf 'Termux Muscle %s is installed; %s is not newer. No update performed. Use --force to reinstall a compatible version.\n' "$TM_PROJECT_VERSION" "$version"
-            return 0
+        "$TM_CORE" version-check "$version" || tm_error invalid_version 'Requested manager version is invalid.'
+        if [[ $force == false ]]; then
+            tm_self_update_version_gate "$version" "$TM_PROJECT_VERSION" || return $?
         fi
     fi
     # v0.1.x cannot read regular manual-file ownership records. Reject before
@@ -136,7 +146,8 @@ tm_self_update() (
         fi
     }
     [[ -z $version ]] || tm_check_tooling_compatibility "$version"
-    work=$(mktemp -d "${TMPDIR:-$TM_PREFIX/tmp}/termux-muscle-self-update.XXXXXXXX")
+    work=$(mktemp -d "${TMPDIR:-$TM_PREFIX/tmp}/termux-muscle-self-update.XXXXXXXX") ||
+        tm_error temporary_failed 'Cannot create a private self-update download directory.'
     trap 'rm -rf -- "$work"' EXIT
     tm_fetch_project() {
         curl -q --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
@@ -146,13 +157,13 @@ tm_self_update() (
     if [[ -z $version ]]; then
         tm_fetch_project "https://api.github.com/repos/$repository/releases/latest" "$work/latest.json" 1048576 ||
             tm_error download_failed 'Cannot resolve the latest project release; current tooling was preserved.'
-        version=$("$TM_CORE" json-get "$work/latest.json" tag_name)
+        version=$("$TM_CORE" json-get "$work/latest.json" tag_name) ||
+            tm_error invalid_version 'Latest release metadata has no valid version tag.'
         [[ $version == v* ]] || tm_error invalid_version 'Latest project release has no version tag.'
         version=${version#v}
-        "$TM_CORE" version-check "$version"
-        if [[ $force == false ]] && ! tm_project_version_newer "$version" "$TM_PROJECT_VERSION"; then
-            printf 'Termux Muscle %s is installed; %s is not newer. No update performed. Use --force to reinstall a compatible version.\n' "$TM_PROJECT_VERSION" "$version"
-            return 0
+        "$TM_CORE" version-check "$version" || tm_error invalid_version 'Latest release version is invalid.'
+        if [[ $force == false ]]; then
+            tm_self_update_version_gate "$version" "$TM_PROJECT_VERSION" || return $?
         fi
     fi
     tm_check_tooling_compatibility "$version"
@@ -167,5 +178,6 @@ tm_self_update() (
         tm_error checksum_failed 'Installer checksum does not match; no downloaded code was executed.'
     # No mutation lock is held during network requests, compilation or tests.
     # The verified installer takes it only when the new source is ready.
-    "$TM_PREFIX/bin/bash" "$work/install.sh" --version "$version" --root "$TM_ROOT" --prefix "$TM_PREFIX" --no-install
+    "$TM_PREFIX/bin/bash" "$work/install.sh" --version "$version" --root "$TM_ROOT" --prefix "$TM_PREFIX" --no-install ||
+        tm_error update_failed 'The verified installer did not complete; inspect its output. The manager update was not confirmed.'
 )
