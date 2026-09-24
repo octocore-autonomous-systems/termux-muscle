@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.3.1
+
+- Run installer tests against the freshly built 0.3.1 helper even when an older installed manager exports its own helper path into the installer process. This fixes `self-update` from 0.2.0, which stopped safely during the 0.3.0 migration test before changing the manager.
+- Preserve all published 0.3.0 assets and history; publish this correction as a separate release.
+
+Fresh [Galaxy S26 Ultra evidence from 2026-09-24 UTC](compatibility/galaxy-s26-ultra-0.3.1-20260924.md) covers private source installation after a retained transient startup-probe failure, offline update/rollback, clean removal and one bounded authenticated Sonnet 5 shell-tool workflow. Public installer delivery remains a separate post-publication check.
+
 ## 0.3.0
 
 - Add read-only `migration` advisories for settings loader overrides, legacy plugin/worktree paths, and executable PATH shadowing. Keep private values out of output and leave all user files unchanged.
