@@ -35,7 +35,8 @@ Usage: termux-muscle [--root DIR] [--prefix TERMUX_PREFIX] COMMAND [OPTIONS]
   test --output FILE           Write a sanitized local device report; no uploads
   link [--replace] [--path P]  Own a Claude entry; preserve or back up an existing command
   cleanup [--keep N]           Remove inactive releases; keep active sessions protected
-  self-update [--version X.Y.Z] Build a newer release of Termux Muscle
+  self-update [--version X.Y.Z] [-f|--force]
+                                Install a newer Termux Muscle manager release
   uninstall                    Remove owned files and restore unchanged command entries
 
 Install/update: --claude-version X.Y.Z|latest --allow-unverified requests an
@@ -44,6 +45,8 @@ Install sets up claude automatically and saves replaced commands for restoration
 Use --no-link to preserve Claude command entries. Full manual: man termux-muscle.
 Repair/update: --offline uses only verified cached artifacts.
 Test: --model MODEL_ID explicitly permits an authenticated model request and usage.
+Self-update skips equal or older manager versions with a notice; --force permits
+a compatible reinstall or downgrade after normal integrity checks.
 
 This independent OAS project is not affiliated with or authorized by Anthropic.
 EOF

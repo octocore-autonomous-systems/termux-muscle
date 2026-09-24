@@ -79,13 +79,13 @@ normal launches still do. See [startup acceptance](docs/testing.md#isolated-star
 | Install the version tested for this project release | `termux-muscle update` |
 | Restore the previous local release | `termux-muscle rollback` |
 | Rebuild from verified cached downloads | `termux-muscle repair --offline` |
-| Update this management tool | `termux-muscle self-update` |
+| Update this management tool | `termux-muscle self-update` (`--force` to reinstall a compatible version) |
 | Write a device report for review | `termux-muscle test --output report.json` |
 | Remove this installation and restore eligible commands/manual | `termux-muscle uninstall` |
 
 Default updates stay with the project's compatibility pin. An explicitly requested upstream version is experimental until tested on your device; see `update --help`. Installation and ordinary health checks make no paid model requests. Uninstall restores replaced commands only while their installed entries remain unchanged and owned; it preserves later foreign changes and keeps the recovery evidence. Claude account data, settings, sessions, projects and installed Termux packages remain intact.
 
-`rollback` restores a previous **Claude Code runtime**. Management-tool self-update is separate: 0.2.0 rejects `self-update --version` requests below 0.2.0 because older managers cannot read the new manual ownership records. Do not run an old installer over a newer installation. An intentional manager downgrade requires uninstalling with the current manager first.
+`rollback` restores a previous **Claude Code runtime**. Management-tool self-update is separate: the next manager skips an equal or older published version with a notice; `-f` or `--force` deliberately reinstalls a compatible version after the normal integrity checks. In-place updates below 0.2.0 remain incompatible even with `--force`, because those managers cannot read the manual ownership records. Do not run an old installer over a newer installation. An intentional downgrade below 0.2.0 requires uninstalling with the current manager first.
 
 ## Device compatibility
 

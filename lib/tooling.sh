@@ -94,16 +94,40 @@ tm_uninstall() {
     return "$result"
 }
 
+tm_project_version_newer() {
+    # Versions have already passed tm-core's strict X.Y.Z validation. Compare
+    # digit strings by length first so large components cannot overflow Bash.
+    local LC_ALL=C part
+    local -a candidate installed
+    IFS=. read -r -a candidate <<< "$1"
+    IFS=. read -r -a installed <<< "$2"
+    for part in 0 1 2; do
+        if (( ${#candidate[part]} > ${#installed[part]} )); then return 0; fi
+        if (( ${#candidate[part]} < ${#installed[part]} )); then return 1; fi
+        if [[ ${candidate[part]} > ${installed[part]} ]]; then return 0; fi
+        if [[ ${candidate[part]} < ${installed[part]} ]]; then return 1; fi
+    done
+    return 1
+}
+
 tm_self_update() (
     set -euo pipefail
-    local version='' repository=octocore-autonomous-systems/termux-muscle work expected base
+    local version='' force=false repository=octocore-autonomous-systems/termux-muscle work expected base
     while (($#)); do
         case $1 in
             --version) (($# > 1)) || tm_error usage '--version needs X.Y.Z.'; version=$2; shift 2 ;;
+            -f|--force) force=true; shift ;;
             *) tm_error usage "Unknown self-update option: $1" ;;
         esac
     done
-    [[ -z $version ]] || "$TM_CORE" version-check "$version"
+    "$TM_CORE" version-check "$TM_PROJECT_VERSION"
+    if [[ -n $version ]]; then
+        "$TM_CORE" version-check "$version"
+        if [[ $force == false ]] && ! tm_project_version_newer "$version" "$TM_PROJECT_VERSION"; then
+            printf 'Termux Muscle %s is installed; %s is not newer. No update performed. Use --force to reinstall a compatible version.\n' "$TM_PROJECT_VERSION" "$version"
+            return 0
+        fi
+    fi
     # v0.1.x cannot read regular manual-file ownership records. Reject before
     # running its installer, which could otherwise publish old tooling first.
     tm_check_tooling_compatibility() {
@@ -126,6 +150,10 @@ tm_self_update() (
         [[ $version == v* ]] || tm_error invalid_version 'Latest project release has no version tag.'
         version=${version#v}
         "$TM_CORE" version-check "$version"
+        if [[ $force == false ]] && ! tm_project_version_newer "$version" "$TM_PROJECT_VERSION"; then
+            printf 'Termux Muscle %s is installed; %s is not newer. No update performed. Use --force to reinstall a compatible version.\n' "$TM_PROJECT_VERSION" "$version"
+            return 0
+        fi
     fi
     tm_check_tooling_compatibility "$version"
     base=https://github.com/$repository/releases/download/v$version

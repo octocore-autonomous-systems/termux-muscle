@@ -192,13 +192,18 @@ Current, previous and leased releases remain protected.
 reports eligible release identifiers without deleting them.
 This command does not remove account data or uninstall Termux packages.
 .TP
-.BR self-update " [\-\-version X.Y.Z]"
+.BR self-update " [\-\-version X.Y.Z] [\-f|\-\-force]"
 Download a published Termux Muscle source release, verify its checksums,
 compile it locally and run its offline mandatory tests before publishing the
 new management tool.
 Without
 .BR \-\-version ,
 resolve the latest published project release.
+If the resolved version is equal to or older than the installed manager,
+print a notice and exit successfully without downloading the installer.
+.BR \-f " or " \-\-force
+permits an intentional reinstall or compatible downgrade, while retaining
+the normal checksum, build, test and ownership checks.
 This command leaves the current Claude Code runtime selected.
 An in-place downgrade to older management releases that cannot read the
 current ownership records is rejected.
