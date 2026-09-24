@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Start with `termux-muscle doctor`, `termux-muscle versions` and `man termux-muscle`. Keep the error category and exact versions. This page describes 0.3.1; its [device report](../compatibility/galaxy-s26-ultra-0.3.1-20260924.md) distinguishes native lifecycle checks from authenticated workflows and public delivery. If you report a problem, use the [bug form](https://github.com/octocore-autonomous-systems/termux-muscle/issues/new?template=bug-report.yml) and attach a reviewed `termux-muscle test --output report.json` report.
+Start with `termux-muscle doctor`, `termux-muscle versions` and `man termux-muscle`. Keep the error category and exact versions. This page describes 0.3.2; its [device report](../compatibility/galaxy-s26-ultra-0.3.2-20260924.md) distinguishes native lifecycle checks from authenticated workflows and public delivery. If you report a problem, use the [bug form](https://github.com/octocore-autonomous-systems/termux-muscle/issues/new?template=bug-report.yml) and attach a reviewed `termux-muscle test --output report.json` report.
 
 | Symptom | Likely boundary | Next action |
 | --- | --- | --- |

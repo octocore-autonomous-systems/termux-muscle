@@ -2,7 +2,11 @@
 
 ## Unreleased
 
+## 0.3.2
+
 - Reserve `self-update` exit 0 for a completed management update or forced reinstall. Report an equal version with status 2, an older target with status 3, and update failures with status 1; preserve distinct stderr categories and the force override.
+
+Fresh [Galaxy S26 Ultra evidence from 2026-09-24 UTC](compatibility/galaxy-s26-ultra-0.3.2-20260924.md) covers private source installation, offline update/rollback, clean removal, the new status contract and one bounded authenticated Sonnet 5 shell-tool workflow. Public installer delivery remains a separate post-publication check.
 
 ## 0.3.1
 
