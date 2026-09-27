@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Track upstream Claude Code's ARM64 musl `latest` release every six hours in GitHub Actions, opening one compatibility-testing issue per newer observed version. Preserve closed decisions and maintainer edits; leave compatibility pins and user installations unchanged. Add offline maintainer-tool regressions and manual read-only checks.
+
 ## 0.4.0
 
 - Move the default pin from Claude Code **2.1.270** to **2.1.283**, the current upstream release, recording its official npm tarball URL, the registry SHA-512 SRI integrity value and the SHA-256 of the extracted vendor executable. The payload itself is unmodified; only its identity and digests are recorded here.
