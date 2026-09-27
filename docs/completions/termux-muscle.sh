@@ -61,6 +61,10 @@ _termux_muscle_complete() {
         fi
     done
     if [[ $command == run ]]; then return 0; fi
+    if [[ $command == help && $current != -* && $previous == help ]]; then
+        mapfile -t COMPREPLY < <(compgen -W "$commands" -- "$current")
+        return 0
+    fi
     case $previous in
         --root|--prefix)
             mapfile -t COMPREPLY < <(compgen -d -- "$current")
@@ -118,7 +122,7 @@ _termux_muscle_complete() {
         update) options='-h --help --root --prefix --claude-version --allow-unverified --offline' ;;
         rollback) options='-h --help --root --prefix' ;;
         repair) options='-h --help --root --prefix --offline' ;;
-        versions) options='-h --help --root --prefix --json' ;;
+        versions) options='-h --help --root --prefix --available --all --json' ;;
         doctor) options='-h --help --root --prefix --output' ;;
         migration) options='-h --help --root --prefix' ;;
         test) options='-h --help --root --prefix --output --model' ;;

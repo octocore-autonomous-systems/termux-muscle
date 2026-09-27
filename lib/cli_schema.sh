@@ -4,51 +4,65 @@
 tm_schema_help() {
     case ${1:-} in
         '') cat <<'TM_SCHEMA_HELP_ROOT'
-usage: termux-muscle [-h] [--root DIR] [--prefix DIR] [--version] COMMAND ...
+usage: termux-muscle [--root DIR] [--prefix DIR] <command> [options]
+       termux-muscle --version | --help
 
 Install, run and maintain Claude Code on Termux.
 
-positional arguments:
-  COMMAND
-    help         Show the manager command overview.
-    install      Install the pinned Claude Code runtime and set up claude on
-                 PATH.
-    run          Run Claude Code and forward all following arguments
-                 unchanged.
-    update       Validate a runtime candidate before changing the active
-                 release.
-    rollback     Restore the previous validated runtime release.
-    repair       Rebuild the current runtime from verified original artifacts.
-    versions     Show current, previous and retained runtime releases.
-    doctor       Check local installation health without model requests.
-    migration    Report read-only settings and path migration advisories.
-    test         Write a sanitized local device report; no uploads.
-    link         Own a Claude command entry with restoration evidence.
-    cleanup      Remove inactive releases while protecting active sessions.
-    self-update  Install a newer Termux Muscle manager release.
-    uninstall    Remove owned files and restore eligible original entries.
+Claude Code:
+  install      Install the pinned Claude Code release and put claude on PATH
+  run          Run Claude Code, passing all following arguments through
+  update       Validate a newer Claude Code release, then switch to it
+  rollback     Switch back to the previous validated release
+  repair       Rebuild the active release from verified original artifacts
+  versions     List installed releases; --available lists installable ones
+  cleanup      Remove inactive releases, protecting running sessions
+  link         Take over the claude command, recording how to restore it
 
-options:
-  -h, --help     show this help message and exit
+Termux Muscle:
+  self-update  Upgrade Termux Muscle itself (not Claude Code)
+  uninstall    Remove Termux Muscle and restore the original claude command
+  help         Show this overview, or 'help <command>' for one command
+
+Troubleshooting (checks the device, Termux Muscle and Claude Code together;
+read-only, nothing is uploaded):
+  doctor       Check that the device, the claude launcher and the active
+               Claude Code release all work, without contacting Anthropic
+  test         Run the doctor checks and save a sanitized device report;
+               --model also makes one real model request
+  migration    Find leftover pre-Termux-Muscle workarounds in Claude Code's
+               settings, plugin paths and PATH
+
+Global options:
   --root DIR     managed installation root
-  --prefix DIR   native Termux package prefix
-  --version      print manager version
+                 (default: ~/.local/share/termux-muscle)
+  --prefix DIR   Termux package prefix (default: $PREFIX)
+  --version      print Termux Muscle and active Claude Code versions
+  -h, --help     show this help
 
-Install/update: --claude-version X.Y.Z|latest with --allow-unverified requests
-an upstream release beyond the project pin. Repair/update --offline uses
-verified cached artifacts. Test --model permits an authenticated model
-request. Self-update exits 0 when installed, 2 when current, 3 for an older
-target, and 1 on failure. Use --force to reinstall or compatibly downgrade. By
-default, self-update shows one progress dot per completed test program;
---verbose streams the full log and --json includes its full bounded
-transcript. This independent OAS project is not affiliated with or authorized
-by Anthropic. Full manual: man termux-muscle.
+Common tasks:
+  termux-muscle versions --available    what can I install?
+  termux-muscle update                  move to the current pinned release
+  termux-muscle update --claude-version latest --allow-unverified
+                                        try a release beyond the pin
+  termux-muscle rollback                undo the last update
+  termux-muscle doctor                  something's wrong; start here
+  termux-muscle self-update             upgrade the manager
+
+Run 'termux-muscle <command> --help' for its options and exit codes.
+Full manual: man termux-muscle
+
+Termux Muscle is an independent open-source project, not affiliated with or
+authorized by Anthropic.
 TM_SCHEMA_HELP_ROOT
             ;;
         help) cat <<'TM_SCHEMA_HELP_HELP'
-usage: termux-muscle help [-h] [--root DIR] [--prefix DIR]
+usage: termux-muscle help [-h] [--root DIR] [--prefix DIR] [COMMAND]
 
-Show the manager command overview.
+Show this overview, or 'help <command>' for one command.
+
+positional arguments:
+  COMMAND       show help for this command
 
 options:
   -h, --help    show this help message and exit
@@ -61,7 +75,7 @@ usage: termux-muscle install [-h] [--root DIR] [--prefix DIR]
                              [--claude-version X.Y.Z|latest]
                              [--allow-unverified] [--offline] [--no-link]
 
-Install the pinned Claude Code runtime and set up claude on PATH.
+Install the pinned Claude Code release and put claude on PATH.
 
 options:
   -h, --help            show this help message and exit
@@ -72,12 +86,16 @@ options:
   --allow-unverified    permit a version beyond the project pin
   --offline             use verified cached archives
   --no-link             preserve existing Claude command entries
+
+Without --claude-version, the project pin is used. Any other version,
+including latest, also needs --allow-unverified. Run 'versions --available' to
+see installable versions.
 TM_SCHEMA_HELP_INSTALL
             ;;
         run) cat <<'TM_SCHEMA_HELP_RUN'
 usage: termux-muscle run [--] CLAUDE_ARGUMENTS...
 
-Run Claude Code and forward all following arguments unchanged.
+Run Claude Code, passing all following arguments through.
 
 positional arguments:
   CLAUDE_ARGUMENTS
@@ -88,7 +106,7 @@ usage: termux-muscle update [-h] [--root DIR] [--prefix DIR]
                             [--claude-version X.Y.Z|latest]
                             [--allow-unverified] [--offline]
 
-Validate a runtime candidate before changing the active release.
+Validate a newer Claude Code release, then switch to it.
 
 options:
   -h, --help            show this help message and exit
@@ -98,12 +116,16 @@ options:
                         select an upstream version
   --allow-unverified    permit a version beyond the project pin
   --offline             use verified cached archives
+
+Without --claude-version, the project pin is used. Any other version,
+including latest, also needs --allow-unverified. Run 'versions --available' to
+see installable versions.
 TM_SCHEMA_HELP_UPDATE
             ;;
         rollback) cat <<'TM_SCHEMA_HELP_ROLLBACK'
 usage: termux-muscle rollback [-h] [--root DIR] [--prefix DIR]
 
-Restore the previous validated runtime release.
+Switch back to the previous validated release.
 
 options:
   -h, --help    show this help message and exit
@@ -114,7 +136,7 @@ TM_SCHEMA_HELP_ROLLBACK
         repair) cat <<'TM_SCHEMA_HELP_REPAIR'
 usage: termux-muscle repair [-h] [--root DIR] [--prefix DIR] [--offline]
 
-Rebuild the current runtime from verified original artifacts.
+Rebuild the active release from verified original artifacts.
 
 options:
   -h, --help    show this help message and exit
@@ -124,21 +146,29 @@ options:
 TM_SCHEMA_HELP_REPAIR
             ;;
         versions) cat <<'TM_SCHEMA_HELP_VERSIONS'
-usage: termux-muscle versions [-h] [--root DIR] [--prefix DIR] [--json]
+usage: termux-muscle versions [-h] [--root DIR] [--prefix DIR] [--available]
+                              [--all] [--json]
 
-Show current, previous and retained runtime releases.
+List installed releases; --available lists installable ones.
 
 options:
   -h, --help    show this help message and exit
   --root DIR    managed installation root
   --prefix DIR  native Termux package prefix
-  --json        print machine readable state
+  --available   list installable Claude Code releases
+  --all         with --available, list every release
+  --json        print machine readable output
+
+--available reads the official npm registry and never installs anything. Only
+the pinned release has passed Termux Muscle acceptance; install another with
+update --claude-version X.Y.Z --allow-unverified.
 TM_SCHEMA_HELP_VERSIONS
             ;;
         doctor) cat <<'TM_SCHEMA_HELP_DOCTOR'
 usage: termux-muscle doctor [-h] [--root DIR] [--prefix DIR] [--output FILE]
 
-Check local installation health without model requests.
+Check that the device, the claude launcher and the active Claude Code release
+all work, without contacting Anthropic.
 
 options:
   -h, --help     show this help message and exit
@@ -150,7 +180,8 @@ TM_SCHEMA_HELP_DOCTOR
         migration) cat <<'TM_SCHEMA_HELP_MIGRATION'
 usage: termux-muscle migration [-h] [--root DIR] [--prefix DIR]
 
-Report read-only settings and path migration advisories.
+Find leftover pre-Termux-Muscle workarounds in Claude Code's settings, plugin
+paths and PATH.
 
 options:
   -h, --help    show this help message and exit
@@ -162,21 +193,23 @@ TM_SCHEMA_HELP_MIGRATION
 usage: termux-muscle test [-h] [--root DIR] [--prefix DIR] [--output FILE]
                           [--model MODEL_ID]
 
-Write a sanitized local device report; no uploads.
+Run the doctor checks and save a sanitized device report; --model also makes
+one real model request.
 
 options:
   -h, --help        show this help message and exit
   --root DIR        managed installation root
   --prefix DIR      native Termux package prefix
   --output FILE     write a new local report
-  --model MODEL_ID  permit an authenticated model request
+  --model MODEL_ID  also make one authenticated request with this model
+                    (repeatable)
 TM_SCHEMA_HELP_TEST
             ;;
         link) cat <<'TM_SCHEMA_HELP_LINK'
 usage: termux-muscle link [-h] [--root DIR] [--prefix DIR] [--replace]
                           [--path PATH]
 
-Own a Claude command entry with restoration evidence.
+Take over the claude command, recording how to restore it.
 
 options:
   -h, --help    show this help message and exit
@@ -190,7 +223,7 @@ TM_SCHEMA_HELP_LINK
 usage: termux-muscle cleanup [-h] [--root DIR] [--prefix DIR] [--keep N]
                              [--dry-run]
 
-Remove inactive releases while protecting active sessions.
+Remove inactive releases, protecting running sessions.
 
 options:
   -h, --help    show this help message and exit
@@ -204,22 +237,27 @@ TM_SCHEMA_HELP_CLEANUP
 usage: termux-muscle self-update [-h] [--root DIR] [--prefix DIR]
                                  [--version X.Y.Z] [-f] [-V] [--json]
 
-Install a newer Termux Muscle manager release.
+Upgrade Termux Muscle itself (not Claude Code).
 
 options:
   -h, --help       show this help message and exit
   --root DIR       managed installation root
   --prefix DIR     native Termux package prefix
-  --version X.Y.Z  select an exact manager release
-  -f, --force      permit compatible reinstall or downgrade
+  --version X.Y.Z  install this manager release (default: newest)
+  -f, --force      reinstall the same release, or downgrade if compatible
   -V, --verbose    stream the full build and test log
-  --json           print a versioned result with full transcript
+  --json           print a versioned result with the bounded test transcript
+
+By default, one progress dot is shown per completed test program.
+
+exit status:
+  0  installed    2  already current    3  target is older    1  failed
 TM_SCHEMA_HELP_SELF_UPDATE
             ;;
         uninstall) cat <<'TM_SCHEMA_HELP_UNINSTALL'
 usage: termux-muscle uninstall [-h] [--root DIR] [--prefix DIR]
 
-Remove owned files and restore eligible original entries.
+Remove Termux Muscle and restore the original claude command.
 
 options:
   -h, --help    show this help message and exit
@@ -227,7 +265,7 @@ options:
   --prefix DIR  native Termux package prefix
 TM_SCHEMA_HELP_UNINSTALL
             ;;
-        *) tm_error usage 'Unknown command help target.' ;;
+        *) tm_error usage "Unknown command: $1. Run termux-muscle --help." ;;
     esac
 }
 
@@ -255,6 +293,8 @@ tm_schema_validate() {
             repair/--offline) shift ;;
             versions/--root) (($# > 1)) || tm_error usage '--root needs a value.'; shift 2 ;;
             versions/--prefix) (($# > 1)) || tm_error usage '--prefix needs a value.'; shift 2 ;;
+            versions/--available) shift ;;
+            versions/--all) shift ;;
             versions/--json) shift ;;
             doctor/--root) (($# > 1)) || tm_error usage '--root needs a value.'; shift 2 ;;
             doctor/--prefix) (($# > 1)) || tm_error usage '--prefix needs a value.'; shift 2 ;;

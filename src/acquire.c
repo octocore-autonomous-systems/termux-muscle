@@ -692,11 +692,255 @@ static void print_field(const char *path, const char *field) {
     }
     json_object_put(input);
 }
+#define MAX_REGISTRY_DOCUMENT (16U * 1024U * 1024U)
+struct available {
+    const char *version;
+    char released[11];
+    json_object *tags;
+    bool pinned, active, retained, deprecated, in_registry;
+};
+static int compare_versions(const char *left, const char *right) {
+    for (int part = 0; part < 3; part++) {
+        size_t a = strcspn(left, "."), b = strcspn(right, ".");
+        if (a != b)
+            return a > b ? 1 : -1;
+        int difference = memcmp(left, right, a);
+        if (difference)
+            return difference;
+        left += a + (left[a] != 0);
+        right += b + (right[b] != 0);
+    }
+    return 0;
+}
+static int newest_first(const void *left, const void *right) {
+    return compare_versions(((const struct available *)right)->version,
+                            ((const struct available *)left)->version);
+}
+/* Registry text reaches the terminal, so only plain tag names are shown. */
+static bool tag_name_valid(const char *name) {
+    size_t length = strlen(name);
+    if (!length || length > 32)
+        return false;
+    for (const char *p = name; *p; p++)
+        if (!islower((unsigned char)*p) && !isdigit((unsigned char)*p) && !strchr("._-", *p))
+            return false;
+    return true;
+}
+static struct available *find_available(struct available *list, size_t count, const char *version) {
+    for (size_t i = 0; i < count; i++)
+        if (!strcmp(list[i].version, version))
+            return &list[i];
+    return NULL;
+}
+static struct available *add_local(struct available **list, size_t *count, size_t *capacity,
+                                   const char *version) {
+    struct available *entry = find_available(*list, *count, version);
+    if (entry)
+        return entry;
+    if (*count == *capacity) {
+        *capacity = *capacity ? *capacity * 2 : 16;
+        *list = realloc(*list, *capacity * sizeof **list);
+        if (!*list)
+            tm_die("out_of_memory", "Cannot list available releases.");
+    }
+    entry = &(*list)[(*count)++];
+    memset(entry, 0, sizeof *entry);
+    entry->version = version;
+    entry->tags = json_object_new_array();
+    return entry;
+}
+/* Release identifiers start with the exact Claude Code version. */
+static char *release_version(const char *id) {
+    size_t length = strcspn(id, "-");
+    char *version = tm_alloc(length + 1);
+    memcpy(version, id, length);
+    version[length] = 0;
+    if (!tm_version_valid(version))
+        tm_die("invalid_state", "A release identifier has no valid version.");
+    return version;
+}
+static void list_available(const char *manifest_path, const char *metadata_path, const char *root,
+                           const char *limit_text, const char *format) {
+    size_t limit = SIZE_MAX;
+    if (strcmp(limit_text, "all")) {
+        char *end;
+        errno = 0;
+        unsigned long value = strtoul(limit_text, &end, 10);
+        if (errno || !*limit_text || *end || !value || value > 10000)
+            tm_die("invalid_arguments", "Use a positive listing limit or all.");
+        limit = value;
+    }
+    bool json = !strcmp(format, "json");
+    if (!json && strcmp(format, "text"))
+        tm_die("invalid_arguments", "Choose text or json listing output.");
+    json_object *manifest = tm_json_read(manifest_path);
+    json_object *claude = tm_json_field(manifest, "claude", json_type_object);
+    if (strcmp(tm_json_string(claude, "package"), PACKAGE))
+        tm_die("invalid_metadata", "Only the official ARM64 musl package is supported.");
+    const char *pinned = tm_json_string(claude, "version");
+    if (!tm_version_valid(pinned))
+        tm_die("invalid_metadata", "The project pin is not an exact version.");
+    size_t size;
+    char *text = tm_read_file(metadata_path, MAX_REGISTRY_DOCUMENT, &size);
+    json_object *metadata = tm_json_parse(text, size);
+    free(text);
+    if (strcmp(tm_json_string(metadata, "name"), PACKAGE))
+        tm_die("invalid_metadata", "The registry returned a different package.");
+    json_object *versions = tm_json_field(metadata, "versions", json_type_object), *tags = NULL,
+                *times = NULL;
+    if (json_object_object_get_ex(metadata, "dist-tags", &tags) &&
+        !json_object_is_type(tags, json_type_object))
+        tags = NULL;
+    if (json_object_object_get_ex(metadata, "time", &times) &&
+        !json_object_is_type(times, json_type_object))
+        times = NULL;
+
+    struct available *list = NULL;
+    size_t count = 0, capacity = 0;
+    json_object_object_foreach(versions, key, value) {
+        if (!tm_version_valid(key) || !json_object_is_type(value, json_type_object))
+            continue;
+        struct available *entry = add_local(&list, &count, &capacity, key);
+        entry->in_registry = true;
+        json_object *field;
+        entry->deprecated = json_object_object_get_ex(value, "deprecated", &field) &&
+                            json_object_is_type(field, json_type_string) &&
+                            json_object_get_string_len(field) > 0;
+        const char *stamp = times ? tm_json_optional_string(times, key) : NULL;
+        if (stamp && matches(stamp, "^[0-9]{4}-[0-9]{2}-[0-9]{2}T"))
+            memcpy(entry->released, stamp, 10);
+    }
+    size_t registry_count = count;
+    add_local(&list, &count, &capacity, pinned)->pinned = true;
+    const char *active = NULL;
+    json_object *state = NULL, *owned = json_object_new_array();
+    char *state_path = tm_path(root, "state.json");
+    if (!access(state_path, F_OK)) {
+        state = tm_store_state(root);
+        const char *current = tm_json_optional_string(state, "current");
+        json_object *history = tm_json_field(state, "history", json_type_array);
+        for (size_t i = 0; i < json_object_array_length(history); i++) {
+            const char *id = json_object_get_string(json_object_array_get_idx(history, i));
+            /* The owned array keeps each parsed version alive for the listing. */
+            char *parsed = release_version(id);
+            json_object_array_add(owned, json_object_new_string(parsed));
+            free(parsed);
+            const char *version = json_object_get_string(
+                json_object_array_get_idx(owned, json_object_array_length(owned) - 1));
+            struct available *entry = add_local(&list, &count, &capacity, version);
+            if (current && !strcmp(id, current)) {
+                entry->active = true;
+                active = entry->version;
+            }
+            entry->retained = true;
+        }
+        /* Another copy of the active version is not a separate retained release. */
+        for (size_t i = 0; i < count; i++)
+            list[i].retained &= !list[i].active;
+    }
+    free(state_path);
+    if (tags) {
+        json_object_object_foreach(tags, name, target) {
+            struct available *entry;
+            if (tag_name_valid(name) && json_object_is_type(target, json_type_string) &&
+                (entry = find_available(list, count, json_object_get_string(target))))
+                json_object_array_add(entry->tags, json_object_new_string(name));
+        }
+    }
+    qsort(list, count, sizeof *list, newest_first);
+
+    size_t shown = 0;
+    json_object *releases = json_object_new_array();
+    if (!json) {
+        puts("Claude Code releases for Termux (linux-arm64-musl), newest first:\n");
+        printf("%-10s %-11s %s\n", "VERSION", "RELEASED", "STATUS");
+    }
+    for (size_t i = 0, rank = 0; i < count; i++) {
+        struct available *entry = &list[i];
+        /* Pinned, active and retained releases are always listed. */
+        bool local = entry->pinned || entry->active || entry->retained;
+        bool recent = entry->in_registry && ++rank <= limit;
+        if (!recent && !local)
+            continue;
+        if (entry->in_registry)
+            shown++;
+        if (json) {
+            json_object *item = json_object_new_object();
+            add_string(item, "version", entry->version);
+            json_object_object_add(item, "released",
+                                   entry->released[0] ? json_object_new_string(entry->released)
+                                                      : NULL);
+            json_object_object_add(item, "pinned", json_object_new_boolean(entry->pinned));
+            json_object_object_add(item, "active", json_object_new_boolean(entry->active));
+            json_object_object_add(item, "retained", json_object_new_boolean(entry->retained));
+            json_object_object_add(item, "tags", json_object_get(entry->tags));
+            json_object_object_add(item, "deprecated", json_object_new_boolean(entry->deprecated));
+            json_object_object_add(item, "in_registry",
+                                   json_object_new_boolean(entry->in_registry));
+            json_object_array_add(releases, item);
+            continue;
+        }
+        char status[512] = "";
+        size_t used = 0;
+        const char *parts[8];
+        size_t n = 0;
+        parts[n++] = entry->pinned ? "pinned" : "unverified";
+        if (entry->active)
+            parts[n++] = "active";
+        if (entry->retained)
+            parts[n++] = "retained";
+        if (entry->deprecated)
+            parts[n++] = "deprecated";
+        if (!entry->in_registry)
+            parts[n++] = "not in registry";
+        for (size_t k = 0; k < n; k++)
+            used += (size_t)snprintf(status + used, sizeof status - used, "%s%s", k ? ", " : "",
+                                     parts[k]);
+        for (size_t k = 0; k < json_object_array_length(entry->tags) && used < sizeof status; k++)
+            used +=
+                (size_t)snprintf(status + used, sizeof status - used, ", %s",
+                                 json_object_get_string(json_object_array_get_idx(entry->tags, k)));
+        printf("%-10s %-11s %s\n", entry->version, entry->released[0] ? entry->released : "-",
+               status);
+    }
+    if (json) {
+        json_object *result = json_object_new_object();
+        add_string(result, "schema", "termux-muscle.available.v1");
+        add_string(result, "package", PACKAGE);
+        add_string(result, "pinned", pinned);
+        json_object_object_add(result, "active", active ? json_object_new_string(active) : NULL);
+        json_object_object_add(result, "total", json_object_new_int64((int64_t)registry_count));
+        json_object_object_add(result, "complete",
+                               json_object_new_boolean(shown == registry_count));
+        json_object_object_add(result, "releases", releases);
+        tm_json_print(result);
+        json_object_put(result);
+    } else {
+        json_object_put(releases);
+        if (shown < registry_count)
+            printf("\nShowing %zu of %zu releases; add --all to list every one.\n", shown,
+                   registry_count);
+        puts("\nOnly pinned releases have passed Termux Muscle acceptance. To try another:\n"
+             "  termux-muscle update --claude-version X.Y.Z --allow-unverified");
+    }
+    for (size_t i = 0; i < count; i++)
+        json_object_put(list[i].tags);
+    free(list);
+    if (state)
+        json_object_put(state);
+    json_object_put(owned);
+    json_object_put(metadata);
+    json_object_put(manifest);
+}
 int tm_acquire_main(int argc, char **argv) {
     if (!strcmp(argv[0], "acquire-plan") && (argc == 4 || argc == 5)) {
         json_object *plan = make_plan(argv[1], argv[2], argv[3], argc == 5 ? argv[4] : NULL);
         tm_json_print(plan);
         json_object_put(plan);
+        return 0;
+    }
+    if (!strcmp(argv[0], "acquire-available") && argc == 6) {
+        list_available(argv[1], argv[2], argv[3], argv[4], argv[5]);
         return 0;
     }
     if (!strcmp(argv[0], "acquire-field") && argc == 3) {

@@ -82,3 +82,30 @@ tm_acquire() (
     done
     "$TM_CORE" acquire-extract "$tm_work/plan.json" "$tm_npm" "$tm_musl" "$tm_release"
 )
+
+# Read-only listing for versions --available: one registry document, parsed and
+# labelled by the helper. Nothing is cached, verified for install or activated.
+tm_available_versions() (
+    set -euo pipefail
+    [[ $# == 2 ]] || { printf '%s\n' 'termux-muscle: invalid_arguments: listing needs all and json flags.' >&2; exit 1; }
+    local tm_all=$1 tm_json=$2 tm_work tm_http tm_limit=10 tm_format=text
+    [[ $tm_all == false ]] || tm_limit=all
+    [[ $tm_json == false ]] || tm_format=json
+    tm_work=$(mktemp -d "${TMPDIR:-/tmp}/termux-muscle-available.XXXXXXXX") || exit 1
+    trap 'rm -rf -- "$tm_work"' EXIT
+    # -q must be curl's first option: an unrelated .curlrc must not enable
+    # redirects, disable verification, or select another output file.
+    tm_http=$(curl -q --fail --silent --show-error --proto '=https' \
+        --connect-timeout 15 --max-time 60 --max-filesize 16777216 \
+        --output "$tm_work/metadata.json" --write-out '%{http_code}' -- \
+        'https://registry.npmjs.org/@anthropic-ai%2fclaude-code-linux-arm64-musl') || {
+        printf '%s\n' 'termux-muscle: registry_unavailable: Cannot read the official npm registry; check the network and retry.' >&2
+        exit 1
+    }
+    [[ $tm_http == 200 ]] || {
+        printf '%s\n' 'termux-muscle: registry_unavailable: The official npm registry did not return HTTP 200; redirects are not followed.' >&2
+        exit 1
+    }
+    "$TM_CORE" acquire-available "$TM_SOURCE/compatibility.json" "$tm_work/metadata.json" \
+        "$TM_ROOT" "$tm_limit" "$tm_format"
+)

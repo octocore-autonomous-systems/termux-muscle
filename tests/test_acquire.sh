@@ -179,4 +179,51 @@ tm_acquire "$test_work/next-repair" "$test_work/next-cache" "$test_work/next/pay
 cmp -- "$test_work/next/payload.json" "$test_work/next-repair/payload.json"
 must_fail offline_unavailable tm_acquire_plan "$valid/compatibility.json" latest allow-unverified true "$test_work/no-offline-latest.json"
 pass 'explicit unverified version resolution, truthful receipt and offline repair'
+
+# versions --available: one registry document labelled against the pin and the
+# installation. Numeric ordering, limits, local releases and hostile tags.
+listing=$test_work/listing
+mkdir -- "$listing"
+printf '%s\n' '{"schema":1,"claude":{"version":"2.1.10","package":"@anthropic-ai/claude-code-linux-arm64-musl"}}' > "$listing/compatibility.json"
+cat > "$listing/registry.json" <<'JSON'
+{"name":"@anthropic-ai/claude-code-linux-arm64-musl",
+ "dist-tags":{"latest":"2.1.11","stable":"2.1.9","Bad\u001b[31m":"2.1.11","next":"9.9.9"},
+ "versions":{"2.1.8":{},"2.1.9":{},"2.1.10":{},"2.1.11":{"deprecated":"broken"},"2.1.12-beta.1":{},"0.0.0":{}},
+ "time":{"2.1.8":"2026-01-08T00:00:00.000Z","2.1.9":"2026-01-09T00:00:00.000Z","2.1.10":"2026-01-10T00:00:00.000Z","2.1.11":"not a date"}}
+JSON
+fresh=$listing/fresh-root
+"$TM_CORE" acquire-available "$listing/compatibility.json" "$listing/registry.json" "$fresh" all text > "$listing/all.txt"
+[[ ! -e $fresh ]] || fail 'listing created an installation root'
+diff -u - "$listing/all.txt" <<'TEXT' || fail 'available listing text changed'
+Claude Code releases for Termux (linux-arm64-musl), newest first:
+
+VERSION    RELEASED    STATUS
+2.1.11     -           unverified, deprecated, latest
+2.1.10     2026-01-10  pinned
+2.1.9      2026-01-09  unverified, stable
+2.1.8      2026-01-08  unverified
+0.0.0      -           unverified
+
+Only pinned releases have passed Termux Muscle acceptance. To try another:
+  termux-muscle update --claude-version X.Y.Z --allow-unverified
+TEXT
+"$TM_CORE" acquire-available "$listing/compatibility.json" "$listing/registry.json" "$fresh" 1 text > "$listing/one.txt"
+grep -Fq '2.1.11 ' "$listing/one.txt" && grep -Fq '2.1.10 ' "$listing/one.txt" || fail 'limit hid the pinned release'
+! grep -Fq '2.1.9 ' "$listing/one.txt" || fail 'limit ignored'
+grep -Fq 'Showing 2 of 5 releases; add --all' "$listing/one.txt" || fail 'limit summary missing'
+root=$listing/root
+"$TM_CORE" with-lock "$root" create -- true
+old=$("$TM_CORE" with-lock "$root" existing -- bash "$test_root/tests/test_state.sh" --candidate "$TM_CORE" "$root" 2.1.8 activate)
+"$TM_CORE" with-lock "$root" existing -- bash "$test_root/tests/test_state.sh" --candidate "$TM_CORE" "$root" 2.1.7 activate > /dev/null
+"$TM_CORE" acquire-available "$listing/compatibility.json" "$listing/registry.json" "$root" 2 json > "$listing/local.json"
+[[ -n $old && $("$TM_CORE" json-get "$listing/local.json" schema) == termux-muscle.available.v1 ]] || fail 'listing schema'
+[[ $("$TM_CORE" json-get "$listing/local.json" active) == 2.1.7 ]] || fail 'active version'
+[[ $("$TM_CORE" json-get "$listing/local.json" complete) == false ]] || fail 'partial listing reported complete'
+[[ $("$TM_CORE" json-get "$listing/local.json" releases) == '[{"version":"2.1.11","released":null,"pinned":false,"active":false,"retained":false,"tags":["latest"],"deprecated":true,"in_registry":true},{"version":"2.1.10","released":"2026-01-10","pinned":true,"active":false,"retained":false,"tags":[],"deprecated":false,"in_registry":true},{"version":"2.1.8","released":"2026-01-08","pinned":false,"active":false,"retained":true,"tags":[],"deprecated":false,"in_registry":true},{"version":"2.1.7","released":null,"pinned":false,"active":true,"retained":false,"tags":[],"deprecated":false,"in_registry":false}]' ]] ||
+    { cat -- "$listing/local.json" >&2; fail 'local releases were not labelled'; }
+printf '%s\n' '{"name":"@evil/claude-code-linux-arm64-musl","versions":{}}' > "$listing/other.json"
+must_fail invalid_metadata "$TM_CORE" acquire-available "$listing/compatibility.json" "$listing/other.json" "$fresh" all text
+must_fail invalid_arguments "$TM_CORE" acquire-available "$listing/compatibility.json" "$listing/registry.json" "$fresh" 0 text
+must_fail invalid_arguments "$TM_CORE" acquire-available "$listing/compatibility.json" "$listing/registry.json" "$fresh" all yaml
+pass 'available versions: numeric order, pin/active/retained labels, limits and safe tags'
 printf 'Acquisition regression groups passed: %s\n' "$test_count"

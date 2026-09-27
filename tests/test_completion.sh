@@ -44,6 +44,15 @@ complete_for install --claude-version latest --
 contains --offline
 complete_for update --claude-version l
 contains latest
+complete_for versions --
+contains --available
+contains --all
+complete_for help ''
+contains install
+contains self-update
+excludes --root
+complete_for help install ''
+((${#COMPREPLY[@]} == 0)) || fail 'help completed a second topic'
 complete_for run --mo
 ((${#COMPREPLY[@]} == 0)) || fail 'manager completed vendor options'
 complete_for run -- --mo

@@ -33,6 +33,10 @@ tm_acquire_plan() {
     printf '%s\n' acquisition-plan >> "$TM_FIXTURE_TRACE/events"
     printf '%s\n' '{"status":"ready","version":"2.1.270"}' > "$5"
 }
+tm_available_versions() {
+    printf '%s\n' available-listing >> "$TM_FIXTURE_TRACE/events"
+    printf '%s\0' "$@" > "$TM_FIXTURE_TRACE/available.argv"
+}
 tm_acquire() {
     printf '%s\n' acquisition-copy >> "$TM_FIXTURE_TRACE/events"
     printf '%s\n' '{"version":"2.1.270","compatibility_status":"pinned"}' > "$1/payload.json"
@@ -86,6 +90,13 @@ case $1 in
                 ;;
             show) printf '%s\n' '{"current":null,"previous":null,"history":[]}' ;;
             versions) printf '%s\n' 'Fixture installation history is available.' ;;
+            current)
+                [[ ${TM_FIXTURE_NO_CURRENT:-0} != 1 ]] || {
+                    printf '%s\n' 'termux-muscle: not_installed: fixture has no active release' >&2
+                    exit 32
+                }
+                printf '%s\n' 2.1.270-0123456789abcdef01234567
+                ;;
             candidate)
                 id=2.1.270-0123456789abcdef01234567
                 "$TM_FIXTURE_MKDIR" -p -- "$root/releases/$id"
@@ -182,6 +193,32 @@ local_cli install --help > "$trace/install-help"
 pass 'vendor help passes through while manager help needs no installation'
 
 reset_trace
+local_cli --help > "$trace/help"
+local_cli install --help > "$trace/install-help"
+grep -n -e '^Claude Code:$' -e '^Termux Muscle:$' -e '^Troubleshooting ' -e '^Global options:$' \
+    -e '^Common tasks:$' "$trace/help" | cut -d: -f2- > "$trace/sections"
+printf '%s\n' 'Claude Code:' 'Termux Muscle:' \
+    'Troubleshooting (checks the device, Termux Muscle and Claude Code together;' \
+    'Global options:' 'Common tasks:' | cmp -s - "$trace/sections" || fail 'overview sections changed order'
+local_cli help install > "$trace/help-install"
+cmp -- "$trace/install-help" "$trace/help-install" || fail 'help <command> differs from <command> --help'
+local_cli help --help > "$trace/help-help"
+grep -Fq 'usage: termux-muscle help' "$trace/help-help" || fail 'help --help did not describe help'
+[[ $(local_cli help) == "$(cat -- "$trace/help")" ]] || fail 'bare help differs from --help'
+if local_cli help bogus > /dev/null 2> "$trace/help-bogus"; then fail 'unknown help topic accepted'; fi
+grep -Fq 'Unknown command: bogus' "$trace/help-bogus" || fail 'unknown help topic message'
+if local_cli help install update > /dev/null 2>&1; then fail 'help accepted two topics'; fi
+[[ ! -s $trace/events ]] || fail 'help topics invoked the installation helper'
+pass 'grouped overview order and help <command> need no installation'
+
+reset_trace
+[[ $(local_cli --version) == "Termux Muscle $(cat -- "$repo/VERSION")"$'\n''Claude Code 2.1.270 (active)' ]] ||
+    fail 'version did not report the active Claude Code release'
+[[ $(TM_FIXTURE_NO_CURRENT=1 local_cli --version 2>&1) == "Termux Muscle $(cat -- "$repo/VERSION")" ]] ||
+    fail 'version without an active release was not the manager line alone'
+pass 'version keeps the manager line and adds the active release when present'
+
+reset_trace
 # shellcheck disable=SC2016 # Literal shell syntax must survive as vendor arguments.
 arguments=(auth login --root 'vendor root' --prefix 'vendor prefix' '--model' 'arbitrary/model' \
     'spaces and "quotes"' "single'quote" '*' '$(touch never-run)' '`false`' '' $'line\nbreak' --help)
@@ -216,6 +253,17 @@ local_cli versions --json > "$trace/versions.json"
 has_event state-show || fail 'machine-readable versions did not dispatch local state'
 [[ ! -d $missing_prefix ]] || fail 'read-only command created a missing prefix'
 pass 'both versions formats work without runtime dependencies or an existing prefix'
+
+reset_trace
+local_cli versions --available > /dev/null
+expect_argv "$trace/available.argv" false false
+local_cli versions --json --all --available > /dev/null
+expect_argv "$trace/available.argv" true true
+if has_event state-versions || has_event state-show; then fail 'available listing read local history through the shell'; fi
+if local_cli versions --all > /dev/null 2> "$trace/all.err"; then fail 'versions --all accepted without --available'; fi
+grep -Fq -- '--all applies to versions --available only' "$trace/all.err" || fail 'versions --all message'
+if local_cli versions --remote > /dev/null 2>&1; then fail 'unknown versions option accepted'; fi
+pass 'versions --available routes its flags to the read-only registry listing'
 
 reset_trace
 local_cli cleanup --dry-run --keep 0 > "$trace/cleanup"
