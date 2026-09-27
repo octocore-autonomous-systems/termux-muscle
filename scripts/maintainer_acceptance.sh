@@ -20,9 +20,13 @@
 #                                         [--keep-work] [--preflight]
 #
 #   --model ID   Also run the authenticated shell-tool check with this exact
-#                model. This makes a real model request on your account,
-#                bounded by --max-budget-usd 0.50. Without it, shell_tools
-#                stays SKIP and the report cannot pass the release gate.
+#                model. This makes one real model request as your Claude
+#                login. A subscription login (Pro or Max over OAuth) counts
+#                it against plan usage and is not billed; an API key is
+#                billed, capped by --max-budget-usd 0.50. The report's
+#                total_cost_usd is Claude Code's estimate at API prices, not a
+#                charge. Without --model, shell_tools stays SKIP and the report
+#                cannot pass the release gate.
 #   --output F   Report path (default: compatibility/reports/acceptance-
 #                VERSION-UTCSTAMP.json). Must not exist.
 #   --keep-work  Keep the disposable work directory even on success.
@@ -107,7 +111,7 @@ Termux Muscle $version acceptance
   source      $SRC (${commit:0:7}$($dirty && printf ', %s uncommitted or untracked file(s)' "$changes"))
   pinned      Claude Code $pin, musl $musl
   live root   $LIVE_ROOT (fingerprinted, never modified)
-  model check ${model:-none; shell_tools will be SKIP}${model:+ (real request, budget \$$BUDGET_USD)}
+  model check ${model:-none; shell_tools will be SKIP}${model:+ (one real request: plan usage on a subscription, billed up to \$$BUDGET_USD on an API key)}
   report      $output
 PLAN
 $preflight_only && { printf '%s\n' 'Preflight passed; nothing was changed.' >&2; exit 0; }
@@ -218,7 +222,7 @@ if [[ -z $model ]]; then
 elif [[ -z $updated ]]; then
     record shell_tools SKIP prerequisite_failed
 else
-    say "shell_tools: one real Bash tool call with $model (budget \$$BUDGET_USD)"
+    say "shell_tools: one real Bash tool call with $model (API-key spend cap \$$BUDGET_USD)"
     nonce=$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')
     fixture=$work/fixture/tm-fixture
     printf '%s\n' "$nonce" > "$work/fixture/needle.txt"

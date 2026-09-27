@@ -3,6 +3,107 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <openssl/evp.h>
+
+/* Serialize the self-update result in C. Base64 preserves arbitrary tool
+ * output, including NUL and invalid UTF-8, in a valid JSON document. The
+ * caller caps the transcript before invoking this command. */
+static int self_update_json(int argc, char **argv) {
+    if (argc != 11)
+        tm_die("usage", "Invalid self-update result arguments.");
+    json_object *result = json_object_new_object();
+    json_object_object_add(result, "schema",
+                           json_object_new_string("termux-muscle.self-update.v1"));
+    json_object_object_add(result, "current_version", json_object_new_string(argv[1]));
+    json_object_object_add(result, "target_version",
+                           !strcmp(argv[2], "-") ? NULL : json_object_new_string(argv[2]));
+    json_object_object_add(result, "forced", json_object_new_boolean(!strcmp(argv[3], "true")));
+    json_object_object_add(result, "result", json_object_new_string(argv[4]));
+    json_object_object_add(result, "exit_code", json_object_new_int(atoi(argv[5])));
+    json_object_object_add(result, "error_code",
+                           !strcmp(argv[6], "-") ? NULL : json_object_new_string(argv[6]));
+    json_object_object_add(result, "message",
+                           !strcmp(argv[7], "-") ? NULL : json_object_new_string(argv[7]));
+    FILE *stream = fopen(argv[8], "rb");
+    if (!stream)
+        tm_die("log_missing", "Cannot read self-update transcript.");
+    char *bytes = malloc(33554433);
+    if (!bytes)
+        tm_die("out_of_memory", "Cannot allocate self-update transcript.");
+    size_t length = fread(bytes, 1, 33554433, stream);
+    if (ferror(stream) || length > 33554432 || !feof(stream))
+        tm_die("log_too_large", "Self-update transcript exceeds 32 MiB.");
+    fclose(stream);
+    /* Build/test output is arbitrary bytes, so base64 keeps even non-UTF-8 and
+     * NUL output round-trippable without emitting invalid JSON. */
+    size_t encoded_size = 4 * ((length + 2) / 3) + 1;
+    unsigned char *encoded = malloc(encoded_size);
+    if (!encoded)
+        tm_die("out_of_memory", "Cannot encode self-update transcript.");
+    EVP_EncodeBlock(encoded, (unsigned char *)bytes, (int)length);
+    json_object *transcript = json_object_new_object();
+    json_object_object_add(transcript, "complete",
+                           json_object_new_boolean(!strcmp(argv[9], "true")));
+    json_object_object_add(transcript, "encoding", json_object_new_string("base64"));
+    json_object_object_add(transcript, "combined_output_base64",
+                           json_object_new_string((char *)encoded));
+    json_object *stages = json_object_new_array();
+    FILE *events = strcmp(argv[10], "-") ? fopen(argv[10], "r") : NULL;
+    if (strcmp(argv[10], "-") && !events)
+        tm_die("invalid_events", "Cannot read self-update stage events.");
+    size_t offsets[8] = {0}, stage_count = 0;
+    char names[8][24] = {{0}}, event_line[80];
+    if (events) {
+        while (fgets(event_line, sizeof(event_line), events)) {
+            unsigned long long offset;
+            char name[24], extra;
+            if (stage_count == 7 ||
+                sscanf(event_line, "%23[a-z_] %llu %c", name, &offset, &extra) != 2 ||
+                offset > length || (stage_count && offset < offsets[stage_count - 1]))
+                tm_die("invalid_events", "Self-update stage events are invalid.");
+            offsets[stage_count] = (size_t)offset;
+            snprintf(names[stage_count], sizeof(names[stage_count]), "%s", name);
+            stage_count++;
+        }
+        if (ferror(events))
+            tm_die("invalid_events", "Cannot read self-update stage events.");
+        fclose(events);
+    }
+    if (!stage_count) {
+        snprintf(names[0], sizeof(names[0]), "manager");
+        offsets[0] = 0;
+        stage_count = 1;
+    } else if (offsets[0] != 0) {
+        for (size_t i = stage_count; i > 0; i--) {
+            offsets[i] = offsets[i - 1];
+            snprintf(names[i], sizeof(names[i]), "%s", names[i - 1]);
+        }
+        offsets[0] = 0;
+        snprintf(names[0], sizeof(names[0]), "manager");
+        stage_count++;
+    }
+    for (size_t i = 0; i < stage_count; i++) {
+        size_t start = offsets[i], end = i + 1 < stage_count ? offsets[i + 1] : length;
+        size_t encoded_len = 4 * ((end - start + 2) / 3) + 1;
+        unsigned char *part = malloc(encoded_len);
+        if (!part)
+            tm_die("out_of_memory", "Cannot encode a self-update stage.");
+        EVP_EncodeBlock(part, (unsigned char *)bytes + start, (int)(end - start));
+        json_object *stage = json_object_new_object();
+        json_object_object_add(stage, "name", json_object_new_string(names[i]));
+        json_object_object_add(stage, "output_base64", json_object_new_string((char *)part));
+        json_object_array_add(stages, stage);
+        free(part);
+    }
+    json_object_object_add(transcript, "stages", stages);
+    json_object_object_add(result, "transcript", transcript);
+    puts(json_object_to_json_string_ext(result,
+                                        JSON_C_TO_STRING_PLAIN | JSON_C_TO_STRING_NOSLASHESCAPE));
+    free(bytes);
+    free(encoded);
+    json_object_put(result);
+    return 0;
+}
 
 static int json_get(const char *file, const char *key) {
     json_object *j = tm_json_read(file), *v = j;
@@ -34,6 +135,8 @@ int main(int argc, char **argv) {
     }
     if (!strcmp(argv[0], "json-get") && argc == 3)
         return json_get(argv[1], argv[2]);
+    if (!strcmp(argv[0], "self-update-json"))
+        return self_update_json(argc, argv);
     if (!strcmp(argv[0], "json-check") && argc == 2) {
         json_object_put(tm_json_read(argv[1]));
         return 0;

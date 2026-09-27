@@ -109,9 +109,8 @@ or user installation updated. Registry metadata is not Android acceptance eviden
 ## Promotion checklist
 
 - [ ] Download using the existing experimental-version acquisition path in a disposable installation; verify archive integrity and obtain the executable SHA-256.
-- [ ] Run isolated version/help/initialization acceptance on Android; preserve the working runtime on failure.
-- [ ] Run device/workflow acceptance from `docs/testing.md`, including actual shell/file tools and lifecycle recovery; record FAIL/SKIP limits explicitly.
-- [ ] Submit a reviewed compatibility PR with the exact source hashes, updated versioned evidence, release metadata and known limits; do not copy old device PASS results.
+- [ ] Move the pin on a branch and commit it. From a fresh native Termux shell (not inside Claude Code), in a clean checkout of that commit, run `scripts/maintainer_acceptance.sh --model <model-id>`. It runs install, startup, shell tool, update, rollback and uninstall checks in a disposable root, leaves the working installation unchanged and writes a report under `compatibility/reports/`; record FAIL/SKIP limits explicitly.
+- [ ] Submit a reviewed compatibility PR with the exact source hashes, that report registered as versioned evidence, release metadata and known limits; do not copy old device PASS results.
 - [ ] Publish through the existing verified-tag release workflow after review and required checks.
 
 See [release tracking](https://github.com/{REPOSITORY}/blob/main/docs/release-tracking.md)

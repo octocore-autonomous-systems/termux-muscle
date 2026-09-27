@@ -11,6 +11,34 @@ tm_manual_index() {
     fi
 }
 
+tm_completion_path() {
+    printf '%s/bash-completion/completions/termux-muscle\n' "${XDG_DATA_HOME:-$HOME/.local/share}"
+}
+
+tm_completion_install() {
+    local target=$TM_ROOT/tools/current/docs/completions/termux-muscle.sh
+    local path
+    path=$(tm_completion_path)
+    [[ -f $target && ! -L $target ]] || tm_error completion_missing 'Published manager lacks its Bash completion script.'
+    mkdir -p -- "${path%/*}"
+    if [[ -e $path || -L $path ]]; then
+        if [[ -L $path && $(readlink -- "$path") == "$target" ]]; then return 0; fi
+        printf 'Existing Bash completion preserved: %s\nSource the managed script directly: %s\n' "$path" "$target" >&2
+        return 0
+    fi
+    ln -s -- "$target" "$path"
+    printf 'Bash completion installed: %s\n' "$path"
+}
+
+tm_completion_remove() {
+    local path target
+    path=$(tm_completion_path)
+    target=$TM_ROOT/tools/current/docs/completions/termux-muscle.sh
+    if [[ -L $path && $(readlink -- "$path") == "$target" ]]; then
+        rm -- "$path"
+    fi
+}
+
 tm_bootstrap() (
     set -euo pipefail
     local source_dir='' build_dir='' no_install=false link_claude=true
@@ -63,6 +91,7 @@ tm_bootstrap() (
         tm_manual_index -d || :
         printf 'Manual installed: %s (man termux-muscle)\n' "$manual_path"
     fi
+    tm_completion_install
     if [[ $no_install == false ]]; then
         tm_install_release install --no-link
         if [[ $link_claude == true ]]; then tm_default_claude_links; fi
@@ -88,6 +117,7 @@ tm_uninstall() {
         fi
     fi
     "$TM_CORE" tooling "$TM_ROOT" uninstall || result=$?
+    if ((result == 0)); then tm_completion_remove; fi
     if [[ $indexed == true && ( -e $manual || -L $manual ) ]]; then
         tm_manual_index -d || :
     fi
@@ -121,7 +151,7 @@ tm_self_update_version_gate() {
     return 2
 }
 
-tm_self_update() (
+tm_self_update_impl() (
     set -euo pipefail
     local version='' force=false repository=octocore-autonomous-systems/termux-muscle work expected base
     while (($#)); do
@@ -134,6 +164,7 @@ tm_self_update() (
     "$TM_CORE" version-check "$TM_PROJECT_VERSION" || tm_error invalid_version 'Installed manager version is invalid.'
     if [[ -n $version ]]; then
         "$TM_CORE" version-check "$version" || tm_error invalid_version 'Requested manager version is invalid.'
+        [[ -z ${TM_SELF_UPDATE_TARGET_FILE:-} ]] || printf '%s\n' "$version" > "$TM_SELF_UPDATE_TARGET_FILE"
         if [[ $force == false ]]; then
             tm_self_update_version_gate "$version" "$TM_PROJECT_VERSION" || return $?
         fi
@@ -162,6 +193,7 @@ tm_self_update() (
         [[ $version == v* ]] || tm_error invalid_version 'Latest project release has no version tag.'
         version=${version#v}
         "$TM_CORE" version-check "$version" || tm_error invalid_version 'Latest release version is invalid.'
+        [[ -z ${TM_SELF_UPDATE_TARGET_FILE:-} ]] || printf '%s\n' "$version" > "$TM_SELF_UPDATE_TARGET_FILE"
         if [[ $force == false ]]; then
             tm_self_update_version_gate "$version" "$TM_PROJECT_VERSION" || return $?
         fi
@@ -178,6 +210,115 @@ tm_self_update() (
         tm_error checksum_failed 'Installer checksum does not match; no downloaded code was executed.'
     # No mutation lock is held during network requests, compilation or tests.
     # The verified installer takes it only when the new source is ready.
+    if [[ -n ${TM_SELF_UPDATE_EVENTS:-} ]]; then
+        printf 'installer %s\n' "$(wc -c < "$TM_SELF_UPDATE_TRANSCRIPT_FILE")" >> "$TM_SELF_UPDATE_EVENTS"
+    fi
     "$TM_PREFIX/bin/bash" "$work/install.sh" --version "$version" --root "$TM_ROOT" --prefix "$TM_PREFIX" --no-install ||
         tm_error update_failed 'The verified installer did not complete; inspect its output. The manager update was not confirmed.'
+)
+
+tm_self_update() (
+    set -euo pipefail
+    local json=false verbose=false force=false arg work status=0 target=- result=failed error_code=- message=- line complete=true
+    local -a args=()
+    for arg in "$@"; do
+        case $arg in
+            --json) json=true ;;
+            -V|--verbose) verbose=true ;;
+            -f|--force) force=true; args+=("$arg") ;;
+            *) args+=("$arg") ;;
+        esac
+    done
+    if [[ $json == false && $verbose == true ]]; then
+        unset TM_SELF_UPDATE_EVENTS TM_SELF_UPDATE_TRANSCRIPT_FILE TM_SELF_UPDATE_PROGRESS_MODE TM_SELF_UPDATE_TARGET_FILE
+        tm_self_update_impl "${args[@]}"
+        return
+    fi
+    if [[ $json == false ]]; then printf 'Checking manager release...\n' >&2; fi
+    work=$(mktemp -d "${TMPDIR:-$TM_PREFIX/tmp}/termux-muscle-result.XXXXXXXX") || {
+        if [[ $json == true ]]; then
+            "$TM_CORE" self-update-json "$TM_PROJECT_VERSION" - "$force" failed 1 temporary_failed \
+                'Cannot create a private self-update result directory.' /dev/null true -
+        else
+            printf 'termux-muscle: temporary_failed: Cannot create a private self-update result directory.\n' >&2
+        fi
+        return 1
+    }
+    chmod 700 "$work"
+    : > "$work/transcript"
+    : > "$work/events"
+    TM_SELF_UPDATE_TARGET_FILE=$work/target
+    tm_self_update_capture() (
+        # Bound raw compiler/test output before management publication.
+        ulimit -f 65536
+        export TM_SELF_UPDATE_EVENTS="$work/events" TM_SELF_UPDATE_TRANSCRIPT_FILE="$work/transcript"
+        if [[ $json == false ]]; then
+            export TM_SELF_UPDATE_PROGRESS_MODE=concise
+        else
+            unset TM_SELF_UPDATE_PROGRESS_MODE
+        fi
+        tm_self_update_impl "${args[@]}"
+    )
+    if [[ $json == true ]]; then
+        if tm_self_update_capture > "$work/transcript" 2>&1 3>/dev/null; then status=0; else status=$?; fi
+    elif tm_self_update_capture 3>&2 > "$work/transcript" 2>&1; then
+        status=0
+    else
+        status=$?
+    fi
+    [[ ! -f $work/target ]] || target=$(< "$work/target")
+    case $status in
+        0) result=installed ;;
+        2) result=already_current; error_code=already_current ;;
+        3) result=target_older; error_code=target_older ;;
+        *) status=1; result=failed ;;
+    esac
+    while IFS= read -r line; do
+        if [[ $line =~ ^termux-muscle:\ ([a-z_]+):\ (.*)$ ]]; then
+            if [[ $error_code == - ]]; then error_code=${BASH_REMATCH[1]}; fi
+            message=${BASH_REMATCH[2]}
+            break
+        fi
+    done < "$work/transcript"
+    if [[ $status == 1 && $error_code == - ]]; then
+        error_code=update_failed
+        message='The verified installer did not complete; inspect the transcript.'
+    fi
+    if (( $(stat -c %s -- "$work/transcript") >= 33554432 )); then
+        status=1 result=failed error_code=capture_failed complete=false
+        message='The 32 MiB transcript limit was reached; update completion is unconfirmed.'
+    fi
+    if [[ $status == 0 ]]; then message=-; fi
+    if [[ $json == true ]]; then
+        if ! "$TM_CORE" self-update-json "$TM_PROJECT_VERSION" "$target" "$force" "$result" \
+            "$status" "$error_code" "$message" "$work/transcript" "$complete" "$work/events"; then
+            # The primary serializer writes only after reading all inputs, so
+            # a malformed stage record can still yield one failure object.
+            if "$TM_CORE" self-update-json "$TM_PROJECT_VERSION" "$target" "$force" failed 1 \
+                capture_failed "Cannot encode the full transcript; private log retained at $work/transcript." \
+                /dev/null false -; then
+                return 1
+            fi
+            printf 'termux-muscle: capture_failed: JSON result could not be produced; private log retained at %s.\n' "$work/transcript" >&2
+            return 1
+        fi
+        rm -rf -- "$work"
+        return "$status"
+    fi
+    if [[ $status == 0 ]]; then
+        printf 'Installed Termux Muscle %s.\n' "$target" >&2
+        rm -rf -- "$work"
+    elif [[ $status == 2 || $status == 3 ]]; then
+        printf 'termux-muscle: %s: %s\n' "$error_code" "$message" >&2
+        rm -rf -- "$work"
+    else
+        local stage='release verification'
+        if [[ -s $work/events ]]; then
+            stage=$(tail -n 1 "$work/events")
+            stage=${stage%% *}
+        fi
+        printf 'termux-muscle: %s: during %s: %s\nFull log: %s\n' \
+            "$error_code" "$stage" "$message" "$work/transcript" >&2
+    fi
+    return "$status"
 )

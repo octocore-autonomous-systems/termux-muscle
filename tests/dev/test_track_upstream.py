@@ -94,6 +94,7 @@ class PublicationTests(unittest.TestCase):
         self.assertIn(tracker.marker("2.1.10"), payload["body"])
         self.assertIn("no archive downloaded", payload["body"])
         self.assertIn("FAIL/SKIP", payload["body"])
+        self.assertIn("scripts/maintainer_acceptance.sh --model", payload["body"])
 
     def test_open_closed_and_later_page_issues_are_not_modified(self):
         for state in ("open", "closed"):

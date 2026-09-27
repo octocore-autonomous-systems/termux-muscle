@@ -21,6 +21,7 @@ guards="$scratch/guard-bin"
 mkdir -p -- "$source_dir/bin" "$source_dir/lib" "$source_dir/libexec" \
     "$root/cache" "$root/releases" "$trace" "$restricted" "$guards" "$prefix/bin"
 cp -- "$repo/bin/termux-muscle" "$source_dir/bin/termux-muscle"
+cp -- "$repo/lib/cli_schema.sh" "$source_dir/lib/cli_schema.sh"
 cp -- "$repo/VERSION" "$source_dir/VERSION"
 cli="$source_dir/bin/termux-muscle"
 export TM_FIXTURE_TRACE="$trace" TM_FIXTURE_MKDIR="$host_mkdir" TM_FIXTURE_MKTEMP="$host_mktemp"

@@ -5,7 +5,7 @@ set -eu
 # Archive validation must not inherit options from unrelated shell customizations.
 unset TAR_OPTIONS GZIP
 REPOSITORY="octocore-autonomous-systems/termux-muscle"
-VERSION="0.4.0"
+VERSION="0.5.0"
 
 fail() { printf '%s\n' "termux-muscle: $*" >&2; exit 1; }
 usage() {
@@ -90,6 +90,21 @@ fetch() {
         --connect-timeout 15 --max-time 180 --retry 2 --retry-max-time 240 \
         --max-filesize "$3" --output "$2" "$1" || fail "download failed; the managed installation was not changed"
 }
+record_update_stage() {
+    [ -n "${TM_SELF_UPDATE_EVENTS:-}" ] || return 0
+    [ -n "${TM_SELF_UPDATE_TRANSCRIPT_FILE:-}" ] || fail "missing self-update transcript path"
+    bytes=$(wc -c < "$TM_SELF_UPDATE_TRANSCRIPT_FILE") || fail "cannot measure self-update transcript"
+    printf '%s %s\n' "$1" "$bytes" >> "$TM_SELF_UPDATE_EVENTS" || fail "cannot record self-update stage"
+    if [ "${TM_SELF_UPDATE_PROGRESS_MODE:-}" = concise ]; then
+        case "$1" in
+            verification) printf 'Verifying source archive...\n' >&3 ;;
+            build) printf 'Building Termux Muscle locally...\n' >&3 ;;
+            test) printf 'Running test programs: ' >&3 ;;
+            installation) printf 'Installing verified manager...\n' >&3 ;;
+        esac
+    fi
+}
+record_update_stage verification
 fetch "$base/SHA256SUMS" "$scratch/SHA256SUMS" 65536
 fetch "$base/$asset" "$scratch/$asset" 16777216
 expected=$(awk -v name="$asset" '$2 == name {count++; value=$1} END {if(count != 1) exit 1; print value}' "$scratch/SHA256SUMS") || fail "checksum manifest has no unique source entry"
@@ -126,8 +141,10 @@ timeout --kill-after=5 60 tar --extract --gzip --file "$scratch/$asset" --direct
 source_dir="$scratch/source/termux-muscle-$version"
 [ -f "$source_dir/VERSION" ] && [ "$(cat "$source_dir/VERSION")" = "$version" ] || fail "source VERSION does not match the requested release"
 [ -f "$source_dir/Makefile" ] && [ -f "$source_dir/bin/termux-muscle" ] || fail "source archive lacks its build or CLI entry"
+record_update_stage build
 printf '%s\n' "Building and testing Termux Muscle $version locally..." >&2
 timeout --kill-after=5 600 make -C "$source_dir" all || fail "local compilation failed; the managed installation was not changed"
+record_update_stage test
 timeout --kill-after=5 600 make -C "$source_dir" check || fail "local tests failed; the managed installation was not changed"
 [ -x "$source_dir/build/tm-core" ] || fail "local build did not produce its C helper"
 set -- "$source_dir/bin/termux-muscle" bootstrap --source-dir "$source_dir" --build-dir "$source_dir/build"
@@ -135,4 +152,5 @@ set -- "$source_dir/bin/termux-muscle" bootstrap --source-dir "$source_dir" --bu
 [ -z "$install_prefix" ] || set -- "$@" --prefix "$install_prefix"
 [ "$no_install" -eq 0 ] || set -- "$@" --no-install
 [ "$link_claude" -eq 1 ] || set -- "$@" --no-link
+record_update_stage installation
 "$termux_prefix/bin/bash" "$@"
