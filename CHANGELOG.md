@@ -8,11 +8,11 @@
 - Document **Opus 5.5** (`claude-opus-5-5`, minimum client **2.1.280**) and **Fable 5** (`claude-fable-5`, minimum client 2.1.219) in the compatibility manifest. Opus 5.5 is the reason for the pin move: the 2.1.270 pin is below its minimum client version, so a default installation could not select it. The release gate enforces that every documented model's minimum client version is at or below the pinned version.
 - Report a missing `verified_on` in the strict release gate as an absent device-acceptance date rather than as a malformed metadata field. The release is rejected either way; only the reason is now legible.
 - Add `scripts/maintainer_acceptance.sh`, which runs the complete maintainer lifecycle (bootstrap, isolated startup, offline update, optional authenticated Bash-tool and exact-model check, offline rollback, uninstall) in a disposable root. It proves the live installation unchanged, writes a device report and previews the release gate. It refuses to run inside a managed Claude Code session and explains why.
-- Claim no verified model for this version. The 0.3.2 and earlier Sonnet 5 results, and the 0.1.0 Opus and mixed Fable observations, remain dated evidence for their own releases and are not relabeled.
+- Verify **Opus 5.5** with an exact authenticated Bash-tool workflow on the Galaxy S26 Ultra. The 0.3.2 and earlier Sonnet 5 results, and the 0.1.0 Opus and mixed Fable observations, remain dated evidence for their own releases and are not relabeled.
 
 Musl stays at **1.2.6-r2** with unchanged digests, and the acquisition, startup-acceptance, update, rollback and removal behavior is unchanged.
 
-**No device acceptance is asserted for 0.4.0 yet, so this version is not publishable.** `compatibility.json` registers no report and omits `verified_on`, and the strict release gate therefore refuses it. Maintainer acceptance must run from a fresh native Termux shell: the runtime's nested-namespace guard deliberately refuses to start a candidate payload from inside an already-managed Claude Code session, so acceptance cannot be produced from within one. See [docs/releases/0.4.0.md](docs/releases/0.4.0.md).
+[Galaxy S26 Ultra evidence from 2026-09-27 UTC](compatibility/galaxy-s26-ultra-0.4.0-20260927.md), produced by the new acceptance script from a clean checkout of the tested commit, covers private source installation, isolated startup, offline update and rollback, removal with the live installation unchanged, and one bounded authenticated Opus 5.5 shell-tool workflow. Acceptance must run from a fresh native Termux shell: the runtime's nested-namespace guard refuses to start a candidate payload from inside a managed Claude Code session. Public installer delivery remains a separate post-publication check.
 
 ## 0.3.2
 
