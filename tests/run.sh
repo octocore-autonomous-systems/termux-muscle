@@ -6,13 +6,18 @@ export LC_ALL=C
 # A running older manager exports TM_CORE while invoking the downloaded
 # installer. Always exercise this checkout's freshly built helper.
 export TM_CORE="$PWD/build/tm-core"
+# A self-update runs this suite with its stage-event and progress variables
+# set and progress on FD 3. Only this runner reports progress: some tests run
+# nested installers, which must not see the caller's variables or files.
+progress_mode=${TM_SELF_UPDATE_PROGRESS_MODE:-}
+unset TM_SELF_UPDATE_EVENTS TM_SELF_UPDATE_TRANSCRIPT_FILE TM_SELF_UPDATE_PROGRESS_MODE TM_SELF_UPDATE_TARGET_FILE
 shopt -s nullglob
 count=0
 skipped=0
 failed=0
 progress_count=0
 progress_result() {
-    [[ ${TM_SELF_UPDATE_PROGRESS_MODE:-} == concise ]] || return 0
+    [[ $progress_mode == concise ]] || return 0
     case $1 in
         passed)
             printf '.' >&3
@@ -28,7 +33,7 @@ progress_result() {
 run_program() {
     local label=$1 status; shift
     printf 'RUN %s\n' "$label"
-    if "$@"; then
+    if "$@" 3>&-; then
         ((count += 1))
         progress_result passed
     else
@@ -50,7 +55,7 @@ for script in tests/test_*.sh; do
     run_program "$script" bash "$script"
 done
 ((count + skipped > 0)) || { printf '%s\n' 'No tests were found.' >&2; exit 1; }
-if [[ ${TM_SELF_UPDATE_PROGRESS_MODE:-} == concise ]]; then
+if [[ $progress_mode == concise ]]; then
     if ((progress_count % 60 != 0)); then printf '\n' >&3; fi
     printf 'Tests: %d passed, %d skipped, %d failed.\n' "$count" "$skipped" "$failed" >&3
 fi
