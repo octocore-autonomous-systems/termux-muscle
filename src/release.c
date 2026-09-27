@@ -359,6 +359,15 @@ static const char *report_path(json_object *item) {
     return text_field(item, "path");
 }
 static void verify_reports(const char *root, json_object *manifest, json_object *models) {
+    json_object *dated;
+    /* An absent or empty verified_on is the ordinary state of a version still
+     * awaiting device acceptance. Say so plainly instead of reporting it as a
+     * malformed field; the release remains rejected either way. */
+    if (!json_object_object_get_ex(manifest, "verified_on", &dated) ||
+        !json_object_is_type(dated, json_type_string) || !*json_object_get_string(dated))
+        invalid(
+            "Release needs a verified_on acceptance date and a matching maintainer device report; "
+            "this version asserts no device acceptance yet.");
     const char *verified_on = text_field(manifest, "verified_on");
     ensure_date(verified_on);
     if (strcmp(text_field(models, "checked_documentation_on"), verified_on) > 0)
