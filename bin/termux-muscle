@@ -16,42 +16,10 @@ TM_PREFIX=${PREFIX:-/data/data/com.termux/files/usr}
 TM_PROJECT_VERSION=$(cat -- "$TM_SOURCE/VERSION")
 source "$TM_SOURCE/lib/acquire.sh"
 source "$TM_SOURCE/lib/commands.sh"
+source "$TM_SOURCE/lib/cli_schema.sh"
 
 tm_error() { printf 'termux-muscle: %s: %s\n' "$1" "$2" >&2; exit 1; }
-tm_help() {
-    cat <<'EOF'
-Termux Muscle — install, run and maintain Claude Code on Termux
-
-Usage: termux-muscle [--root DIR] [--prefix TERMUX_PREFIX] COMMAND [OPTIONS]
-
-  install [--no-link]          Install pinned Claude Code and set up claude on PATH
-  run [--] CLAUDE_ARGUMENTS     Run Claude with its ordinary authentication/settings
-  update                       Validate a candidate before changing the active release
-  rollback                     Restore the previous validated release, without a download
-  repair [--offline]           Rebuild from verified original artifacts
-  versions                     Show active, previous and retained release identifiers
-  doctor                       Check local installation health; no model requests
-  migration                    Read-only settings/path advisories as sanitized JSON
-  test --output FILE           Write a sanitized local device report; no uploads
-  link [--replace] [--path P]  Own a Claude entry; preserve or back up an existing command
-  cleanup [--keep N]           Remove inactive releases; keep active sessions protected
-  self-update [--version X.Y.Z] [-f|--force]
-                                Install a newer Termux Muscle manager release
-  uninstall                    Remove owned files and restore unchanged command entries
-
-Install/update: --claude-version X.Y.Z|latest --allow-unverified requests an
-upstream release beyond the project pin. It still must pass local startup checks.
-Install sets up claude automatically and saves replaced commands for restoration.
-Use --no-link to preserve Claude command entries. Full manual: man termux-muscle.
-Repair/update: --offline uses only verified cached artifacts.
-Test: --model MODEL_ID explicitly permits an authenticated model request and usage.
-Self-update: status 0 means installed; 2 means already current; 3 means
-the target is older; 1 means update failure. --force permits a compatible
-reinstall or downgrade after normal integrity checks.
-
-This independent OAS project is not affiliated with or authorized by Anthropic.
-EOF
-}
+tm_help() { tm_schema_help "${1:-}"; }
 tm_preflight() {
     local dependency
     [[ -x $TM_CORE ]] || tm_error helper_missing 'Build this checkout with make, or rerun the source installer.'
@@ -204,7 +172,12 @@ case $command in
     help|-h|--help) tm_help; exit ;;
     --version) printf 'Termux Muscle %s\n' "$TM_PROJECT_VERSION"; exit ;;
 esac
-if [[ $command != run && ${1:-} == --help ]]; then tm_help; exit; fi
+if [[ $command != run ]]; then
+    case $command in
+        install|update|repair|rollback|versions|doctor|migration|test|link|cleanup|self-update|uninstall)
+            tm_schema_validate "$command" "$@" ;;
+    esac
+fi
 [[ -x $TM_CORE ]] || tm_error helper_missing 'Build this checkout with make, or rerun the source installer.'
 TM_ROOT=$("$TM_CORE" root-check "$TM_ROOT")
 TM_PREFIX=$(realpath -m -- "$TM_PREFIX")

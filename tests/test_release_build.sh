@@ -12,6 +12,7 @@ mkdir -p "$source/.githooks" "$source/docs/man" "$source/docs/images"
 mkdir -p "$source/tests/dev"
 printf '# maintainer tracker fixture\n' > "$source/scripts/track_upstream.py"
 printf '# maintainer tracker test fixture\n' > "$source/tests/dev/test_track_upstream.py"
+printf '# maintainer CLI schema generator fixture\n' > "$source/scripts/cli_schema.py"
 # A tiny fixed PNG tests byte preservation, without decoding or editing artwork.
 printf '%s' 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a1XkAAAAASUVORK5CYII=' | base64 --decode > "$source/docs/images/termux-muscle-hero.png"
 printf '.TH TERMUX-MUSCLE 1\n.SH NAME\ntermux-muscle \- fixture manual\n' > "$source/docs/man/termux-muscle.1"
@@ -68,7 +69,7 @@ grep -q '/.githooks/pre-commit$' "$work/names" || fail 'contributor hook omitted
 tar -tvzf "$work/dist/$asset" > "$work/modes"
 grep -Eq '^-rwxr-xr-x .*[/]\.githooks/pre-commit$' "$work/modes" || fail 'contributor hook is not executable'
 if grep -Eq '/build/|\.pyz$|\.pyc$|tm-core$' "$work/names"; then fail 'archive included compiler output or bytecode'; fi
-for approved in scripts/track_upstream.py tests/dev/test_track_upstream.py; do
+for approved in scripts/track_upstream.py scripts/cli_schema.py tests/dev/test_track_upstream.py; do
     tar -xOzf "$work/dist/$asset" "termux-muscle-$fixture_version/$approved" > "$work/python-source"
     cmp "$work/python-source" "$source/$approved" || fail 'maintainer Python source omitted or changed'
 done

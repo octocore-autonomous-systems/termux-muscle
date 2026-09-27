@@ -24,7 +24,9 @@ expect_status() {
 prefix=$scratch/prefix
 mkdir -p -- "$prefix/bin" "$prefix/tmp" "$scratch/stage/bin" "$scratch/stage/libexec"
 mkdir -p -- "$scratch/stage/docs/man"
+mkdir -p -- "$scratch/stage/docs/completions"
 printf '.TH TERMUX-MUSCLE 1\n.SH NAME\ntermux-muscle \\- fixture manual\n' > "$scratch/stage/docs/man/termux-muscle.1"
+printf '# fixture Bash completion\n' > "$scratch/stage/docs/completions/termux-muscle.sh"
 ln -s -- "$(command -v bash)" "$prefix/bin/bash"
 stage=$scratch/stage
 cp -- "$core" "$stage/libexec/tm-core"
@@ -278,6 +280,7 @@ printf 'called\n' >> "$TM_TEST_REMOTE/calls"
 while (($#)); do
     case $1 in --output) output=$2; shift 2 ;; *) url=$1; shift ;; esac
 done
+[[ ${TM_TEST_CURL_FAIL:-0} != 1 ]] || exit 22
 case $url in
     */releases/latest) printf '{"tag_name":"v%s"}\n' "${TM_TEST_LATEST_VERSION:-0.2.0}" > "$output" ;;
     */SHA256SUMS) cp "$TM_TEST_REMOTE/SHA256SUMS" "$output" ;;
@@ -332,6 +335,17 @@ manual=$prefix/share/man/man1/termux-muscle.1
 [[ -f $manual && ! -L $manual && $(stat -c %a "$manual") == 644 ]] || fail 'manual was not installed as a readable regular page'
 cmp "$manual" "$TM_TEST_STAGE/docs/man/termux-muscle.1" || fail 'manual content mismatch'
 [[ $(cat "$scratch/remote/index-calls") == -d && $(readlink "$prefix/bin/termux-muscle") == "$root/bin/termux-muscle" ]] || fail 'manual indexing or prefix manager command missing'
+completion=$(HOME=$hook_home bash "$scratch/hook.sh" completion_path)
+completion_target=$root/tools/current/docs/completions/termux-muscle.sh
+[[ -L $completion && $(readlink -- "$completion") == "$completion_target" ]] || fail 'Bash completion missing from the user completion directory'
+rm -- "$completion"
+printf 'foreign completion\n' > "$completion"
+HOME=$hook_home PATH=$hook_path env -u TMPDIR "$core" with-lock "$root" existing -- bash "$scratch/hook.sh" \
+    bootstrap --source-dir "$TM_SOURCE" --build-dir "$TM_SOURCE/build" --no-install > "$scratch/hook-output" 2> "$scratch/error"
+[[ $(cat "$completion") == 'foreign completion' ]] || fail 'foreign Bash completion was replaced'
+grep -q 'Existing Bash completion preserved' "$scratch/error" || fail 'foreign completion preservation lacked guidance'
+rm -- "$completion"
+ln -s -- "$completion_target" "$completion"
 rm "$hook_home/.local/bin/termux-muscle"
 HOME=$hook_home PATH=$hook_path env -u TMPDIR "$core" with-lock "$root" existing -- bash "$scratch/hook.sh" \
     bootstrap --source-dir "$TM_SOURCE" --build-dir "$TM_SOURCE/build" --no-link > "$scratch/hook-output"
@@ -405,6 +419,9 @@ pass 'busy uninstall restores the manual index and leaves the installation intac
 
 cat > "$scratch/remote/install.sh" <<'SH'
 printf '%s\0' "$@" > "$TM_TEST_REMOTE/executed"
+printf 'mock build output\nmock test output\n'
+[[ ${TM_TEST_INSTALL_FAIL_STAGE:-} != build ]] || { printf 'mock compilation failed\n' >&2; exit 1; }
+[[ ${TM_TEST_INSTALL_FAIL_STAGE:-} != test ]] || { printf 'mock tests failed\n' >&2; exit 1; }
 [[ -z ${TM_TEST_INSTALL_EXIT:-} ]] || exit "$TM_TEST_INSTALL_EXIT"
 SH
 (cd "$scratch/remote" && sha256sum install.sh > SHA256SUMS)
@@ -434,6 +451,10 @@ grep -q ': target_older:' "$scratch/hook-error" || fail 'latest older version la
 pass 'equal and older manager versions report distinct nonzero status before installer download'
 
 expect_status 0 env -u TMPDIR PATH="$scratch/mocks:$PATH" TM_TEST_LATEST_VERSION="$next_version" bash "$scratch/hook.sh" self_update
+[[ ! -s $scratch/hook-output ]] || fail 'default self-update leaked raw stdout'
+grep -q 'Checking manager release' "$scratch/hook-error" || fail 'default update omitted release stage'
+grep -q "Installed Termux Muscle $next_version" "$scratch/hook-error" || fail 'default update omitted completion'
+if grep -q 'mock build output' "$scratch/hook-error"; then fail 'default update leaked compiler output'; fi
 printf '%s\0' --version "$next_version" --root "$root" --prefix "$prefix" --no-install > "$scratch/expected"
 cmp "$scratch/remote/executed" "$scratch/expected" || fail 'self-update immutable source forwarding'
 cmp "$root/state.json" "$scratch/runtime-before-self-update.json" || fail 'self-update changed runtime state'
@@ -453,12 +474,156 @@ grep -q ': checksum_failed:' "$scratch/hook-error" || fail 'checksum failure lac
 [[ ! -e $scratch/remote/executed ]] || fail 'unverified self-update code executed'
 cat > "$scratch/remote/install.sh" <<'SH'
 printf '%s\0' "$@" > "$TM_TEST_REMOTE/executed"
+printf 'mock build output\nmock test output\n'
+[[ ${TM_TEST_INSTALL_FAIL_STAGE:-} != build ]] || { printf 'mock compilation failed\n' >&2; exit 1; }
+[[ ${TM_TEST_INSTALL_FAIL_STAGE:-} != test ]] || { printf 'mock tests failed\n' >&2; exit 1; }
 [[ -z ${TM_TEST_INSTALL_EXIT:-} ]] || exit "$TM_TEST_INSTALL_EXIT"
 SH
 (cd "$scratch/remote" && sha256sum install.sh > SHA256SUMS)
 expect_status 1 env TM_TEST_INSTALL_EXIT=3 PATH="$scratch/mocks:$PATH" bash "$scratch/hook.sh" self_update --version "$next_version"
 grep -q ': update_failed:' "$scratch/hook-error" || fail 'installer failure lacked update error category'
+grep -q 'during installer:' "$scratch/hook-error" || fail 'default failure omitted installer stage'
+failure_log=$(sed -n 's/^Full log: //p' "$scratch/hook-error")
+[[ -f $failure_log && $(stat -c %a -- "$failure_log") == 600 &&
+   $(stat -c %a -- "${failure_log%/*}") == 700 ]] || fail 'failed update log is not private'
+grep -q 'mock test output' "$failure_log" || fail 'failed update log lost details'
 pass 'newer and forced compatible self-update verify checksums and distinguish installer failure from no-update status'
+
+assert_update_json() {
+    local wanted_result=$1 wanted_code=$2
+    "$core" json-check "$scratch/hook-output" || fail 'self-update JSON is invalid'
+    [[ $(wc -l < "$scratch/hook-output") == 1 ]] || fail 'self-update JSON is not one line'
+    [[ $("$core" json-get "$scratch/hook-output" result) == "$wanted_result" ]] || fail 'self-update JSON result'
+    [[ $("$core" json-get "$scratch/hook-output" exit_code) == "$wanted_code" ]] || fail 'self-update JSON exit code'
+    [[ $("$core" json-get "$scratch/hook-output" schema) == termux-muscle.self-update.v1 ]] || fail 'self-update JSON schema'
+    [[ $("$core" json-get "$scratch/hook-output" transcript.complete) == true ]] || fail 'incomplete self-update JSON transcript'
+    [[ ! -s $scratch/hook-error ]] || fail 'self-update JSON leaked subprocess stderr'
+}
+printf '\000\377\012' > "$scratch/binary-transcript"
+"$core" self-update-json "$bootstrap_version" - false failed 1 fixture fixture \
+    "$scratch/binary-transcript" true - > "$scratch/binary-result.json"
+"$core" json-check "$scratch/binary-result.json" || fail 'binary transcript broke JSON validity'
+[[ $("$core" json-get "$scratch/binary-result.json" transcript.combined_output_base64) == AP8K ]] ||
+    fail 'binary transcript lost bytes'
+printf 'build 0\ntest 2\ninstallation 3\n' > "$scratch/stage-events"
+"$core" self-update-json "$bootstrap_version" "$next_version" false installed 0 - - \
+    "$scratch/binary-transcript" true "$scratch/stage-events" > "$scratch/stage-result.json"
+stage_json=$("$core" json-get "$scratch/stage-result.json" transcript.stages)
+[[ $stage_json == *'"name":"build"'* && $stage_json == *'"name":"test"'* &&
+   $stage_json == *'"name":"installation"'* ]] || fail 'structured JSON stage boundaries'
+expect_status 2 env PATH="$scratch/mocks:$PATH" bash "$scratch/hook.sh" self_update --json --version "$bootstrap_version"
+assert_update_json already_current 2
+[[ $("$core" json-get "$scratch/hook-output" target_version) == "$bootstrap_version" ]] || fail 'equal JSON target'
+expect_status 2 env PATH="$scratch/mocks:$PATH" bash "$scratch/hook.sh" self_update -V --version "$bootstrap_version"
+grep -q ': already_current:' "$scratch/hook-error" || fail 'verbose equal target notice'
+expect_status 3 env TM_PROJECT_VERSION="$next_version" PATH="$scratch/mocks:$PATH" bash "$scratch/hook.sh" self_update --version "$bootstrap_version" --json
+assert_update_json target_older 3
+expect_status 3 env TM_PROJECT_VERSION="$next_version" PATH="$scratch/mocks:$PATH" bash "$scratch/hook.sh" self_update --verbose --version "$bootstrap_version"
+grep -q ': target_older:' "$scratch/hook-error" || fail 'verbose older target notice'
+expect_status 1 env PATH="$scratch/mocks:$PATH" bash "$scratch/hook.sh" self_update --json --version '../../escape'
+assert_update_json failed 1
+[[ $("$core" json-get "$scratch/hook-output" error_code) == invalid_version ]] || fail 'invalid JSON error code'
+[[ $("$core" json-get "$scratch/hook-output" target_version) == null ]] || fail 'invalid JSON target should be null'
+expect_status 0 env PATH="$scratch/mocks:$PATH" bash "$scratch/hook.sh" self_update --json --force --version "$bootstrap_version"
+assert_update_json installed 0
+[[ $("$core" json-get "$scratch/hook-output" forced) == true ]] || fail 'forced JSON flag'
+cp "$scratch/hook-output" "$scratch/plain-json"
+expect_status 0 env PATH="$scratch/mocks:$PATH" bash "$scratch/hook.sh" self_update --verbose --json --force --version "$bootstrap_version"
+cmp "$scratch/plain-json" "$scratch/hook-output" || fail '--verbose altered JSON output'
+expect_status 0 env PATH="$scratch/mocks:$PATH" bash "$scratch/hook.sh" self_update --json -V --force --version "$bootstrap_version"
+cmp "$scratch/plain-json" "$scratch/hook-output" || fail '-V altered JSON output'
+expect_status 0 env PATH="$scratch/mocks:$PATH" bash "$scratch/hook.sh" self_update -V --force --version "$bootstrap_version"
+grep -q 'mock build output' "$scratch/hook-output" || fail '-V did not stream installer stdout'
+expect_status 0 env PATH="$scratch/mocks:$PATH" bash "$scratch/hook.sh" self_update --force --version "$bootstrap_version" --verbose
+grep -q 'mock test output' "$scratch/hook-output" || fail '--verbose did not stream test stdout'
+expect_status 1 env TM_TEST_INSTALL_EXIT=3 PATH="$scratch/mocks:$PATH" bash "$scratch/hook.sh" self_update --json --version "$next_version"
+assert_update_json failed 1
+[[ $("$core" json-get "$scratch/hook-output" error_code) == update_failed ]] || fail 'installer JSON error code'
+expect_status 1 env TM_TEST_INSTALL_EXIT=3 PATH="$scratch/mocks:$PATH" bash "$scratch/hook.sh" self_update --verbose --version "$next_version"
+grep -q 'mock test output' "$scratch/hook-output" || fail 'verbose failure hid test transcript'
+grep -q ': update_failed:' "$scratch/hook-error" || fail 'verbose failure hid update error'
+for failure_stage in build test; do
+    expect_status 1 env TM_TEST_INSTALL_FAIL_STAGE="$failure_stage" PATH="$scratch/mocks:$PATH" \
+        bash "$scratch/hook.sh" self_update -V --version "$next_version"
+    if [[ $failure_stage == build ]]; then failure_text='mock compilation failed'; else failure_text='mock tests failed'; fi
+    grep -q "$failure_text" "$scratch/hook-error" ||
+        fail "verbose $failure_stage failure hid diagnostics"
+done
+expect_status 1 env TM_TEST_CURL_FAIL=1 PATH="$scratch/mocks:$PATH" bash "$scratch/hook.sh" self_update --json --version "$next_version"
+assert_update_json failed 1
+[[ $("$core" json-get "$scratch/hook-output" error_code) == download_failed ]] || fail 'download JSON error code'
+printf corrupt >> "$scratch/remote/install.sh"
+expect_status 1 env PATH="$scratch/mocks:$PATH" bash "$scratch/hook.sh" self_update --json --version "$next_version"
+assert_update_json failed 1
+[[ $("$core" json-get "$scratch/hook-output" error_code) == checksum_failed ]] || fail 'checksum JSON error code'
+cat > "$scratch/remote/install.sh" <<'SH'
+printf '%s\0' "$@" > "$TM_TEST_REMOTE/executed"
+[[ -z ${TM_TEST_INSTALL_EXIT:-} ]] || exit "$TM_TEST_INSTALL_EXIT"
+SH
+(cd "$scratch/remote" && sha256sum install.sh > SHA256SUMS)
+pass 'self-update JSON emits one versioned result across success and handled failures'
+
+cat > "$scratch/remote/install.sh" <<'SH'
+set -euo pipefail
+stage() {
+    printf '%s %s\n' "$1" "$(wc -c < "$TM_SELF_UPDATE_TRANSCRIPT_FILE")" >> "$TM_SELF_UPDATE_EVENTS"
+    [[ ${TM_SELF_UPDATE_PROGRESS_MODE:-} == concise ]] || return 0
+    case $1 in
+        verification) printf 'Verifying source archive...\n' >&3 ;;
+        build) printf 'Building Termux Muscle locally...\n' >&3 ;;
+        test) printf 'Running test programs: ' >&3 ;;
+        installation) printf 'Installing verified manager...\n' >&3 ;;
+    esac
+}
+stage verification
+printf 'verified source\n'
+stage build
+printf 'compiler command\n'
+if [[ ${TM_TEST_PROGRESS_FAIL_STAGE:-} == build ]]; then printf 'compiler failed\n' >&2; exit 1; fi
+stage test
+printf 'RUN test_one\nPASS test_one\n'
+if [[ ${TM_TEST_PROGRESS_FAIL_STAGE:-} == test ]]; then
+    if [[ ${TM_SELF_UPDATE_PROGRESS_MODE:-} == concise ]]; then
+        printf '\nTests: 0 passed, 0 skipped, 1 failed.\n' >&3
+    fi
+    printf 'test failed\n' >&2
+    exit 1
+fi
+if [[ ${TM_SELF_UPDATE_PROGRESS_MODE:-} == concise ]]; then
+    printf '.\nTests: 1 passed, 0 skipped, 0 failed.\n' >&3
+fi
+stage installation
+if [[ ${TM_TEST_PROGRESS_FAIL_STAGE:-} == installation ]]; then printf 'publication failed\n' >&2; exit 1; fi
+printf 'published manager\n'
+if [[ ${TM_TEST_PROGRESS_FAIL_STAGE:-} == events ]]; then printf 'invalid event\n' >> "$TM_SELF_UPDATE_EVENTS"; fi
+SH
+(cd "$scratch/remote" && sha256sum install.sh > SHA256SUMS)
+expect_status 0 env PATH="$scratch/mocks:$PATH" bash "$scratch/hook.sh" self_update --force --version "$bootstrap_version"
+[[ ! -s $scratch/hook-output ]] || fail 'concise update leaked raw stdout'
+grep -q 'Running test programs: \.' "$scratch/hook-error" || fail 'concise update lacked completed-test dot'
+grep -q 'Tests: 1 passed, 0 skipped, 0 failed.' "$scratch/hook-error" || fail 'concise update lacked test totals'
+grep -q "Installed Termux Muscle $bootstrap_version" "$scratch/hook-error" || fail 'concise update lacked final status'
+if grep -q 'compiler command' "$scratch/hook-error"; then fail 'concise update leaked compiler chatter'; fi
+for failure_stage in build test installation; do
+    expect_status 1 env TM_TEST_PROGRESS_FAIL_STAGE="$failure_stage" PATH="$scratch/mocks:$PATH" \
+        bash "$scratch/hook.sh" self_update --force --version "$bootstrap_version"
+    grep -q "during $failure_stage:" "$scratch/hook-error" || fail "concise $failure_stage failure omitted its stage"
+    failure_log=$(sed -n 's/^Full log: //p' "$scratch/hook-error")
+    [[ -f $failure_log && $(stat -c %a -- "$failure_log") == 600 ]] || fail 'concise failure log is not private'
+done
+expect_status 0 env PATH="$scratch/mocks:$PATH" bash "$scratch/hook.sh" self_update --json --force --version "$bootstrap_version"
+assert_update_json installed 0
+stage_json=$("$core" json-get "$scratch/hook-output" transcript.stages)
+[[ $stage_json == *'"name":"verification"'* && $stage_json == *'"name":"build"'* &&
+   $stage_json == *'"name":"test"'* && $stage_json == *'"name":"installation"'* ]] ||
+    fail 'JSON omitted instrumented installer stages'
+expect_status 1 env TM_TEST_PROGRESS_FAIL_STAGE=events PATH="$scratch/mocks:$PATH" \
+    bash "$scratch/hook.sh" self_update --json --force --version "$bootstrap_version"
+"$core" json-check "$scratch/hook-output" || fail 'stage-event fallback is not JSON'
+[[ $("$core" json-get "$scratch/hook-output" error_code) == capture_failed &&
+   $("$core" json-get "$scratch/hook-output" transcript.complete) == false ]] ||
+    fail 'unreadable stage events lacked incomplete JSON result'
+pass 'concise stages, completed-test dots and structured JSON share exact installer events'
 
 before_calls=$(wc -l < "$scratch/remote/calls")
 rejects invalid_version env PATH="$scratch/mocks:$PATH" bash "$scratch/hook.sh" self_update --version '../../escape'
@@ -466,7 +631,7 @@ rejects incompatible_tooling env PATH="$scratch/mocks:$PATH" bash "$scratch/hook
 [[ $(wc -l < "$scratch/remote/calls") == "$before_calls" ]] || fail 'invalid update version reached network'
 HOME=$hook_home PATH=$hook_path "$core" with-lock "$root" existing -- bash "$scratch/hook.sh" uninstall >/dev/null
 [[ $(tail -1 "$scratch/remote/index-calls") == -u ]] || fail 'uninstall did not remove the owned manual index while page existed'
-[[ ! -e $root && ! -e $hook_home/.local/bin/termux-muscle && ! -e $prefix/bin/termux-muscle && ! -e $manual &&
+[[ ! -e $root && ! -e $hook_home/.local/bin/termux-muscle && ! -e $prefix/bin/termux-muscle && ! -e $manual && ! -L $completion &&
    $(readlink "$prefix/bin/claude") == "$shadow/claude" && $(cat "$hook_home/.local/bin/claude") == legacy-home &&
    $(stat -c %a "$shadow/claude") == 751 && $("$shadow/claude") == legacy-shadow ]] || fail 'default commands were not restored or the manual was not removed'
 pass 'invalid self-update selectors are rejected before network; shell-created entries uninstall cleanly'
