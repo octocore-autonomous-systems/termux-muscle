@@ -27,6 +27,8 @@
 #                VERSION-UTCSTAMP.json). Must not exist.
 #   --keep-work  Keep the disposable work directory even on success.
 #   --preflight  Check prerequisites, print the plan, and stop.
+#   --allow-dirty  Accept uncommitted or untracked source files. The report
+#                records this, and such evidence does not describe any commit.
 #
 # Exit: 0 all required checks PASS and live installation unchanged;
 #       1 at least one required check is not PASS; 2 usage or preflight
@@ -48,14 +50,15 @@ BUDGET_USD=0.50
 die() { printf 'acceptance: %s\n' "$*" >&2; exit 2; }
 say() { printf '\n== %s\n' "$*" >&2; }
 
-model='' output='' keep_work=false preflight_only=false
+model='' output='' keep_work=false preflight_only=false allow_dirty=false
 while (($#)); do
     case $1 in
+        --allow-dirty) allow_dirty=true; shift ;;
         --model) (($# > 1)) || die '--model needs an exact model ID.'; model=$2; shift 2 ;;
         --output) (($# > 1)) || die '--output needs a file.'; output=$2; shift 2 ;;
         --keep-work) keep_work=true; shift ;;
         --preflight) preflight_only=true; shift ;;
-        -h|--help) sed -n '3,33p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) sed -n '3,35p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) die "unknown option: $1 (see --help)" ;;
     esac
 done
@@ -82,13 +85,26 @@ pin=$(jq -r '.claude.version' "$SRC/compatibility.json")
 musl=$(jq -r '.musl.version' "$SRC/compatibility.json")
 [[ $(jq -r '.project_version' "$SRC/compatibility.json") == "$version" ]] ||
     die 'VERSION and compatibility.json project_version disagree.'
+# Evidence must describe a commit. `make stage` copies whole bin/, lib/ and
+# docs/ trees into the tested installation, so untracked files count too.
+# Reports written by this script are the only exemption.
+commit=$(git -C "$SRC" rev-parse HEAD)
+changes=$(git -C "$SRC" status --porcelain --untracked-files=all -- . ':!compatibility/reports' | wc -l)
+dirty=false
+((changes == 0)) || dirty=true
+if [[ $dirty == true && $allow_dirty == false ]]; then
+    die "the source tree has $changes uncommitted or untracked file(s), so the result would not
+describe commit ${commit:0:7}. Run from a clean checkout of the branch being released, e.g.
+  git -C '$SRC' worktree add ../termux-muscle-acceptance ${commit:0:7}
+or pass --allow-dirty for an exploratory run whose report records the tree as dirty."
+fi
 stamp=$(date -u +%Y%m%dT%H%M%SZ)
 [[ -n $output ]] || output=$SRC/compatibility/reports/acceptance-$version-$stamp.json
 [[ ! -e $output && ! -L $output ]] || die "report already exists: $output"
 
 cat >&2 <<PLAN
 Termux Muscle $version acceptance
-  source      $SRC ($(git -C "$SRC" rev-parse --short HEAD)$(git -C "$SRC" diff --quiet HEAD -- || printf ', uncommitted changes'))
+  source      $SRC (${commit:0:7}$($dirty && printf ', %s uncommitted or untracked file(s)' "$changes"))
   pinned      Claude Code $pin, musl $musl
   live root   $LIVE_ROOT (fingerprinted, never modified)
   model check ${model:-none; shell_tools will be SKIP}${model:+ (real request, budget \$$BUDGET_USD)}
@@ -334,7 +350,8 @@ overrides=$(for id in "${!result[@]}"; do
 done | jq -sc .)
 mkdir -p -- "$(dirname -- "$output")"
 jq --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --argjson over "$overrides" --argjson models "$models" \
-    --argjson workflow "$workflow" --argjson live "$live_unchanged" --arg notes "$(basename -- "${output%.json}").md" '
+    --argjson workflow "$workflow" --argjson live "$live_unchanged" --arg notes "$(basename -- "${output%.json}").md" \
+    --arg commit "$commit" --argjson dirty "$dirty" '
     # Observed results replace the diagnostic placeholders by ID; checks the
     # diagnostic report does not know about are appended in ID order.
     ([.checks[].id]) as $ids
@@ -343,6 +360,7 @@ jq --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --argjson over "$overrides" --argjs
                  + ($over | map(select(.id as $i | $ids | index($i) | not)) | sort_by(.id)))
     | .generated_at = $at
     | .provenance = "maintainer"
+    | .source = {commit: $commit, uncommitted_changes: $dirty}
     | .models = $models
     | .evidence_notes = $notes
     | .lifecycle_acceptance = {scope: "isolated_native_source_bootstrap_no_link",
