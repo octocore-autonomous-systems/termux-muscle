@@ -92,7 +92,7 @@ Default updates stay with the project's compatibility pin. An explicitly request
 
 Use `-V` or `--verbose` to stream the full installer, build, and test transcript. With `--json`, either verbose flag has no effect: JSON contains the complete captured transcript. The `transcript.stages` array separates verification, build, test, and installation output for installers that emit stage boundaries; older published installers appear as one `installer` stage. Each stage has base64 `output_base64` bytes.
 
-Ordinary self-update output shows release verification, local build, tests and installation as they start. During tests, one dot means one top level C or shell test program has passed; the line wraps after 60 dots and ends with passed, skipped and failed program totals. Compiler commands and individual PASS lines stay in a private full log. On failure, the command names the stage and retains that log at the printed path.
+Ordinary self-update output shows release verification, local build, tests and installation as they start. During tests, one dot means one top level C or shell test program has passed, and the stage ends with passed, skipped and failed program totals. On a terminal, a spinner with elapsed seconds runs during the build, and after the dots a live status shows the running program, its position such as `3/15`, and its elapsed seconds; each is erased when its step ends. Logs and `--json` transcripts receive only the dots, which wrap after 60, and the totals. Set `TM_SELF_UPDATE_PROGRESS_LIVE=0` to turn the live status off. Compiler commands and individual PASS lines stay in a private full log. On failure, the command names the stage and retains that log at the printed path.
 
 ## Upstream release tracking
 

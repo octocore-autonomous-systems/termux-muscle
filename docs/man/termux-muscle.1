@@ -210,8 +210,12 @@ Download a published Termux Muscle source release, verify its checksums,
 compile it locally and run its offline mandatory tests before publishing the
 new management tool.
 Ordinary output names each stage and prints one dot for each completed top
-level test program, followed by program totals. A failure names its stage
-and leaves a private full log at the printed path.
+level test program, followed by program totals. On a terminal, a spinner
+with elapsed seconds runs during the build, and a live status after the dots
+shows the running test program, its position and its elapsed seconds; each
+is erased when its step ends. Set TM_SELF_UPDATE_PROGRESS_LIVE=0 to turn the
+live status off. A failure names its stage and leaves a private full log at
+the printed path.
 Without
 .BR \-\-version ,
 resolve the latest published project release.

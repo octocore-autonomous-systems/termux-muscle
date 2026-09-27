@@ -37,6 +37,7 @@ case "${0##*/}" in
         if [[ ${MOCK_MISSING_MAN:-0} == 1 ]]; then cp "$MOCK_WORK/mock" "$MOCK_WORK/bin/man"; fi;;
     make)
         source=$2; target=${!#}; printf '%s\n' "$target" >> "$MOCK_WORK/make.log"
+        if [[ -n "${MOCK_MAKE_SLEEP:-}" && "$target" == all ]]; then sleep "$MOCK_MAKE_SLEEP"; fi
         [[ "${MOCK_MAKE_FAIL:-}" != "$target" ]] || exit 47
         mkdir -p "$source/build"
         printf '#!/bin/sh\nexit 0\n' > "$source/build/tm-core"
@@ -212,5 +213,61 @@ unset MOCK_WAIT
 [[ $status != 0 && ! -e "$work/cli.args" ]] || fail 'interrupted download reached publication'
 clean; run_install
 [[ $status == 0 ]] || fail 'retry after interruption failed'
+clean; passed
+# A quiet self-update on a terminal shows a build spinner with elapsed
+# seconds, erases it at the next stage or on failure, and leaves nothing
+# running afterwards.
+mkdir -p "$work/progress-bin"
+for tool in wc date; do ln -s "$(command -v "$tool")" "$work/progress-bin/$tool"; done
+progress_install() {
+    : > "$work/events"
+    : > "$work/transcript"
+    set +e
+    env PATH="$mock_bin:$work/progress-bin" PREFIX="$work/com.termux/files/usr" TMPDIR="$work/tmp space" PROOT_TMP_DIR= \
+        TM_SELF_UPDATE_PROGRESS_MODE=concise TM_SELF_UPDATE_PROGRESS_LIVE=1 TM_SELF_UPDATE_EVENTS="$work/events" \
+        TM_SELF_UPDATE_TRANSCRIPT_FILE="$work/transcript" MOCK_MAKE_SLEEP=1.2 \
+        "$sh_path" "$project/install.sh" --version 0.1.0 --no-install --no-link \
+        > "$work/output" 2> "$work/error" 3> "$work/progress"
+    status=$?
+    set -e
+}
+progress_settled() {
+    local size
+    size=$(stat -c %s -- "$work/progress")
+    sleep 1.2
+    [[ $(stat -c %s -- "$work/progress") == "$size" ]] || fail "build spinner kept writing after $1"
+}
+progress_install
+[[ $status == 0 ]] || fail 'live-progress installation failed'
+grep -aq $'\r''Building Termux Muscle locally\.\.\. [|/\\-] [01]s'$'\033''\[K' "$work/progress" ||
+    fail "build spinner lacked a frame or elapsed seconds: $(od -c "$work/progress" | head -5)"
+visible=$(sed 's/.*\r//' "$work/progress" | sed $'s/\033\\[K//g')
+[[ $visible == $'Verifying source archive...\nBuilding Termux Muscle locally...\nRunning test programs: Installing verified manager...' ]] ||
+    fail "build spinner was not erased at the next stage: $visible"
+progress_settled success
+clean; passed
+
+export MOCK_MAKE_FAIL=all
+progress_install
+unset MOCK_MAKE_FAIL
+[[ $status != 0 ]] || fail 'failed live-progress build succeeded'
+[[ $(tail -c 40 "$work/progress"; printf x) == *$'\r''Building Termux Muscle locally...'$'\033''[K'$'\n'x ]] ||
+    fail 'failed build left its spinner on the terminal'
+progress_settled failure
+clean; passed
+
+progress_install
+[[ $status == 0 ]] || fail 'live-progress retry failed'
+: > "$work/progress"
+set +e
+env PATH="$mock_bin:$work/progress-bin" PREFIX="$work/com.termux/files/usr" TMPDIR="$work/tmp space" PROOT_TMP_DIR= \
+    TM_SELF_UPDATE_PROGRESS_MODE=concise TM_SELF_UPDATE_EVENTS="$work/events" \
+    TM_SELF_UPDATE_TRANSCRIPT_FILE="$work/transcript" MOCK_MAKE_SLEEP=0.6 \
+    "$sh_path" "$project/install.sh" --version 0.1.0 --no-install --no-link \
+    > "$work/output" 2> "$work/error" 3> "$work/progress"
+status=$?
+set -e
+[[ $status == 0 && $(< "$work/progress") == $'Verifying source archive...\nBuilding Termux Muscle locally...\nRunning test programs: Installing verified manager...' ]] ||
+    fail "non-terminal progress changed: $(od -c "$work/progress" | head -5)"
 clean; passed
 printf 'PASS: %s bootstrap regressions (shell only)\n' "$count"
