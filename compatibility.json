@@ -1,13 +1,12 @@
 {
   "schema": 1,
-  "project_version": "0.3.2",
-  "verified_on": "2026-09-24",
+  "project_version": "0.4.0",
   "claude": {
-    "version": "2.1.270",
+    "version": "2.1.283",
     "package": "@anthropic-ai/claude-code-linux-arm64-musl",
-    "tarball": "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-arm64-musl/-/claude-code-linux-arm64-musl-2.1.270.tgz",
-    "integrity": "sha512-8QeMcNCn89vIlz09hhkZeoZbPHbpMfIXKIIwL3fW6hI49EQAGJGSgZK2YaD+LnWosrxw+6zJun7yMOecDp7wqA==",
-    "binary_sha256": "067b322dfca0ed81521b562ef05825e8be282eeb5c83441e4be824415572dbc0"
+    "tarball": "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-arm64-musl/-/claude-code-linux-arm64-musl-2.1.283.tgz",
+    "integrity": "sha512-JcZDkbhkSdyuwSmZUlzEXOQiIn4U8vGwbxkU/MoFymU93RfmpmOUnj3TZALyNll0t86b0IpiYCXWFfaKu7ZUUw==",
+    "binary_sha256": "7e607db312a84ed8d7e17c34be93accad5f79366c5a043758ba8de95fdb5d070"
   },
   "musl": {
     "version": "1.2.6-r2",
@@ -17,13 +16,23 @@
   },
   "backend": "unmodified-musl-proot",
   "models": {
-    "checked_documentation_on": "2026-09-14",
+    "checked_documentation_on": "2026-09-27",
     "source": "https://code.claude.com/docs/en/model-config",
     "documented": [
       {
         "id": "claude-fable-5-1",
         "name": "Fable 5.1",
         "minimum_claude_version": "2.1.257"
+      },
+      {
+        "id": "claude-fable-5",
+        "name": "Fable 5",
+        "minimum_claude_version": "2.1.219"
+      },
+      {
+        "id": "claude-opus-5-5",
+        "name": "Opus 5.5",
+        "minimum_claude_version": "2.1.280"
       },
       {
         "id": "claude-opus-5",
@@ -37,11 +46,12 @@
       }
     ],
     "verified": [
-      "claude-sonnet-5"
+      "claude-opus-5-5"
     ],
-    "availability_note": "Sonnet 5 passed an exact authenticated Bash-tool workflow on 2026-09-24 with 0.3.2 on the reported Galaxy S26 Ultra. Dated 0.3.1, 0.3.0 and 0.2.0 Sonnet checks and 0.1.0 Opus/Sonnet and mixed Fable observations remain historical. Model availability depends on account, provider and organization policy."
+    "availability_note": "Documented minimum client versions come from Anthropic's model configuration reference, reviewed on 2026-09-27. Opus 5.5 requires client 2.1.280 or later, so the previous 2.1.270 pin could not select it and this 2.1.283 pin can. Opus 5.5 passed an exact authenticated Bash-tool workflow on 2026-09-27 with 0.4.0 on the reported Galaxy S26 Ultra. Dated 0.3.2 and earlier Sonnet 5 checks and the 0.1.0 Opus and mixed Fable observations remain historical evidence for their own releases. Model availability depends on account, provider and organization policy."
   },
   "reports": [
-    "compatibility/galaxy-s26-ultra-0.3.2-20260924.json"
-  ]
+    "compatibility/galaxy-s26-ultra-0.4.0-20260927.json"
+  ],
+  "verified_on": "2026-09-27"
 }
