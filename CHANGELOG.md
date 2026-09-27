@@ -1,8 +1,15 @@
 # Changes
 
-## Unreleased
+## 0.5.0
 
-- Track upstream Claude Code's ARM64 musl `latest` release every six hours in GitHub Actions, opening one compatibility-testing issue per newer observed version. Preserve closed decisions and maintainer edits; leave compatibility pins and user installations unchanged. Add offline maintainer-tool regressions and manual read-only checks.
+- Make ordinary `self-update` output concise. It names release verification, local build, tests and installation as each stage starts, prints one dot per passed top-level C or shell test program (wrapping after 60) and ends with passed, skipped and failed program totals. Compiler commands and individual PASS lines go to a private full log, which is kept at the printed path when a stage fails.
+- Add `self-update -V/--verbose` to stream the full installer, build and test transcript, and `self-update --json`, which emits one `termux-muscle.self-update.v1` object with the result, exit code, error code and the complete transcript as base64, split into stages when the installer marks them. Exit statuses stay 0/1/2/3.
+- Define the command line once in an argparse schema (`scripts/cli_schema.py`, a maintainer tool) that generates `lib/cli_schema.sh`, the source of help text and of the new Bash completion. Install and uninstall manage the completion file.
+- **The first `self-update` from 0.4.0 to 0.5.0 still shows the full output.** Quiet mode is requested by the running manager and honored by the downloaded installer, and the 0.4.0 manager does not request it. Later self-updates run by a 0.5.0 or newer manager are concise.
+- Clarify the model-check cost in `scripts/maintainer_acceptance.sh`: with a subscription login such as Pro or Max over OAuth the request counts against plan usage and is not billed; with an API key it is billed, capped at $0.50. The report's `total_cost_usd` is Claude Code's estimate at API prices.
+- Track upstream Claude Code's ARM64 musl `latest` release every six hours in GitHub Actions, opening one compatibility-testing issue per newer observed version. Preserve closed decisions and maintainer edits; leave compatibility pins and user installations unchanged. Add offline maintainer-tool regressions and manual read-only checks. Its issue checklist runs `scripts/maintainer_acceptance.sh` for device acceptance.
+
+The Claude Code pin stays at **2.1.283** and musl at **1.2.6-r2**, with unchanged digests.
 
 ## 0.4.0
 
