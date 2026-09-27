@@ -10,6 +10,8 @@
 
 The Claude Code pin stays at **2.1.283** and musl at **1.2.6-r2**, with unchanged digests.
 
+[Galaxy S26 Ultra evidence from 2026-09-27 UTC](compatibility/galaxy-s26-ultra-0.7.0-20260927.md) covers `make check` (all 15 test programs passed) and maintainer acceptance from a clean checkout of the tested commit, including one bounded authenticated Opus 5.5 shell-tool workflow.
+
 ## 0.6.0
 
 - Show signs of life during a quiet `self-update` on a terminal. The build shows a spinner with elapsed seconds. During tests, a live status after the dots shows the running program, its position such as `3/15`, and its elapsed seconds, so a slow program is distinguishable from a stall. Each status is erased when its step ends, and wraps follow the terminal width.
