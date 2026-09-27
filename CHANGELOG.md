@@ -7,6 +7,8 @@
 
 The Claude Code pin stays at **2.1.283** and musl at **1.2.6-r2**, with unchanged digests.
 
+[Galaxy S26 Ultra evidence from 2026-09-27 UTC](compatibility/galaxy-s26-ultra-0.5.1-20260927.md) covers `make check` under a simulated quiet self-update (all 15 test programs passed, the outer event file untouched) and maintainer acceptance from a clean checkout of the tested commit, including one bounded authenticated Opus 5.5 shell-tool workflow. The published quiet self-update is a post-publication check.
+
 ## 0.5.0
 
 - Make ordinary `self-update` output concise. It names release verification, local build, tests and installation as each stage starts, prints one dot per passed top-level C or shell test program (wrapping after 60) and ends with passed, skipped and failed program totals. Compiler commands and individual PASS lines go to a private full log, which is kept at the printed path when a stage fails.
