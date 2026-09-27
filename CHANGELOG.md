@@ -1,5 +1,12 @@
 # Changes
 
+## 0.5.1
+
+- Fix `self-update` and `self-update --json` from 0.5.0, which stopped during tests with `valid source install failed`. The self-update's stage-event and progress variables reached the installer's test programs, and the bootstrap test's nested installer tried to write the caller's event file. The test runner now keeps that state to itself and reports progress alone; a new runner test covers it. `self-update --verbose` was not affected.
+- The fix is in the downloaded installer's test runner, so a 0.5.0 manager can update to 0.5.1 with the ordinary quiet `self-update`.
+
+The Claude Code pin stays at **2.1.283** and musl at **1.2.6-r2**, with unchanged digests.
+
 ## 0.5.0
 
 - Make ordinary `self-update` output concise. It names release verification, local build, tests and installation as each stage starts, prints one dot per passed top-level C or shell test program (wrapping after 60) and ends with passed, skipped and failed program totals. Compiler commands and individual PASS lines go to a private full log, which is kept at the printed path when a stage fails.
