@@ -8,7 +8,7 @@
 
 An independent community project from [Octocore Autonomous Systems](https://github.com/octocore-autonomous-systems) (OAS). **Not affiliated with, endorsed by, sponsored by, or authorized by Anthropic.** Claude and Claude Code are Anthropic products; your use of them remains subject to Anthropic's terms and account access.
 
-> **0.4.0 pins Claude Code 2.1.283** on Android **ARM64 / aarch64**, the first pin that satisfies Opus 5.5's minimum client version. Private source installation, startup, update, rollback, removal and an authenticated **Opus 5.5** tool workflow passed on **Samsung Galaxy S26 Ultra, Android 16, Termux 0.118.3 (GitHub)**. See the scoped [0.4.0 report](compatibility/galaxy-s26-ultra-0.4.0-20260927.md); other configurations need volunteer evidence.
+> **0.5.0 pins Claude Code 2.1.283** on Android **ARM64 / aarch64** and makes `self-update` quiet by default, with Bash completion. Private source installation, startup, update, rollback, removal and an authenticated **Opus 5.5** tool workflow passed on **Samsung Galaxy S26 Ultra, Android 16, Termux 0.118.3 (GitHub)**. See the scoped [0.5.0 report](compatibility/galaxy-s26-ultra-0.5.0-20260927.md); other configurations need volunteer evidence.
 
 [Install](#install) · [Commands](#everyday-use) · [Device matrix](#device-compatibility) · [Troubleshooting](docs/troubleshooting.md) · [Contribute](CONTRIBUTING.md)
 
@@ -30,7 +30,7 @@ This is a **Claude Code lifecycle manager**, not a general agent runtime. It doe
 Run this in a **native Termux shell on an ARM64 Android device**:
 
 ```sh
-curl -fsSL https://github.com/octocore-autonomous-systems/termux-muscle/releases/download/v0.4.0/install.sh | sh
+curl -fsSL https://github.com/octocore-autonomous-systems/termux-muscle/releases/download/v0.5.0/install.sh | sh
 ```
 
 The installer adds missing Termux prerequisites with `pkg`, verifies the release's source archive, builds the C helper locally and runs its offline tests before installation. Bash manages the lifecycle; the helper uses json-c, libarchive and OpenSSL. Build and test tools are Clang, make, pkg-config and diffutils; tar and gzip unpack the source. Runtime tools are Bash, PRoot, coreutils, ripgrep, curl and CA certificates. Termux's `mandoc` package provides the manual viewer. The installed project requires no Python, npm or Ubuntu installation. Contributors can regenerate the checked-in CLI help and completion files from the standard-library `argparse` definition with `python3 scripts/cli_schema.py`; add `--check` to verify they are current.
@@ -112,12 +112,15 @@ The capability matrix grows only when someone supplies a report. **PASS** means 
 
 | Tested configuration | Install | Start | Shell namespace | Claude tools | Manual | Update | Rollback | Removal | Evidence |
 | --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | --- |
+| **0.5.0, 2026-09-27 UTC** · Samsung Galaxy S26 Ultra · SM-S948U · Android 16 / API 36 · Termux 0.118.3 (GitHub) | PASS⁶ | PASS | PASS | PASS | — | PASS | PASS | PASS | [Maintainer report](compatibility/galaxy-s26-ultra-0.5.0-20260927.md) · [JSON](compatibility/galaxy-s26-ultra-0.5.0-20260927.json) |
 | **0.4.0, 2026-09-27 UTC** · Samsung Galaxy S26 Ultra · SM-S948U · Android 16 / API 36 · Termux 0.118.3 (GitHub) | PASS⁵ | PASS | PASS | PASS | — | PASS | PASS | PASS | [Maintainer report](compatibility/galaxy-s26-ultra-0.4.0-20260927.md) · [JSON](compatibility/galaxy-s26-ultra-0.4.0-20260927.json) |
 | **0.3.2, 2026-09-24 UTC** · Samsung Galaxy S26 Ultra · SM-S948U · Android 16 / API 36 · Termux 0.118.3 (GitHub) | PASS⁴ | PASS | PASS | PASS | — | PASS | PASS | PASS | [Maintainer report](compatibility/galaxy-s26-ultra-0.3.2-20260924.md) · [JSON](compatibility/galaxy-s26-ultra-0.3.2-20260924.json) |
 | **0.3.1, 2026-09-24 UTC** · Samsung Galaxy S26 Ultra · SM-S948U · Android 16 / API 36 · Termux 0.118.3 (GitHub) | PASS³ | PASS | PASS | PASS | — | PASS | PASS | PASS | [Maintainer report](compatibility/galaxy-s26-ultra-0.3.1-20260924.md) · [JSON](compatibility/galaxy-s26-ultra-0.3.1-20260924.json) |
 | **0.3.0, 2026-09-24 UTC** · Samsung Galaxy S26 Ultra · SM-S948U · Android 16 / API 36 · Termux 0.118.3 (GitHub) | PASS² | PASS | PASS | PASS | — | PASS | PASS | PASS | [Maintainer report](compatibility/galaxy-s26-ultra-0.3.0-20260924.md) · [JSON](compatibility/galaxy-s26-ultra-0.3.0-20260924.json) |
 | **0.2.0, 2026-09-15 UTC** · Samsung Galaxy S26 Ultra · SM-S948U · Android 16 / API 36 · Termux 0.118.3 (GitHub) | PASS¹ | PASS | PASS | PASS | PASS | PASS | PASS | PASS | [Maintainer report](compatibility/galaxy-s26-ultra-0.2.0-20260915.md) · [JSON](compatibility/galaxy-s26-ultra-0.2.0-20260915.json) |
 | **0.1.0, 2026-09-14** · Samsung Galaxy S26 Ultra · SM-S948U · Android 16 / API 36 · Termux 0.118.3 (GitHub) | PASS | PASS | PASS | PASS | — | PASS | PASS | PASS | [Historical report](compatibility/galaxy-s26-ultra-20260914.md) · [JSON](compatibility/galaxy-s26-ultra-20260914.json) |
+
+⁶ Version 0.5.0 keeps the 2.1.283 pin and adds quiet self-update, `--verbose`, `--json` and Bash completion. Its acceptance ran `scripts/maintainer_acceptance.sh` from a clean checkout of the tested commit, with a private root and `--no-link`, and verified Opus 5.5 again with an exact authenticated Bash-tool fixture. Command takeover, indexed manual discovery and public HTTPS delivery were not retested; the quiet self-update output is checked after publication.
 
 ⁵ Version 0.4.0 moves the pin to Claude Code 2.1.283. Its acceptance ran `scripts/maintainer_acceptance.sh` from a clean checkout of the tested commit, with a private root and `--no-link`, and verified Opus 5.5 with an exact authenticated Bash-tool fixture. Command takeover, indexed manual discovery and public HTTPS delivery were not retested.
 
@@ -139,7 +142,7 @@ Review the local JSON, then [open a Device compatibility issue](https://github.c
 
 ## Claude Code and models
 
-Project versions and Claude Code versions are separate. **0.4.0** moves the pin to **Claude Code 2.1.283** and keeps musl **1.2.6-r2**; 0.1.0 through 0.3.2 all pinned 2.1.270. [compatibility.json](compatibility.json) is the machine-readable record; each published release includes matching notes and checksums. A newer pin does not add a model or an account entitlement: it only makes a client version available that upstream documents as the minimum for a given model.
+Project versions and Claude Code versions are separate. **0.4.0** moved the pin to **Claude Code 2.1.283**, and **0.5.0** keeps it; both keep musl **1.2.6-r2**; 0.1.0 through 0.3.2 all pinned 2.1.270. [compatibility.json](compatibility.json) is the machine-readable record; each published release includes matching notes and checksums. A newer pin does not add a model or an account entitlement: it only makes a client version available that upstream documents as the minimum for a given model.
 
 | Documented model | Model ID | Minimum Claude Code |
 | --- | --- | --- |
@@ -149,7 +152,7 @@ Project versions and Claude Code versions are separate. **0.4.0** moves the pin 
 | Opus 5 | `claude-opus-5` | 2.1.219 |
 | Sonnet 5 | `claude-sonnet-5` | 2.1.197 |
 
-Model documentation was checked **2026-09-27** against [Anthropic's model configuration documentation](https://code.claude.com/docs/en/model-config). **Opus 5.5 requires client 2.1.280 or later, which is why 0.4.0 moves the pin. Opus 5.5 passed exact authenticated tool acceptance with 0.4.0 on 2026-09-27 UTC.** **Sonnet 5 passed exact authenticated tool acceptance with 0.3.2, 0.3.1 and 0.3.0 on 2026-09-24 UTC, and with 0.2.0 on 2026-09-15 UTC.** The dated **0.1.0** report separately retains Opus 5/Sonnet 5 PASS results and a direct Fable 5.1 response with automated upstream fallback/refusal; those observations remain visible in the [historical report](compatibility/galaxy-s26-ultra-20260914.md#model-observations). Opus and Fable were not newly verified for 0.3.2. Availability depends on your account, provider and organization policy; no Opus 5.1 identifier was established by the evidence.
+Model documentation was checked **2026-09-27** against [Anthropic's model configuration documentation](https://code.claude.com/docs/en/model-config). **Opus 5.5 requires client 2.1.280 or later, which is why 0.4.0 moves the pin. Opus 5.5 passed exact authenticated tool acceptance with 0.5.0 and 0.4.0 on 2026-09-27 UTC.** **Sonnet 5 passed exact authenticated tool acceptance with 0.3.2, 0.3.1 and 0.3.0 on 2026-09-24 UTC, and with 0.2.0 on 2026-09-15 UTC.** The dated **0.1.0** report separately retains Opus 5/Sonnet 5 PASS results and a direct Fable 5.1 response with automated upstream fallback/refusal; those observations remain visible in the [historical report](compatibility/galaxy-s26-ultra-20260914.md#model-observations). Opus and Fable were not newly verified for 0.3.2. Availability depends on your account, provider and organization policy; no Opus 5.1 identifier was established by the evidence.
 
 ## Help build something dependable
 

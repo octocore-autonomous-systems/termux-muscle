@@ -11,6 +11,8 @@
 
 The Claude Code pin stays at **2.1.283** and musl at **1.2.6-r2**, with unchanged digests.
 
+[Galaxy S26 Ultra evidence from 2026-09-27 UTC](compatibility/galaxy-s26-ultra-0.5.0-20260927.md), produced by `scripts/maintainer_acceptance.sh` from a clean checkout of the tested commit, covers private source installation, isolated startup, offline update and rollback, removal with the live installation unchanged, and one bounded authenticated Opus 5.5 shell-tool workflow. Public installer delivery and the quiet self-update output are post-publication checks.
+
 ## 0.4.0
 
 - Move the default pin from Claude Code **2.1.270** to **2.1.283**, the current upstream release, recording its official npm tarball URL, the registry SHA-512 SRI integrity value and the SHA-256 of the extracted vendor executable. The payload itself is unmodified; only its identity and digests are recorded here.
