@@ -7,6 +7,8 @@ Bash files and does not need a Python runtime.
 from __future__ import annotations
 
 import argparse
+import difflib
+import functools
 import pathlib
 import shlex
 import sys
@@ -15,6 +17,11 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SCHEMA = ROOT / "lib/cli_schema.sh"
 COMPLETION = ROOT / "docs/completions/termux-muscle.sh"
+# Generated help must not depend on the terminal: argparse otherwise sizes it
+# from COLUMNS, and Python 3.14 may add color when stdout is a terminal.
+FORMAT = {"formatter_class": functools.partial(argparse.HelpFormatter, width=78)}
+if sys.version_info >= (3, 14):
+    FORMAT["color"] = False
 
 
 def parser() -> tuple[argparse.ArgumentParser, dict[str, argparse.ArgumentParser]]:
@@ -34,6 +41,7 @@ def parser() -> tuple[argparse.ArgumentParser, dict[str, argparse.ArgumentParser
             "or authorized by Anthropic. Full manual: man termux-muscle."
         ),
         allow_abbrev=False,
+        **FORMAT,
     )
     root.add_argument("--root", metavar="DIR", help="managed installation root")
     root.add_argument("--prefix", metavar="DIR", help="native Termux package prefix")
@@ -43,7 +51,7 @@ def parser() -> tuple[argparse.ArgumentParser, dict[str, argparse.ArgumentParser
 
     def command(name: str, summary: str) -> argparse.ArgumentParser:
         p = sub.add_parser(name, help=summary, description=summary, allow_abbrev=False,
-                           add_help=name != "run")
+                           add_help=name != "run", **FORMAT)
         if name != "run":
             p.add_argument("--root", metavar="DIR", help="managed installation root")
             p.add_argument("--prefix", metavar="DIR", help="native Termux package prefix")
@@ -187,9 +195,13 @@ def main() -> int:
     root, commands = parser()
     outputs = {SCHEMA: generate_schema(root, commands), COMPLETION: generate_completion(root, commands)}
     if sys.argv[1:] == ["--check"]:
-        stale = [str(path.relative_to(ROOT)) for path, content in outputs.items() if not path.is_file() or path.read_text() != content]
+        stale = [path for path, content in outputs.items() if not path.is_file() or path.read_text() != content]
         if stale:
-            print("stale generated CLI artifacts: " + ", ".join(stale), file=sys.stderr)
+            print("stale generated CLI artifacts: " + ", ".join(str(path.relative_to(ROOT)) for path in stale), file=sys.stderr)
+            for path in stale:
+                name = str(path.relative_to(ROOT))
+                current = path.read_text().splitlines(keepends=True) if path.is_file() else []
+                sys.stderr.writelines(difflib.unified_diff(current, outputs[path].splitlines(keepends=True), name, name + " (generated)"))
             return 1
         return 0
     for path, content in outputs.items():
