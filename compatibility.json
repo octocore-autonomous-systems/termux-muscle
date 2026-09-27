@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "project_version": "0.6.0",
+  "project_version": "0.7.0",
   "claude": {
     "version": "2.1.283",
     "package": "@anthropic-ai/claude-code-linux-arm64-musl",
@@ -48,10 +48,10 @@
     "verified": [
       "claude-opus-5-5"
     ],
-    "availability_note": "Documented minimum client versions come from Anthropic's model configuration reference, reviewed on 2026-09-27. Opus 5.5 passed an exact authenticated Bash-tool workflow on 2026-09-27 with 0.6.0 on the reported Galaxy S26 Ultra, as it did with 0.5.1, 0.5.0 and 0.4.0 on the same 2.1.283 pin. Dated 0.3.2 and earlier Sonnet 5 checks and the 0.1.0 Opus and mixed Fable observations remain historical evidence for their own releases. Model availability depends on account, provider and organization policy."
+    "availability_note": "Documented minimum client versions come from Anthropic's model configuration reference, reviewed on 2026-09-27. Opus 5.5 passed an exact authenticated Bash-tool workflow on 2026-09-27 with 0.7.0 on the reported Galaxy S26 Ultra, as it did with 0.6.0, 0.5.1, 0.5.0 and 0.4.0 on the same 2.1.283 pin. Dated 0.3.2 and earlier Sonnet 5 checks and the 0.1.0 Opus and mixed Fable observations remain historical evidence for their own releases. Model availability depends on account, provider and organization policy."
   },
   "reports": [
-    "compatibility/galaxy-s26-ultra-0.6.0-20260927.json"
+    "compatibility/galaxy-s26-ultra-0.7.0-20260927.json"
   ],
   "verified_on": "2026-09-27"
 }
