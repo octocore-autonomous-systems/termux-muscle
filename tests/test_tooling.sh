@@ -16,6 +16,11 @@ rejects() {
     if "$@" > "$scratch/out" 2> "$scratch/error"; then fail "accepted $expected"; fi
     grep -Fq ": $expected:" "$scratch/error" || { cat "$scratch/error" >&2; fail "wrong failure for $expected"; }
 }
+expect_status() {
+    local expected=$1 actual=0; shift
+    "$@" > "$scratch/hook-output" 2> "$scratch/hook-error" || actual=$?
+    [[ $actual == "$expected" ]] || fail "self-update exited $actual instead of $expected"
+}
 prefix=$scratch/prefix
 mkdir -p -- "$prefix/bin" "$prefix/tmp" "$scratch/stage/bin" "$scratch/stage/libexec"
 mkdir -p -- "$scratch/stage/docs/man"
@@ -274,7 +279,7 @@ while (($#)); do
     case $1 in --output) output=$2; shift 2 ;; *) url=$1; shift ;; esac
 done
 case $url in
-    */releases/latest) printf '{"tag_name":"v0.2.0"}\n' > "$output" ;;
+    */releases/latest) printf '{"tag_name":"v%s"}\n' "${TM_TEST_LATEST_VERSION:-0.2.0}" > "$output" ;;
     */SHA256SUMS) cp "$TM_TEST_REMOTE/SHA256SUMS" "$output" ;;
     */install.sh) cp "$TM_TEST_REMOTE/install.sh" "$output" ;;
     *) exit 83 ;;
@@ -400,24 +405,64 @@ pass 'busy uninstall restores the manual index and leaves the installation intac
 
 cat > "$scratch/remote/install.sh" <<'SH'
 printf '%s\0' "$@" > "$TM_TEST_REMOTE/executed"
+[[ -z ${TM_TEST_INSTALL_EXIT:-} ]] || exit "$TM_TEST_INSTALL_EXIT"
 SH
 (cd "$scratch/remote" && sha256sum install.sh > SHA256SUMS)
 cp "$root/state.json" "$scratch/runtime-before-self-update.json"
-PATH=$scratch/mocks:$PATH env -u TMPDIR bash "$scratch/hook.sh" self_update > "$scratch/hook-output"
-printf '%s\0' --version 0.2.0 --root "$root" --prefix "$prefix" --no-install > "$scratch/expected"
+next_version=${bootstrap_version%.*}.$(( ${bootstrap_version##*.} + 1 ))
+PATH=$scratch/mocks:$PATH bash "$scratch/hook.sh" project_version_newer 0.10.0 0.9.999 || fail 'numeric component length comparison'
+PATH=$scratch/mocks:$PATH bash "$scratch/hook.sh" project_version_newer 999999999999999999999.0.0 999999999999999999998.99.99 || fail 'large component comparison'
+if PATH=$scratch/mocks:$PATH bash "$scratch/hook.sh" project_version_newer 0.2.0 0.2.0; then fail 'equal version compared as newer'; fi
+if PATH=$scratch/mocks:$PATH bash "$scratch/hook.sh" project_version_newer 0.2.9 0.3.0; then fail 'older minor version compared as newer'; fi
+: > "$scratch/remote/calls"
+before_calls=$(wc -l < "$scratch/remote/calls")
+expect_status 2 env -u TMPDIR PATH="$scratch/mocks:$PATH" TM_TEST_LATEST_VERSION="$bootstrap_version" bash "$scratch/hook.sh" self_update
+grep -q ': already_current:.*No update performed.' "$scratch/hook-error" || fail 'latest equal version lacked no-op notice'
+[[ ! -e $scratch/remote/executed && $(wc -l < "$scratch/remote/calls") == $((before_calls + 1)) ]] || fail 'latest equal version fetched installer or executed it'
+prefix_scratch=("$prefix/tmp/"*)
+[[ ${#prefix_scratch[@]} == 0 ]] || fail 'equal-version fallback temporary directory not cleaned'
+before_calls=$(wc -l < "$scratch/remote/calls")
+expect_status 2 env PATH="$scratch/mocks:$PATH" bash "$scratch/hook.sh" self_update --version "$bootstrap_version"
+grep -q ': already_current:.*No update performed.' "$scratch/hook-error" || fail 'explicit equal version lacked no-op notice'
+[[ ! -e $scratch/remote/executed && $(wc -l < "$scratch/remote/calls") == "$before_calls" ]] || fail 'explicit equal version reached network'
+expect_status 3 env TM_PROJECT_VERSION="$next_version" PATH="$scratch/mocks:$PATH" bash "$scratch/hook.sh" self_update --version "$bootstrap_version"
+grep -q ': target_older:.*No update performed.' "$scratch/hook-error" || fail 'older version lacked no-op notice'
+[[ $(wc -l < "$scratch/remote/calls") == "$before_calls" ]] || fail 'explicit older version reached network'
+expect_status 3 env PATH="$scratch/mocks:$PATH" TM_TEST_LATEST_VERSION=0.2.0 bash "$scratch/hook.sh" self_update
+grep -q ': target_older:' "$scratch/hook-error" || fail 'latest older version lacked its category'
+[[ $(wc -l < "$scratch/remote/calls") == $((before_calls + 1)) ]] || fail 'latest older version fetched an installer'
+pass 'equal and older manager versions report distinct nonzero status before installer download'
+
+expect_status 0 env -u TMPDIR PATH="$scratch/mocks:$PATH" TM_TEST_LATEST_VERSION="$next_version" bash "$scratch/hook.sh" self_update
+printf '%s\0' --version "$next_version" --root "$root" --prefix "$prefix" --no-install > "$scratch/expected"
 cmp "$scratch/remote/executed" "$scratch/expected" || fail 'self-update immutable source forwarding'
 cmp "$root/state.json" "$scratch/runtime-before-self-update.json" || fail 'self-update changed runtime state'
 prefix_scratch=("$prefix/tmp/"*)
 [[ ${#prefix_scratch[@]} == 0 ]] || fail 'self-update fallback temporary directory not cleaned'
 rm "$scratch/remote/executed"
+expect_status 0 env PATH="$scratch/mocks:$PATH" bash "$scratch/hook.sh" self_update --force --version "$bootstrap_version"
+printf '%s\0' --version "$bootstrap_version" --root "$root" --prefix "$prefix" --no-install > "$scratch/expected"
+cmp "$scratch/remote/executed" "$scratch/expected" || fail '--force did not reinstall equal version'
+rm "$scratch/remote/executed"
+expect_status 0 env TM_PROJECT_VERSION="$next_version" PATH="$scratch/mocks:$PATH" bash "$scratch/hook.sh" self_update -f --version "$bootstrap_version"
+cmp "$scratch/remote/executed" "$scratch/expected" || fail '-f did not permit compatible older version'
+rm "$scratch/remote/executed"
 printf corrupt >> "$scratch/remote/install.sh"
-rejects checksum_failed env PATH="$scratch/mocks:$PATH" bash "$scratch/hook.sh" self_update --version 0.2.0
+expect_status 1 env PATH="$scratch/mocks:$PATH" bash "$scratch/hook.sh" self_update --version "$next_version"
+grep -q ': checksum_failed:' "$scratch/hook-error" || fail 'checksum failure lacked its category'
 [[ ! -e $scratch/remote/executed ]] || fail 'unverified self-update code executed'
-pass 'self-update resolves an exact tag, verifies installer checksums, cleans the TMPDIR-unset fallback and rejects corruption before execution'
+cat > "$scratch/remote/install.sh" <<'SH'
+printf '%s\0' "$@" > "$TM_TEST_REMOTE/executed"
+[[ -z ${TM_TEST_INSTALL_EXIT:-} ]] || exit "$TM_TEST_INSTALL_EXIT"
+SH
+(cd "$scratch/remote" && sha256sum install.sh > SHA256SUMS)
+expect_status 1 env TM_TEST_INSTALL_EXIT=3 PATH="$scratch/mocks:$PATH" bash "$scratch/hook.sh" self_update --version "$next_version"
+grep -q ': update_failed:' "$scratch/hook-error" || fail 'installer failure lacked update error category'
+pass 'newer and forced compatible self-update verify checksums and distinguish installer failure from no-update status'
 
 before_calls=$(wc -l < "$scratch/remote/calls")
 rejects invalid_version env PATH="$scratch/mocks:$PATH" bash "$scratch/hook.sh" self_update --version '../../escape'
-rejects incompatible_tooling env PATH="$scratch/mocks:$PATH" bash "$scratch/hook.sh" self_update --version 0.1.0
+rejects incompatible_tooling env PATH="$scratch/mocks:$PATH" bash "$scratch/hook.sh" self_update --force --version 0.1.0
 [[ $(wc -l < "$scratch/remote/calls") == "$before_calls" ]] || fail 'invalid update version reached network'
 HOME=$hook_home PATH=$hook_path "$core" with-lock "$root" existing -- bash "$scratch/hook.sh" uninstall >/dev/null
 [[ $(tail -1 "$scratch/remote/index-calls") == -u ]] || fail 'uninstall did not remove the owned manual index while page existed'

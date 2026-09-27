@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Start with `termux-muscle doctor`, `termux-muscle versions` and `man termux-muscle`. Keep the error category and exact versions. This page describes 0.2.0; its [device report](../compatibility/galaxy-s26-ultra-0.2.0-20260915.md) distinguishes native lifecycle checks from authenticated workflows and public delivery. If you report a problem, use the [bug form](https://github.com/octocore-autonomous-systems/termux-muscle/issues/new?template=bug-report.yml) and attach a reviewed `termux-muscle test --output report.json` report.
+Start with `termux-muscle doctor`, `termux-muscle versions` and `man termux-muscle`. Keep the error category and exact versions. This page describes 0.3.2; its [device report](../compatibility/galaxy-s26-ultra-0.3.2-20260924.md) distinguishes native lifecycle checks from authenticated workflows and public delivery. If you report a problem, use the [bug form](https://github.com/octocore-autonomous-systems/termux-muscle/issues/new?template=bug-report.yml) and attach a reviewed `termux-muscle test --output report.json` report.
 
 | Symptom | Likely boundary | Next action |
 | --- | --- | --- |
@@ -18,7 +18,9 @@ Start with `termux-muscle doctor`, `termux-muscle versions` and `man termux-musc
 | Already traced / conflicting namespace | The command is inside an unrelated PRoot or a session pinned to another installation. | Start a fresh native Termux shell for maintenance. |
 | Another maintenance operation is running | A process holds the mutation lock. | Let that operation finish, then retry. A leftover lock file by itself is not evidence of a live owner. |
 | Bad behavior after an update | A newly selected runtime may be incompatible with your workflow. | Run `termux-muscle rollback`, preserve a report, and open an issue. |
-| `self-update --version 0.1.x` is rejected | 0.1.x managers cannot read 0.2.0 manual ownership records. | Keep the current manager. For an intentional management downgrade, uninstall with the current manager before installing the older version; this is separate from Claude runtime rollback. |
+| Self-update from 0.2.0 to 0.3.0 stops in `test_migration.sh` | The 0.3.0 installer inherited the older manager helper path. | Use `termux-muscle self-update --version 0.3.1`. The failed 0.3.0 attempt leaves the installed manager and Claude runtime unchanged. |
+| `self-update` exits 2 (`already_current`) or 3 (`target_older`) | The latest or requested manager version is equal to or older than the installed version. | No installer ran. Exit 1 identifies an update failure. Use `-f` or `--force` only for an intentional compatible reinstall or downgrade. |
+| `self-update --force --version 0.1.x` is rejected | 0.1.x managers cannot read 0.2.0 manual ownership records. | Keep the current manager. For an intentional management downgrade below 0.2.0, uninstall with the current manager before installing the older version; this is separate from Claude runtime rollback. |
 | Upstream install/update tries to replace the managed executable | Claude's own installer does not manage this backend. | Use `termux-muscle update` for the runtime and `termux-muscle self-update` for this tool. |
 | Android kills a long session or background process | OS/vendor process and battery restrictions may apply. | Record the Android/kernel/device configuration and exact scenario. Do not infer that a passing startup test guarantees background survival. |
 | Cross-session messaging is disabled by a UID-mapping check | Claude cannot validate its default inbox ownership in this PRoot environment. | Single-session workflows can continue. See the dated [0.1.0 device report](../compatibility/galaxy-s26-ultra-20260914.md); no new messaging or background-agent support is claimed by 0.2.0. |

@@ -1,6 +1,6 @@
 # Architecture and boundaries
 
-Termux Muscle manages Claude Code on native Android Termux. Version 0.2.0 retains the official Linux ARM64 musl executable and musl loader used by 0.1.0, inside one PRoot namespace. Bash sequences lifecycle commands, and a C helper handles parsing, integrity, owned filesystem state and execution. The helper is compiled on the target device. Vendor payloads are fetched separately with the URLs and digests in `compatibility.json`. The [fresh 0.2.0 report](../compatibility/galaxy-s26-ultra-0.2.0-20260915.md) records native command/manual and runtime lifecycle acceptance plus a separate authenticated Sonnet tool workflow; older 0.1.0 model observations remain historical evidence.
+Termux Muscle manages Claude Code on native Android Termux. Version 0.3.2 retains the official Linux ARM64 musl executable and musl loader used by 0.1.0, inside one PRoot namespace. Bash sequences lifecycle commands, and a C helper handles parsing, integrity, owned filesystem state and execution. The helper is compiled on the target device. Vendor payloads are fetched separately with the URLs and digests in `compatibility.json`. The [fresh 0.3.2 report](../compatibility/galaxy-s26-ultra-0.3.2-20260924.md) records private source lifecycle and authenticated Sonnet tool acceptance; 0.2.0 command/manual and older 0.1.0 model observations remain historical evidence.
 
 ## Why installation needs a manager
 
@@ -30,7 +30,7 @@ Nested execution recognizes a context bound inside the existing namespace and ke
 
 PRoot is part of this design. The project does not claim zero overhead, root-level isolation, universal Android compatibility or equivalence to a supported desktop installation. Ordinary sessions and bounded test probes have different process-lifetime requirements; terminating a health probe must not imply killing legitimate background work in ordinary use.
 
-## Isolated startup gate (unreleased source)
+## Isolated startup gate
 
 Before promotion, the same bounded checker used by doctor runs version, help and `--init-only`
 with private HOME/config/cwd and a clean allowlisted environment. It disables customizations,
@@ -49,7 +49,7 @@ Management-tool updates are separate from runtime updates. The curl bootstrap fe
 
 Installed Bash entries invoke a stable C dispatcher. It selects and leases a versioned tool directory before starting Bash, so a concurrent self-update cannot remove the code a command is using. Tool publication and removal have recovery journals; current, previous and leased tool versions are retained. Self-update builds and tests the downloaded source before taking the publication lock. Changed entry points and unsupported metadata schemas are preserved with an error instead of being overwritten.
 
-The 0.2.0 self-update command rejects a requested management version below 0.2.0 before invoking its installer: 0.1.x tooling cannot read regular-manual ownership records. This is a guard in the new manager, not a universal minimum-reader enforcement mechanism. Directly executing a retained old installer bypasses it and is unsupported; an old bootstrap can partially publish old tooling before discovering an incompatible record. Recovery uses the newer verified installer, or the current manager's uninstall before intentionally installing an older manager. Claude runtime rollback is separate and remains available when a previous runtime exists.
+The self-update command checks the published management version before downloading its installer. An equal version exits 2 (`already_current`) and an older target exits 3 (`target_older`), each with a notice and no installer download, unless `-f` or `--force` is requested. Successful installation exits 0; update failures exit 1. The compatibility guard still rejects forced in-place changes below 0.2.0: 0.1.x tooling cannot read regular-manual ownership records. This is a guard in the current manager, not a universal minimum-reader enforcement mechanism. Directly executing a retained old installer bypasses it and is unsupported; an old bootstrap can partially publish old tooling before discovering an incompatible record. Recovery uses the newer verified installer, or the current manager's uninstall before intentionally installing an older manager. Claude runtime rollback is separate and remains available when a previous runtime exists.
 
 The C helper links installed json-c, libarchive and OpenSSL libraries. Local compilation adapts our helper to the target compiler, Bionic and Termux prefix. It does not compile Claude Code, supply a missing vendor ABI, or prove compatibility with a different Android kernel. Clang and the build tools add installation footprint; the installer does not remove a user's compiler or shared libraries afterward. Python is not required for installation, execution, builds or mandatory tests.
 

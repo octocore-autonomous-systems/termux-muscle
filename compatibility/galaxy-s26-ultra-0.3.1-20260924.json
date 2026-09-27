@@ -1,0 +1,181 @@
+{
+  "schema": 1,
+  "generated_at": "2026-09-24T16:24:58Z",
+  "project": {
+    "name": "Termux Muscle",
+    "version": "0.3.1"
+  },
+  "claude_code": {
+    "version": "2.1.270",
+    "musl_version": "1.2.6-r2"
+  },
+  "environment": {
+    "manufacturer": "samsung",
+    "model": "SM-S948U",
+    "android_version": "16",
+    "android_api": 36,
+    "abi": "arm64-v8a",
+    "device_name": "Samsung Galaxy S26 Ultra",
+    "kernel": "6.12.30-android16-5-pd30ff70-abogkiS948USQS4AZHL-4k",
+    "page_size": 4096,
+    "termux_version": "0.118.3",
+    "termux_source": "GITHUB",
+    "packages": {
+      "bash": "5.3.15",
+      "coreutils": "9.11-1",
+      "curl": "8.22.0",
+      "ca-certificates": "1:2026.08.13",
+      "proot": "5.1.107.92",
+      "ripgrep": "15.2.0",
+      "clang": "21.1.8-3",
+      "make": "4.4.1-1",
+      "pkg-config": "0.29.2-3",
+      "json-c": "0.19",
+      "libarchive": "3.8.9",
+      "openssl": "1:3.6.3",
+      "zlib": "1.3.2",
+      "termux-tools": "1.46.0+really1.45.0-1",
+      "termux-exec": "1:2.5.0-1",
+      "diffutils": "3.12-2",
+      "tar": "1.35-3",
+      "gzip": "1.14-1",
+      "mandoc": "1.14.6-7"
+    }
+  },
+  "provenance": "maintainer",
+  "checks": [
+    {
+      "id": "dns_configuration",
+      "status": "PASS",
+      "detail_code": "nameserver_configured"
+    },
+    {
+      "id": "command_links",
+      "status": "SKIP",
+      "detail_code": "no_managed_commands"
+    },
+    {
+      "id": "runtime_integrity",
+      "status": "PASS",
+      "detail_code": "receipt_hashes_match"
+    },
+    {
+      "id": "startup_version",
+      "status": "PASS",
+      "detail_code": "isolated_version_passed"
+    },
+    {
+      "id": "startup_help",
+      "status": "PASS",
+      "detail_code": "isolated_help_passed"
+    },
+    {
+      "id": "startup_init",
+      "status": "PASS",
+      "detail_code": "isolated_initialization_passed"
+    },
+    {
+      "id": "namespace_shell",
+      "status": "PASS",
+      "detail_code": "local_probe_passed"
+    },
+    {
+      "id": "install",
+      "status": "PASS",
+      "detail_code": "private_source_bootstrap_no_link_after_init_retry"
+    },
+    {
+      "id": "update",
+      "status": "PASS",
+      "detail_code": "offline_candidate_activated"
+    },
+    {
+      "id": "rollback",
+      "status": "PASS",
+      "detail_code": "previous_candidate_restored_offline"
+    },
+    {
+      "id": "uninstall",
+      "status": "PASS",
+      "detail_code": "private_owned_root_removed"
+    },
+    {
+      "id": "shell_tools",
+      "status": "PASS",
+      "detail_code": "authenticated_fixture_observed"
+    },
+    {
+      "id": "interactive",
+      "status": "SKIP",
+      "detail_code": "requires_manual_test"
+    },
+    {
+      "id": "background",
+      "status": "SKIP",
+      "detail_code": "requires_manual_test"
+    },
+    {
+      "id": "screen_off",
+      "status": "SKIP",
+      "detail_code": "requires_manual_test"
+    },
+    {
+      "id": "native_shell",
+      "status": "PASS",
+      "detail_code": "authenticated_fixture_observed"
+    },
+    {
+      "id": "portable_shebang",
+      "status": "PASS",
+      "detail_code": "authenticated_fixture_observed"
+    },
+    {
+      "id": "ripgrep",
+      "status": "PASS",
+      "detail_code": "authenticated_fixture_observed"
+    },
+    {
+      "id": "nested_launcher",
+      "status": "PASS",
+      "detail_code": "authenticated_fixture_observed"
+    }
+  ],
+  "models": [
+    {
+      "requested": "claude-sonnet-5",
+      "status": "PASS",
+      "detail_code": "exact_model_verified",
+      "observed": [
+        "claude-sonnet-5"
+      ]
+    }
+  ],
+  "evidence_notes": "galaxy-s26-ultra-0.3.1-20260924.md",
+  "lifecycle_acceptance": {
+    "scope": "isolated_native_source_bootstrap_no_link",
+    "model_requests": false,
+    "live_host_links_changed": false,
+    "public_release_delivery": "not_exercised",
+    "first_startup_init_attempt": "FAIL_probe_failed_no_promotion",
+    "retry_startup_init": "PASS_after_offline_retry"
+  },
+  "authenticated_workflow": {
+    "generated_at": "2026-09-24T16:25:18Z",
+    "model_requests": true,
+    "live_host_links_changed": false,
+    "exact_fixture_tool_uses": 1,
+    "matching_successful_tool_results": 1,
+    "final_success": true,
+    "fixture_attestation_matches": true,
+    "helper_sha256": "29a98f27ed1f71780f8e5337d6f422b96b66ae1bca5c5ecbce61193a4a414a64",
+    "capture": {
+      "exit_code": 0,
+      "timeout": false,
+      "output_limit": false,
+      "elapsed_ms": 4947,
+      "bytes": 5066
+    },
+    "maximum_turns": 2,
+    "maximum_budget_usd": 0.5
+  }
+}

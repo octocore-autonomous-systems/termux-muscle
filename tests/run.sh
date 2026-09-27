@@ -3,6 +3,9 @@
 set -euo pipefail
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
 export LC_ALL=C
+# A running older manager exports TM_CORE while invoking the downloaded
+# installer. Always exercise this checkout's freshly built helper.
+export TM_CORE="$PWD/build/tm-core"
 shopt -s nullglob
 count=0
 for executable in build/tests/test_*; do

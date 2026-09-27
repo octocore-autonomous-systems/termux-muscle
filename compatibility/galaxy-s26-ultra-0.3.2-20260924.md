@@ -1,0 +1,11 @@
+# Galaxy S26 Ultra acceptance: Termux Muscle 0.3.2
+
+Verified 2026-09-24 UTC on Samsung Galaxy S26 Ultra (SM-S948U), Android 16 / API 36, Termux 0.118.3 from GitHub. The [JSON report](galaxy-s26-ultra-0.3.2-20260924.json) records the exact kernel, page size, security patch, package versions, check results and sanitized workflow metadata. The unmodified payload is Claude Code 2.1.270 with musl 1.2.6-r2.
+
+A private source installation with `--no-link` passed its isolated version, help and initialization checks and activated the pinned runtime. An offline update activated a retained candidate, rollback restored the previous one, local diagnostics passed runtime integrity, DNS configuration and namespace checks, and uninstall removed the owned private root. Live Claude command links were unchanged.
+
+The 0.3.2 source manager was exercised against this private root. An explicit equal target reported `already_current` and exited 2; an explicit older target reported `target_older` and exited 3; invalid input exited 1. Before 0.3.2 publication, the implicit latest lookup resolved public 0.3.1 and exited 3. None of those no-update requests downloaded or executed an installer. The full native regression suite separately verifies successful newer and forced updates exit 0, checksum failure exits 1, and an installer that exits 3 is normalized to update failure 1.
+
+A bounded authenticated run used the 0.3.2 helper and private runtime. Sonnet 5 made exactly one preallowed `Bash(./verify-runtime.sh)` call. An independent checker correlated its successful result, final result, exact model identity and fixture attestation for native shell, portable shebang, ripgrep, nested launcher and shell tools. The capture exited 0 in 6620 ms without timeout or output overflow, capped at two turns and USD 0.50. Raw events with session identifiers remain private.
+
+This source acceptance did not test ordinary `claude` command takeover or indexed manual discovery. Public HTTPS installer delivery and the installed manager's status contract are separate post-publication checks. Interactive UI, background/screen-off operation, custom hooks, MCP tool calls and other models were not exercised for 0.3.2. Earlier reports remain dated evidence with their own scope.
