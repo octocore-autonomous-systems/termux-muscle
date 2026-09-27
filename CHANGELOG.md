@@ -1,12 +1,14 @@
 # Changes
 
-## Unreleased
+## 0.7.0
 
 - Regroup `termux-muscle --help` by what each command acts on: **Claude Code** (install, run, update, rollback, repair, versions, cleanup, link), **Termux Muscle** itself (self-update, uninstall, help) and **Troubleshooting** (doctor, test, migration), which checks the device, the manager and Claude Code together. The overview adds default paths for `--root` and `--prefix` and a short list of common tasks. Command names and options are unchanged.
 - Move details from the old overview's closing paragraph to the command they belong to: self-update exit statuses and progress in `self-update --help`, version selection in `install --help` and `update --help`.
 - Add `termux-muscle help COMMAND`, which prints the same text as `COMMAND --help`. Bash completion completes the command name.
 - `--version` adds a second line naming the active Claude Code release, such as `Claude Code 2.1.283 (active)`. The first line is unchanged, and a fresh or damaged installation prints only that line.
 - Add `versions --available`, which lists Claude Code releases published for the ARM64 musl package, newest first with release dates, labelled pinned or unverified, active or retained, and with upstream tags such as `latest`. It shows the ten newest plus every pinned, active or retained release; `--all` lists all and `--json` prints a `termux-muscle.available.v1` object. It reads one registry document and never downloads archives or changes state. Installing a version other than the pin still needs `--allow-unverified`.
+
+The Claude Code pin stays at **2.1.283** and musl at **1.2.6-r2**, with unchanged digests.
 
 ## 0.6.0
 
