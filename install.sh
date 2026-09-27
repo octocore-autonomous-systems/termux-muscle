@@ -5,7 +5,7 @@ set -eu
 # Archive validation must not inherit options from unrelated shell customizations.
 unset TAR_OPTIONS GZIP
 REPOSITORY="octocore-autonomous-systems/termux-muscle"
-VERSION="0.5.1"
+VERSION="0.6.0"
 
 fail() { printf '%s\n' "termux-muscle: $*" >&2; exit 1; }
 usage() {
@@ -76,9 +76,49 @@ pkg-config --exists json-c libarchive libcrypto || fail "required C libraries or
 [ -x "$termux_prefix/bin/bash" ] || fail "Termux Bash is missing from its package prefix"
 tar --version | grep -q 'GNU tar' || fail "GNU tar is required for restricted source extraction"
 
+# On a terminal, a quiet self-update also shows a spinner and elapsed seconds
+# while the build runs. TM_SELF_UPDATE_PROGRESS_LIVE=0 turns this off and 1
+# forces it; logs and JSON transcripts never receive it.
+live_progress=0
+if [ "${TM_SELF_UPDATE_PROGRESS_MODE:-}" = concise ]; then
+    case "${TM_SELF_UPDATE_PROGRESS_LIVE:-}" in
+        1) live_progress=1 ;;
+        0) ;;
+        *) if [ -t 3 ]; then live_progress=1; fi ;;
+    esac
+fi
+spinner=
+spinner_line=
+start_spinner() {
+    spinner_line=$1
+    if [ "$live_progress" -ne 1 ]; then printf '%s\n' "$1" >&3; return 0; fi
+    printf '%s' "$1" >&3
+    installer=$$
+    started=$(date +%s) || started=
+    (
+        trap - 0 INT TERM HUP
+        set -- '|' '/' '-' '\'
+        # Stop by itself if the installer disappears without cleaning up.
+        while kill -0 "$installer" 2>/dev/null; do
+            elapsed=
+            if [ -n "$started" ] && now=$(date +%s); then elapsed=" $((now - started))s"; fi
+            printf '\r%s %s%s\033[K' "$spinner_line" "$1" "$elapsed" >&3 || exit 0
+            frame=$1; shift; set -- "$@" "$frame"
+            sleep 0.5 2>/dev/null || sleep 1 || exit 0
+        done
+    ) &
+    spinner=$!
+}
+stop_spinner() {
+    [ -n "$spinner" ] || return 0
+    kill "$spinner" 2>/dev/null || :
+    wait "$spinner" 2>/dev/null || :
+    spinner=
+    printf '\r%s\033[K\n' "$spinner_line" >&3
+}
 umask 077
 scratch=$(mktemp -d "${TMPDIR:-${termux_prefix}/tmp}/termux-muscle-install.XXXXXXXX") || fail "cannot create a private download directory"
-cleanup() { rm -rf -- "$scratch"; }
+cleanup() { stop_spinner; rm -rf -- "$scratch"; }
 trap cleanup 0
 trap 'exit 130' INT
 trap 'exit 143' TERM
@@ -91,6 +131,7 @@ fetch() {
         --max-filesize "$3" --output "$2" "$1" || fail "download failed; the managed installation was not changed"
 }
 record_update_stage() {
+    stop_spinner
     [ -n "${TM_SELF_UPDATE_EVENTS:-}" ] || return 0
     [ -n "${TM_SELF_UPDATE_TRANSCRIPT_FILE:-}" ] || fail "missing self-update transcript path"
     bytes=$(wc -c < "$TM_SELF_UPDATE_TRANSCRIPT_FILE") || fail "cannot measure self-update transcript"
@@ -98,7 +139,7 @@ record_update_stage() {
     if [ "${TM_SELF_UPDATE_PROGRESS_MODE:-}" = concise ]; then
         case "$1" in
             verification) printf 'Verifying source archive...\n' >&3 ;;
-            build) printf 'Building Termux Muscle locally...\n' >&3 ;;
+            build) start_spinner 'Building Termux Muscle locally...' ;;
             test) printf 'Running test programs: ' >&3 ;;
             installation) printf 'Installing verified manager...\n' >&3 ;;
         esac
