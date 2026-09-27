@@ -12,6 +12,7 @@ import functools
 import pathlib
 import shlex
 import sys
+import textwrap
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -24,76 +25,146 @@ if sys.version_info >= (3, 14):
     FORMAT["color"] = False
 
 
+# The overview groups commands by what they act on; argparse cannot group
+# subcommands, so it is rendered from this table with the same width.
+GROUPS = (
+    ("Claude Code:", ("install", "run", "update", "rollback", "repair", "versions", "cleanup", "link")),
+    ("Termux Muscle:", ("self-update", "uninstall", "help")),
+    ("Troubleshooting (checks the device, Termux Muscle and Claude Code together; "
+     "read-only, nothing is uploaded):", ("doctor", "test", "migration")),
+)
+SUMMARIES = {
+    "help": "Show this overview, or 'help <command>' for one command",
+    "install": "Install the pinned Claude Code release and put claude on PATH",
+    "run": "Run Claude Code, passing all following arguments through",
+    "update": "Validate a newer Claude Code release, then switch to it",
+    "rollback": "Switch back to the previous validated release",
+    "repair": "Rebuild the active release from verified original artifacts",
+    "versions": "List installed releases; --available lists installable ones",
+    "doctor": "Check that the device, the claude launcher and the active Claude Code "
+              "release all work, without contacting Anthropic",
+    "migration": "Find leftover pre-Termux-Muscle workarounds in Claude Code's settings, "
+                 "plugin paths and PATH",
+    "test": "Run the doctor checks and save a sanitized device report; --model also "
+            "makes one real model request",
+    "link": "Take over the claude command, recording how to restore it",
+    "cleanup": "Remove inactive releases, protecting running sessions",
+    "self-update": "Upgrade Termux Muscle itself (not Claude Code)",
+    "uninstall": "Remove Termux Muscle and restore the original claude command",
+}
+ROOT_TAIL = """\
+Global options:
+  --root DIR     managed installation root
+                 (default: ~/.local/share/termux-muscle)
+  --prefix DIR   Termux package prefix (default: $PREFIX)
+  --version      print Termux Muscle and active Claude Code versions
+  -h, --help     show this help
+
+Common tasks:
+  termux-muscle versions --available    what can I install?
+  termux-muscle update                  move to the current pinned release
+  termux-muscle update --claude-version latest --allow-unverified
+                                        try a release beyond the pin
+  termux-muscle rollback                undo the last update
+  termux-muscle doctor                  something's wrong; start here
+  termux-muscle self-update             upgrade the manager
+
+Run 'termux-muscle <command> --help' for its options and exit codes.
+Full manual: man termux-muscle
+
+Termux Muscle is an independent open-source project, not affiliated with or
+authorized by Anthropic."""
+SELECTION_EPILOG = (
+    "Without --claude-version, the project pin is used. Any other version, including "
+    "latest, also needs --allow-unverified. Run 'versions --available' to see "
+    "installable versions."
+)
+
+
+def root_help() -> str:
+    lines = [
+        "usage: termux-muscle [--root DIR] [--prefix DIR] <command> [options]",
+        "       termux-muscle --version | --help",
+        "",
+        "Install, run and maintain Claude Code on Termux.",
+    ]
+    for title, names in GROUPS:
+        lines += ["", *textwrap.wrap(title, 78)]
+        for name in names:
+            lines += textwrap.wrap(SUMMARIES[name], 78, initial_indent=f"  {name:<11}  ",
+                                   subsequent_indent=" " * 15)
+    return "\n".join(lines) + "\n\n" + ROOT_TAIL
+
+
 def parser() -> tuple[argparse.ArgumentParser, dict[str, argparse.ArgumentParser]]:
-    root = argparse.ArgumentParser(
-        prog="termux-muscle",
-        description="Install, run and maintain Claude Code on Termux.",
-        epilog=(
-            "Install/update: --claude-version X.Y.Z|latest with --allow-unverified "
-            "requests an upstream release beyond the project pin. Repair/update "
-            "--offline uses verified cached artifacts. Test --model permits an "
-            "authenticated model request. Self-update exits 0 when installed, "
-            "2 when current, 3 for an older target, and 1 on failure. "
-            "Use --force to reinstall or compatibly downgrade. By default, "
-            "self-update shows one progress dot per completed test program; "
-            "--verbose streams the full log and --json includes its full bounded "
-            "transcript. This independent OAS project is not affiliated with "
-            "or authorized by Anthropic. Full manual: man termux-muscle."
-        ),
-        allow_abbrev=False,
-        **FORMAT,
-    )
+    root = argparse.ArgumentParser(prog="termux-muscle", allow_abbrev=False, **FORMAT)
     root.add_argument("--root", metavar="DIR", help="managed installation root")
     root.add_argument("--prefix", metavar="DIR", help="native Termux package prefix")
     root.add_argument("--version", action="store_true", help="print manager version")
     sub = root.add_subparsers(dest="command", metavar="COMMAND")
     commands: dict[str, argparse.ArgumentParser] = {}
 
-    def command(name: str, summary: str) -> argparse.ArgumentParser:
-        p = sub.add_parser(name, help=summary, description=summary, allow_abbrev=False,
-                           add_help=name != "run", **FORMAT)
+    def command(name: str, epilog: str | None = None, raw: bool = False) -> argparse.ArgumentParser:
+        summary = SUMMARIES[name] + "."
+        style = dict(FORMAT)
+        if raw:
+            style["formatter_class"] = functools.partial(argparse.RawDescriptionHelpFormatter, width=78)
+        p = sub.add_parser(name, help=summary, description=summary, epilog=epilog,
+                           allow_abbrev=False, add_help=name != "run", **style)
         if name != "run":
             p.add_argument("--root", metavar="DIR", help="managed installation root")
             p.add_argument("--prefix", metavar="DIR", help="native Termux package prefix")
         commands[name] = p
         return p
 
-    command("help", "Show the manager command overview.")
-    p = command("install", "Install the pinned Claude Code runtime and set up claude on PATH.")
+    p = command("help")
+    p.add_argument("topic", nargs="?", metavar="COMMAND", help="show help for this command")
+    p = command("install", SELECTION_EPILOG)
     p.add_argument("--claude-version", metavar="X.Y.Z|latest", help="select an upstream version")
     p.add_argument("--allow-unverified", action="store_true", help="permit a version beyond the project pin")
     p.add_argument("--offline", action="store_true", help="use verified cached archives")
     p.add_argument("--no-link", action="store_true", help="preserve existing Claude command entries")
-    p = command("run", "Run Claude Code and forward all following arguments unchanged.")
+    p = command("run")
     p.usage = "termux-muscle run [--] CLAUDE_ARGUMENTS..."
     p.add_argument("claude_arguments", nargs=argparse.REMAINDER, metavar="CLAUDE_ARGUMENTS")
-    p = command("update", "Validate a runtime candidate before changing the active release.")
+    p = command("update", SELECTION_EPILOG)
     p.add_argument("--claude-version", metavar="X.Y.Z|latest", help="select an upstream version")
     p.add_argument("--allow-unverified", action="store_true", help="permit a version beyond the project pin")
     p.add_argument("--offline", action="store_true", help="use verified cached archives")
-    command("rollback", "Restore the previous validated runtime release.")
-    p = command("repair", "Rebuild the current runtime from verified original artifacts.")
+    command("rollback")
+    p = command("repair")
     p.add_argument("--offline", action="store_true", help="use verified cached archives")
-    p = command("versions", "Show current, previous and retained runtime releases.")
-    p.add_argument("--json", action="store_true", help="print machine readable state")
-    p = command("doctor", "Check local installation health without model requests.")
+    p = command("versions", (
+        "--available reads the official npm registry and never installs anything. Only "
+        "the pinned release has passed Termux Muscle acceptance; install another with "
+        "update --claude-version X.Y.Z --allow-unverified."
+    ))
+    p.add_argument("--available", action="store_true", help="list installable Claude Code releases")
+    p.add_argument("--all", action="store_true", help="with --available, list every release")
+    p.add_argument("--json", action="store_true", help="print machine readable output")
+    p = command("doctor")
     p.add_argument("--output", metavar="FILE", help="write a sanitized local report")
-    command("migration", "Report read-only settings and path migration advisories.")
-    p = command("test", "Write a sanitized local device report; no uploads.")
+    command("migration")
+    p = command("test")
     p.add_argument("--output", metavar="FILE", help="write a new local report")
-    p.add_argument("--model", metavar="MODEL_ID", action="append", help="permit an authenticated model request")
-    p = command("link", "Own a Claude command entry with restoration evidence.")
+    p.add_argument("--model", metavar="MODEL_ID", action="append",
+                   help="also make one authenticated request with this model (repeatable)")
+    p = command("link")
     p.add_argument("--replace", action="store_true", help="back up and replace a foreign entry")
     p.add_argument("--path", metavar="PATH", help="choose the command entry")
-    p = command("cleanup", "Remove inactive releases while protecting active sessions.")
+    p = command("cleanup")
     p.add_argument("--keep", metavar="N", help="retention count")
     p.add_argument("--dry-run", action="store_true", help="report without deleting")
-    p = command("self-update", "Install a newer Termux Muscle manager release.")
-    p.add_argument("--version", metavar="X.Y.Z", help="select an exact manager release")
-    p.add_argument("-f", "--force", action="store_true", help="permit compatible reinstall or downgrade")
+    p = command("self-update", """\
+By default, one progress dot is shown per completed test program.
+
+exit status:
+  0  installed    2  already current    3  target is older    1  failed""", raw=True)
+    p.add_argument("--version", metavar="X.Y.Z", help="install this manager release (default: newest)")
+    p.add_argument("-f", "--force", action="store_true", help="reinstall the same release, or downgrade if compatible")
     p.add_argument("-V", "--verbose", action="store_true", help="stream the full build and test log")
-    p.add_argument("--json", action="store_true", help="print a versioned result with full transcript")
-    command("uninstall", "Remove owned files and restore eligible original entries.")
+    p.add_argument("--json", action="store_true", help="print a versioned result with the bounded test transcript")
+    command("uninstall")
     return root, commands
 
 
@@ -102,8 +173,9 @@ def generate_schema(root: argparse.ArgumentParser, commands: dict[str, argparse.
     for name, p in [("", root), *commands.items()]:
         label = shlex.quote(name)
         tag = "TM_SCHEMA_HELP_" + (name.upper().replace("-", "_") or "ROOT")
-        lines += [f"        {label}) cat <<'{tag}'", p.format_help().rstrip(), tag, "            ;;" ]
-    lines += ["        *) tm_error usage 'Unknown command help target.' ;;", "    esac", "}", "", "tm_schema_validate() {", "    local command=$1; shift", "    while (($#)); do", "        case $command/$1 in"]
+        text = root_help() if p is root else p.format_help().rstrip()
+        lines += [f"        {label}) cat <<'{tag}'", text, tag, "            ;;" ]
+    lines += ["        *) tm_error usage \"Unknown command: $1. Run termux-muscle --help.\" ;;", "    esac", "}", "", "tm_schema_validate() {", "    local command=$1; shift", "    while (($#)); do", "        case $command/$1 in"]
     for name, p in commands.items():
         if name == "run":
             continue
@@ -161,6 +233,10 @@ _termux_muscle_complete() {{
         fi
     done
     if [[ $command == run ]]; then return 0; fi
+    if [[ $command == help && $current != -* && $previous == help ]]; then
+        mapfile -t COMPREPLY < <(compgen -W "$commands" -- "$current")
+        return 0
+    fi
     case $previous in
         --root|--prefix)
             mapfile -t COMPREPLY < <(compgen -d -- "$current")

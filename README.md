@@ -76,6 +76,7 @@ normal launches still do. See [startup acceptance](docs/testing.md#isolated-star
 | Run Claude with its own arguments | `claude --model claude-opus-5` |
 | Read the installed manual | `man termux-muscle` |
 | Inspect installed and retained releases | `termux-muscle versions` |
+| See which Claude Code versions can be installed | `termux-muscle versions --available` |
 | Check installation health | `termux-muscle doctor` |
 | Install the version tested for this project release | `termux-muscle update` |
 | Restore the previous local release | `termux-muscle rollback` |

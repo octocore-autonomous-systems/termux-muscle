@@ -58,12 +58,23 @@ when PREFIX is unset.
 This option does not provide another architecture or Linux distribution.
 .TP
 .B \-\-version
-Print the Termux Muscle project version.
-To print the separate Claude Code version, use
+Print the Termux Muscle project version on the first line.
+When an installation has an active release, a second line names its
+Claude Code version, for example
+.BR "Claude Code 2.1.283 (active)" .
+The first line never changes format, and a missing or damaged installation
+only omits the second line.
+To ask the Claude Code executable itself, use
 .BR "termux-muscle run -- --version" .
 .TP
-.BR help ", " \-h ", " \-\-help
+.BR help " [" COMMAND "], " \-h ", " \-\-help
 Print the command overview.
+It groups commands by what they act on: Claude Code, Termux Muscle itself,
+and troubleshooting checks that span the device, the manager and Claude Code.
+.B help
+.I COMMAND
+prints the same help as
+.BR "termux-muscle COMMAND --help" .
 .PP
 Put global path options before the command for clarity.
 Arguments after
@@ -154,6 +165,33 @@ policy.
 prints the managed state record, including release identifiers.
 This is distinct from the allowlisted public diagnostic report and can contain
 local lifecycle metadata.
+.TP
+.BR "versions \-\-available" " [\-\-all] [\-\-json]"
+List Claude Code releases published for the official ARM64 musl package,
+newest first, with their release dates.
+Each row is labelled
+.B pinned
+(the version this Termux Muscle release was accepted with) or
+.BR unverified ,
+and also
+.B active
+or
+.B retained
+when it is installed, plus upstream tags such as
+.BR latest .
+The ten newest releases are shown, together with every pinned, active or
+retained one;
+.B \-\-all
+lists every release.
+.B \-\-json
+prints a
+.B termux-muscle.available.v1
+object.
+The listing reads one document from the official npm registry over HTTPS
+without following redirects; it downloads no archive, changes no state and
+does not relax the
+.B \-\-allow-unverified
+requirement for installing a version other than the pin.
 .TP
 .BR doctor " [\-\-output FILE]"
 Check local resolver configuration, managed link ownership, runtime integrity,
@@ -520,6 +558,13 @@ Maintain the pinned runtime and recover locally:
   termux-muscle rollback
   termux-muscle repair --offline
   termux-muscle cleanup --dry-run
+.fi
+.PP
+See which Claude Code versions can be installed:
+.PP
+.nf
+  termux-muscle versions --available
+  termux-muscle versions --available --all
 .fi
 .PP
 Opt into testing a newer upstream version:

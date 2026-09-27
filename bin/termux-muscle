@@ -169,8 +169,22 @@ done
 set -- "${arguments[@]}"
 command=${1:-help}; (($# == 0)) || shift
 case $command in
-    help|-h|--help) tm_help; exit ;;
-    --version) printf 'Termux Muscle %s\n' "$TM_PROJECT_VERSION"; exit ;;
+    -h|--help) tm_help; exit ;;
+    help)
+        case ${1:-} in -h|--help) tm_help help; exit ;; esac
+        (($# <= 1)) || tm_error usage 'help takes at most one command name.'
+        tm_help "${1:-}"; exit
+        ;;
+    --version)
+        printf 'Termux Muscle %s\n' "$TM_PROJECT_VERSION"
+        # Best effort and read-only: a fresh or damaged installation still
+        # reports the manager version and exits successfully.
+        if [[ -x $TM_CORE ]] && active=$("$TM_CORE" state "$TM_ROOT" current 2>/dev/null) &&
+            [[ $active =~ ^([0-9]+\.[0-9]+\.[0-9]+)- ]]; then
+            printf 'Claude Code %s (active)\n' "${BASH_REMATCH[1]}"
+        fi
+        exit
+        ;;
 esac
 if [[ $command != run ]]; then
     case $command in
@@ -191,8 +205,19 @@ case $command in
         esac
         ;;
     versions)
-        if (($# == 0)); then exec "$TM_CORE" state "$TM_ROOT" versions; fi
-        [[ $# == 1 && $1 == --json ]] || tm_error usage 'Use versions or versions --json.'
+        available=false all=false json=false
+        for arg in "$@"; do
+            case $arg in
+                --available) available=true ;;
+                --all) all=true ;;
+                --json) json=true ;;
+            esac
+        done
+        if [[ $available == true ]]; then
+            tm_available_versions "$all" "$json"; exit
+        fi
+        [[ $all == false ]] || tm_error usage '--all applies to versions --available only.'
+        if [[ $json == false ]]; then exec "$TM_CORE" state "$TM_ROOT" versions; fi
         exec "$TM_CORE" state "$TM_ROOT" show
         ;;
     migration)
