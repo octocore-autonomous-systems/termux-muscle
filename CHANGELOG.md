@@ -9,6 +9,8 @@
 
 The Claude Code pin stays at **2.1.283** and musl at **1.2.6-r2**, with unchanged digests.
 
+[Galaxy S26 Ultra evidence from 2026-09-27 UTC](compatibility/galaxy-s26-ultra-0.6.0-20260927.md) covers `make check` under a simulated quiet self-update, with the live test status observed on a real terminal (all 15 test programs passed, the outer event file untouched), and maintainer acceptance from a clean checkout of the tested commit, including one bounded authenticated Opus 5.5 shell-tool workflow. The build spinner in a published self-update is a post-publication check.
+
 ## 0.5.1
 
 - Fix `self-update` and `self-update --json` from 0.5.0, which stopped during tests with `valid source install failed`. The self-update's stage-event and progress variables reached the installer's test programs, and the bootstrap test's nested installer tried to write the caller's event file. The test runner now keeps that state to itself and reports progress alone; a new runner test covers it. `self-update --verbose` was not affected.
