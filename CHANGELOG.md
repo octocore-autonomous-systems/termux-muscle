@@ -1,5 +1,14 @@
 # Changes
 
+## 0.6.0
+
+- Show signs of life during a quiet `self-update` on a terminal. The build shows a spinner with elapsed seconds. During tests, a live status after the dots shows the running program, its position such as `3/15`, and its elapsed seconds, so a slow program is distinguishable from a stall. Each status is erased when its step ends, and wraps follow the terminal width.
+- Dots still mean one passed test program. Logs, CI and `--json` transcripts, where the progress output is not a terminal, receive exactly the 0.5.1 dots and totals. Set `TM_SELF_UPDATE_PROGRESS_LIVE=0` to turn the live status off.
+- The live status stops at the end of each step, on failure and on HUP, INT and TERM, and also stops by itself if its installer or runner disappears. `tests/test_run.sh` and `tests/test_bootstrap.sh` cover each case.
+- The display is drawn by the downloaded installer and test runner, so a 0.5.1 manager shows it on its update to 0.6.0.
+
+The Claude Code pin stays at **2.1.283** and musl at **1.2.6-r2**, with unchanged digests.
+
 ## 0.5.1
 
 - Fix `self-update` and `self-update --json` from 0.5.0, which stopped during tests with `valid source install failed`. The self-update's stage-event and progress variables reached the installer's test programs, and the bootstrap test's nested installer tried to write the caller's event file. The test runner now keeps that state to itself and reports progress alone; a new runner test covers it. `self-update --verbose` was not affected.
