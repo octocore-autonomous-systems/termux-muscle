@@ -8,6 +8,8 @@
 
 The Claude Code pin stays at **2.1.284** and musl at **1.2.6-r2**, with unchanged digests.
 
+[Galaxy S26 Ultra evidence from 2026-09-29 UTC](compatibility/galaxy-s26-ultra-0.9.0-20260929.md) covers `make check` (all 15 test programs passed in a native Termux shell, including the pin history regressions) and maintainer acceptance from a clean checkout of the tested commit, including one bounded authenticated Opus 5.5 shell-tool workflow, with the live installation unchanged.
+
 ## 0.8.0
 
 - Move the default pin from Claude Code **2.1.283** to **2.1.284**, the current upstream release, recording its official npm tarball URL, the registry SHA-512 integrity value and the SHA-256 of the extracted vendor executable. Both digests were confirmed against registry.npmjs.org and by a real acquisition run on a Galaxy S26 Ultra, and the executable digest was reproduced by extracting the cached archive again. The payload is unmodified; musl stays at **1.2.6-r2** with unchanged digests.
