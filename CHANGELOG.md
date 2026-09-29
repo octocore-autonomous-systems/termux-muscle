@@ -1,5 +1,12 @@
 # Changes
 
+## 0.10.0
+
+- Move the default pin from Claude Code **2.1.284** to **2.1.285**, the current upstream release. Record the official ARM64 musl npm tarball, its registry SHA-512 integrity and the extracted executable SHA-256, independently checked against the downloaded archive. The vendor payload is unmodified; musl stays at **1.2.6-r2**.
+- Preserve **2.1.284** in `pin_history` as formerly pinned by **0.8.0 to 0.9.0**, backed by the 0.9.0 maintainer report; set `claude.pinned_since` to **0.10.0**.
+
+Fresh device and authenticated tool acceptance for this release is pending.
+
 ## 0.9.0
 
 - Carry the Claude Code pin history. `compatibility.json` gains `claude.pinned_since`, the project release that first pinned the current version, and `pin_history`, one entry per earlier pin naming its exact version, the first and last project releases that pinned it, its acceptance date and the maintainer report of the last of those releases. The 0.8.0 tree records 2.1.270 (0.1.0 to 0.3.2) and 2.1.283 (0.4.0 to 0.7.0).
