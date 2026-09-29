@@ -697,6 +697,8 @@ struct available {
     const char *version;
     char released[11];
     json_object *tags;
+    /* The pin_history entry for a formerly pinned version, or NULL. */
+    json_object *formerly;
     bool pinned, active, retained, deprecated, in_registry;
 };
 static int compare_versions(const char *left, const char *right) {
@@ -812,6 +814,24 @@ static void list_available(const char *manifest_path, const char *metadata_path,
     }
     size_t registry_count = count;
     add_local(&list, &count, &capacity, pinned)->pinned = true;
+    /* Formerly pinned versions carry the project releases that accepted them.
+     * Older manifests have no history; the release gate validates the field. */
+    json_object *history = NULL;
+    if (json_object_object_get_ex(manifest, "pin_history", &history) &&
+        json_object_is_type(history, json_type_array)) {
+        for (size_t i = 0; i < json_object_array_length(history); i++) {
+            json_object *entry = json_object_array_get_idx(history, i);
+            const char *version = json_object_is_type(entry, json_type_object)
+                                      ? tm_json_optional_string(entry, "version")
+                                      : NULL;
+            if (!version || !tm_version_valid(version) || !strcmp(version, pinned))
+                continue;
+            struct available *item = add_local(&list, &count, &capacity, version);
+            if (!item->formerly)
+                item->formerly = entry;
+        }
+    } else
+        history = NULL;
     const char *active = NULL;
     json_object *state = NULL, *owned = json_object_new_array();
     char *state_path = tm_path(root, "state.json");
@@ -857,8 +877,8 @@ static void list_available(const char *manifest_path, const char *metadata_path,
     }
     for (size_t i = 0, rank = 0; i < count; i++) {
         struct available *entry = &list[i];
-        /* Pinned, active and retained releases are always listed. */
-        bool local = entry->pinned || entry->active || entry->retained;
+        /* Pinned, formerly pinned, active and retained releases are always listed. */
+        bool local = entry->pinned || entry->formerly || entry->active || entry->retained;
         bool recent = entry->in_registry && ++rank <= limit;
         if (!recent && !local)
             continue;
@@ -871,6 +891,8 @@ static void list_available(const char *manifest_path, const char *metadata_path,
                                    entry->released[0] ? json_object_new_string(entry->released)
                                                       : NULL);
             json_object_object_add(item, "pinned", json_object_new_boolean(entry->pinned));
+            json_object_object_add(item, "formerly_pinned",
+                                   entry->formerly ? json_object_get(entry->formerly) : NULL);
             json_object_object_add(item, "active", json_object_new_boolean(entry->active));
             json_object_object_add(item, "retained", json_object_new_boolean(entry->retained));
             json_object_object_add(item, "tags", json_object_get(entry->tags));
@@ -880,11 +902,24 @@ static void list_available(const char *manifest_path, const char *metadata_path,
             json_object_array_add(releases, item);
             continue;
         }
-        char status[512] = "";
+        char status[512] = "", formerly[160] = "";
         size_t used = 0;
         const char *parts[8];
         size_t n = 0;
-        parts[n++] = entry->pinned ? "pinned" : "unverified";
+        if (entry->formerly && !entry->pinned) {
+            json_object *range = NULL;
+            const char *first = NULL, *last = NULL;
+            if (json_object_object_get_ex(entry->formerly, "project_versions", &range) &&
+                json_object_is_type(range, json_type_object)) {
+                first = tm_json_optional_string(range, "first");
+                last = tm_json_optional_string(range, "last");
+            }
+            if (first && last && tm_version_valid(first) && tm_version_valid(last))
+                snprintf(formerly, sizeof formerly, "formerly pinned (%s to %s)", first, last);
+            else
+                snprintf(formerly, sizeof formerly, "formerly pinned");
+        }
+        parts[n++] = entry->pinned ? "pinned" : formerly[0] ? formerly : "unverified";
         if (entry->active)
             parts[n++] = "active";
         if (entry->retained)
@@ -909,6 +944,8 @@ static void list_available(const char *manifest_path, const char *metadata_path,
         add_string(result, "package", PACKAGE);
         add_string(result, "pinned", pinned);
         json_object_object_add(result, "active", active ? json_object_new_string(active) : NULL);
+        json_object_object_add(result, "pin_history",
+                               history ? json_object_get(history) : json_object_new_array());
         json_object_object_add(result, "total", json_object_new_int64((int64_t)registry_count));
         json_object_object_add(result, "complete",
                                json_object_new_boolean(shown == registry_count));
@@ -920,7 +957,9 @@ static void list_available(const char *manifest_path, const char *metadata_path,
         if (shown < registry_count)
             printf("\nShowing %zu of %zu releases; add --all to list every one.\n", shown,
                    registry_count);
-        puts("\nOnly pinned releases have passed Termux Muscle acceptance. To try another:\n"
+        puts("\nThe pinned release passed acceptance with this Termux Muscle version; a formerly\n"
+             "pinned release passed with the Termux Muscle releases shown. Every other version\n"
+             "is unverified. To install any version other than the pin:\n"
              "  termux-muscle update --claude-version X.Y.Z --allow-unverified");
     }
     for (size_t i = 0; i < count; i++)

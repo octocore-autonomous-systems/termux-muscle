@@ -1,5 +1,11 @@
 # Changes
 
+## Unreleased
+
+- Carry the Claude Code pin history. `compatibility.json` gains `claude.pinned_since`, the project release that first pinned the current version, and `pin_history`, one entry per earlier pin naming its exact version, the first and last project releases that pinned it, its acceptance date and the maintainer report of the last of those releases. The 0.8.0 tree records 2.1.270 (0.1.0 to 0.3.2) and 2.1.283 (0.4.0 to 0.7.0).
+- `versions --available` labels a formerly pinned release `formerly pinned (first to last)` instead of `unverified`, always lists it alongside the pinned, active and retained releases, and `--json` adds a `formerly_pinned` field per release plus the manifest's `pin_history`. Versions that were never accepted stay `unverified`, and installing anything other than the pin still needs `--allow-unverified`.
+- The release gate validates every history entry against its report (version, project release, maintainer provenance, all required lifecycle checks PASS, dates) and refuses a manifest that leaves any `docs/releases/X.Y.Z.md` older than `pinned_since` uncovered, so moving the pin without appending the outgoing version fails closed. Release notes gain a pin history table.
+
 ## 0.8.0
 
 - Move the default pin from Claude Code **2.1.283** to **2.1.284**, the current upstream release, recording its official npm tarball URL, the registry SHA-512 integrity value and the SHA-256 of the extracted vendor executable. Both digests were confirmed against registry.npmjs.org and by a real acquisition run on a Galaxy S26 Ultra, and the executable digest was reproduced by extracting the cached archive again. The payload is unmodified; musl stays at **1.2.6-r2** with unchanged digests.

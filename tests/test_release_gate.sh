@@ -67,6 +67,15 @@ printf '#!/bin/sh\nVERSION="%s"\n' "$version" > "$source/install.sh"
 printf '# Changes\n\n## %s\n\nFixture release.\n' "$version" > "$source/CHANGELOG.md"
 cp "$repo/compatibility.json" "$source/compatibility.json"
 manifest="$source/compatibility.json"
+# pin_history entries point at accepted reports of earlier pins; carry those
+# reports and one release note per documented project release into the fixture.
+mkdir -p "$source/docs/releases"
+while IFS= read -r history_report; do
+    cp "$repo/$history_report" "$source/$history_report"
+done < <(python3 -c 'import json,sys;[print(e["report"]) for e in json.load(open(sys.argv[1]))["pin_history"]]' "$manifest")
+while IFS= read -r release_note; do
+    printf '# fixture release %s\n' "$release_note" > "$source/docs/releases/$release_note.md"
+done < <(python3 -c 'import json,sys;d=json.load(open(sys.argv[1]));[print(v) for e in d["pin_history"] for v in (e["project_versions"]["first"],e["project_versions"]["last"])];print(d["claude"]["pinned_since"])' "$manifest")
 report="$source/compatibility/device.json"
 date=$("$work/verifier" fixture-get "$manifest" models.checked_documentation_on)
 claude=$("$work/verifier" fixture-get "$manifest" claude.version)
@@ -142,6 +151,33 @@ reject 'conflicting failed/skipped verified-model status accepted'
 set_json "$manifest" models.verified '["claude-fable-5-1"]'
 set_json "$report" models '[{"requested":"claude-fable-5-1","observed":["claude-fable-5-1"],"status":"PASS"}]'
 "$work/verifier" fixture-duplicate "$report" models; reject 'duplicate model results accepted'
+
+# Pin history: formerly pinned versions must point at real accepted evidence,
+# stay ordered before the current pin, and cover every documented release.
+current_pin=$("$work/verifier" fixture-get "$manifest" claude.version)
+history_count=$(python3 -c 'import json,sys;print(len(json.load(open(sys.argv[1]))["pin_history"]))' "$manifest")
+[[ $history_count -ge 2 ]] || fail 'fixture manifest lacks pin history to test'
+"$work/verifier" fixture-delete "$manifest" claude.pinned_since; reject 'missing claude.pinned_since accepted'
+set_json "$manifest" claude.pinned_since '"999.0.0"'; reject 'pinned_since after the project version accepted'
+set_json "$manifest" pin_history.0.version "\"$current_pin\""; reject 'current pin listed as history accepted'
+"$work/verifier" fixture-duplicate "$manifest" pin_history; reject 'duplicate pin history entry accepted'
+set_json "$manifest" pin_history.0.version '"2.1.1"'; reject 'history version disagreeing with its report accepted'
+set_json "$manifest" pin_history.1.report '"compatibility/missing.json"'; reject 'history report that does not exist accepted'
+set_json "$manifest" pin_history.1.report '"docs/releases/0.7.0.md"'; reject 'history report outside compatibility/ accepted'
+set_json "$manifest" pin_history.1.project_versions.last '"999.0.0"'; reject 'history range reaching the current pin accepted'
+set_json "$manifest" pin_history.1.project_versions.first '"0.0.1"'; reject 'overlapping history ranges accepted'
+set_json "$manifest" pin_history.0.verified_on '"2099-01-01"'; reject 'future history acceptance date accepted'
+set_json "$manifest" pin_history.0.verified_on '"2026-01-01"'; reject 'history report newer than its acceptance date accepted'
+printf '# fixture release\n' > "$source/docs/releases/0.0.9.md"
+check; [[ $status != 0 ]] || fail 'documented release without a pin history entry accepted'
+grep -q 'missing from pin_history' "$work/error" || fail 'moved-pin guard gave the wrong reason'
+rm "$source/docs/releases/0.0.9.md"; reset; ((count+=1))
+set_json "$manifest" pin_history '[]'; reject 'emptied pin history with documented earlier releases accepted'
+check; [[ $status == 0 ]] || fail 'valid pin history rejected'; ((count+=1))
+"$work/verifier" release-notes "$source" > "$work/notes" 2> "$work/error" || fail 'notes with pin history failed'
+grep -q '## Claude Code pin history' "$work/notes" || fail 'notes omitted the pin history'
+grep -q '0\\.1\\.0 to 0\\.3\\.2' "$work/notes" || fail 'notes omitted a history range'
+((count+=1))
 
 set +e
 "$work/incomplete" release-check "$source" > "$work/output" 2> "$work/error"

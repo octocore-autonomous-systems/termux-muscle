@@ -155,7 +155,7 @@ Review the local JSON, then [open a Device compatibility issue](https://github.c
 
 ## Claude Code and models
 
-Project versions and Claude Code versions are separate. **0.8.0** moves the pin to **Claude Code 2.1.284**; **0.4.0** moved it to 2.1.283 and **0.5.0** through **0.7.0** kept it; 0.1.0 through 0.3.2 all pinned 2.1.270; every release keeps musl **1.2.6-r2**. [compatibility.json](compatibility.json) is the machine-readable record; each published release includes matching notes and checksums. A newer pin does not add a model or an account entitlement: it only makes a client version available that upstream documents as the minimum for a given model.
+Project versions and Claude Code versions are separate. **0.8.0** moves the pin to **Claude Code 2.1.284**; **0.4.0** moved it to 2.1.283 and **0.5.0** through **0.7.0** kept it; 0.1.0 through 0.3.2 all pinned 2.1.270; every release keeps musl **1.2.6-r2**. [compatibility.json](compatibility.json) is the machine-readable record; each published release includes matching notes and checksums. Its `pin_history` names every earlier pin with the project releases that accepted it and the report that did so, and `claude.pinned_since` names the release that first pinned the current version, so `termux-muscle versions --available` shows a formerly pinned version as such rather than as unverified. A newer pin does not add a model or an account entitlement: it only makes a client version available that upstream documents as the minimum for a given model.
 
 | Documented model | Model ID | Minimum Claude Code |
 | --- | --- | --- |

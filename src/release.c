@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <dirent.h>
 #include <sys/stat.h>
 #include <time.h>
 
@@ -179,6 +180,18 @@ static char *source_path(const char *root, const char *relative) {
     tm_regular(path);
     return path;
 }
+/* An optional source directory: NULL when absent, otherwise a validated path. */
+static char *source_path_dir(const char *root, const char *relative) {
+    char *path = tm_path(root, relative);
+    struct stat st;
+    if (lstat(path, &st)) {
+        free(path);
+        return NULL;
+    }
+    if (S_ISLNK(st.st_mode) || !S_ISDIR(st.st_mode))
+        invalid("Release notes directory must be a real directory.");
+    return path;
+}
 static void require_source(const char *root, const char *relative) {
     char *path = source_path(root, relative);
     size_t length;
@@ -265,6 +278,110 @@ static void verify_pins(json_object *manifest) {
         invalid("Loader URL must pin the matching Alpine aarch64 package.");
     if (strcmp(text_field(manifest, "backend"), "unmodified-musl-proot"))
         invalid("Compatibility backend is not implemented.");
+}
+/* Formerly pinned Claude Code versions stay distinguishable from versions that
+ * were never accepted. Each history entry names the project releases that pinned
+ * the version and the maintainer report that accepted it with the last of them. */
+static void verify_pin_history(const char *root, json_object *manifest) {
+    json_object *claude = tm_json_field(manifest, "claude", json_type_object);
+    const char *current = text_field(claude, "version"),
+               *pinned_since = text_field(claude, "pinned_since"),
+               *project = text_field(manifest, "project_version");
+    if (!tm_version_valid(pinned_since) || compare_client_versions(pinned_since, project) > 0)
+        invalid(
+            "claude.pinned_since must be the exact project release that first pinned this Claude Code version.");
+    json_object *history = array_field(manifest, "pin_history"), *seen = json_object_new_object();
+    const char *previous_last = NULL;
+    for (size_t i = 0; i < json_object_array_length(history); i++) {
+        json_object *entry = json_object_array_get_idx(history, i);
+        if (!json_object_is_type(entry, json_type_object))
+            invalid("Pin history entries must be objects.");
+        const char *version = text_field(entry, "version");
+        if (!tm_version_valid(version))
+            invalid("Pin history needs exact Claude Code versions.");
+        if (!strcmp(version, current))
+            invalid("The current Claude Code pin does not belong in pin_history.");
+        unique_string(seen, version);
+        json_object *range = tm_json_field(entry, "project_versions", json_type_object);
+        const char *first = text_field(range, "first"), *last = text_field(range, "last");
+        if (!tm_version_valid(first) || !tm_version_valid(last) ||
+            compare_client_versions(first, last) > 0)
+            invalid(
+                "Pin history project_versions need exact first and last project releases in order.");
+        if (compare_client_versions(last, pinned_since) >= 0)
+            invalid("Pin history ranges must end before claude.pinned_since.");
+        if (previous_last && compare_client_versions(first, previous_last) <= 0)
+            invalid("Pin history must be ordered by project release without overlap.");
+        previous_last = last;
+        ensure_date(text_field(entry, "verified_on"));
+        const char *relative = text_field(entry, "report");
+        if (strncmp(relative, "compatibility/", 14))
+            invalid("Pin history reports must live under compatibility/.");
+        char *path = source_path(root, relative);
+        json_object *report = tm_json_read(path);
+        free(path);
+        schema_one(report);
+        json_object *report_project = tm_json_field(report, "project", json_type_object),
+                    *client = tm_json_field(report, "claude_code", json_type_object);
+        if (strcmp(text_field(report_project, "version"), last) ||
+            strcmp(text_field(client, "version"), version))
+            invalid(
+                "A pin history report must be the accepted report of the last project release that pinned that Claude Code version.");
+        if (strcmp(text_field(report, "provenance"), "maintainer"))
+            invalid("Pin history needs maintainer acceptance reports.");
+        const char *date = text_field(report, "generated_at");
+        if (!timestamp_valid(date) || strncmp(date, text_field(entry, "verified_on"), 10) > 0)
+            invalid("A pin history report cannot be newer than its verified_on date.");
+        json_object *checks = array_field(report, "checks");
+        bool passed[sizeof required_checks / sizeof *required_checks] = {false};
+        for (size_t j = 0; j < json_object_array_length(checks); j++) {
+            json_object *check = json_object_array_get_idx(checks, j);
+            const char *id = text_field(check, "id"), *status = text_field(check, "status");
+            for (size_t k = 0; k < sizeof required_checks / sizeof *required_checks; k++)
+                if (!strcmp(id, required_checks[k]))
+                    passed[k] = !strcmp(status, "PASS");
+        }
+        for (size_t k = 0; k < sizeof required_checks / sizeof *required_checks; k++)
+            if (!passed[k])
+                invalid("A pin history report must pass every required lifecycle check.");
+        json_object_put(report);
+    }
+    json_object_put(seen);
+    /* Every documented project release older than the current pin must be
+     * covered by exactly one history range, so a moved pin cannot silently drop
+     * the outgoing version and its evidence. */
+    char *notes = source_path_dir(root, "docs/releases");
+    DIR *dir = notes ? opendir(notes) : NULL;
+    if (dir) {
+        struct dirent *item;
+        while ((item = readdir(dir))) {
+            size_t n = strlen(item->d_name);
+            if (n < 4 || strcmp(item->d_name + n - 3, ".md"))
+                continue;
+            char release[129];
+            if (n - 3 >= sizeof release)
+                continue;
+            memcpy(release, item->d_name, n - 3);
+            release[n - 3] = 0;
+            if (!tm_version_valid(release) || compare_client_versions(release, pinned_since) >= 0)
+                continue;
+            size_t covered = 0;
+            for (size_t i = 0; i < json_object_array_length(history); i++) {
+                json_object *range = tm_json_field(json_object_array_get_idx(history, i),
+                                                   "project_versions", json_type_object);
+                if (compare_client_versions(text_field(range, "first"), release) <= 0 &&
+                    compare_client_versions(release, text_field(range, "last")) <= 0)
+                    covered++;
+            }
+            if (covered != 1) {
+                closedir(dir);
+                invalid(
+                    "docs/releases documents a project release whose Claude Code pin is missing from pin_history; append the outgoing pin when the pin moves.");
+            }
+        }
+        closedir(dir);
+    }
+    free(notes);
 }
 static void verify_models(json_object *models, const char *client_version) {
     ensure_date(text_field(models, "checked_documentation_on"));
@@ -544,6 +661,32 @@ static void render_notes(json_object *manifest, json_object *models) {
         markdown(id);
         fputs(". The release gate requires its matching PASS report.\n", stdout);
     }
+    fputs("\n## Claude Code pin history\n\n", stdout);
+    fputs("Current pin since Termux Muscle ", stdout);
+    markdown(text_field(claude, "pinned_since"));
+    fputs(".\n\n", stdout);
+    json_object *history = array_field(manifest, "pin_history");
+    if (!json_object_array_length(history))
+        fputs("No earlier Claude Code pin is recorded.\n", stdout);
+    else
+        fputs(
+            "| Claude Code | Termux Muscle releases | Accepted | Report |\n| --- | --- | --- | --- |\n",
+            stdout);
+    for (size_t i = 0; i < json_object_array_length(history); i++) {
+        json_object *entry = json_object_array_get_idx(history, i);
+        json_object *range = tm_json_field(entry, "project_versions", json_type_object);
+        fputs("| ", stdout);
+        markdown(text_field(entry, "version"));
+        fputs(" | ", stdout);
+        markdown(text_field(range, "first"));
+        fputs(" to ", stdout);
+        markdown(text_field(range, "last"));
+        fputs(" | ", stdout);
+        markdown(text_field(entry, "verified_on"));
+        fputs(" | ", stdout);
+        markdown(text_field(entry, "report"));
+        fputs(" |\n", stdout);
+    }
     fputs("\n## Device evidence and limitations\n\n", stdout);
     json_object *reports = array_field(manifest, "reports");
     if (!json_object_array_length(reports))
@@ -581,6 +724,7 @@ int tm_release_main(int argc, char **argv) {
     if (strcmp(text_field(manifest, "project_version"), version))
         invalid("Compatibility project_version and VERSION disagree.");
     verify_pins(manifest);
+    verify_pin_history(root, manifest);
     json_object *models = tm_json_field(manifest, "models", json_type_object);
     verify_models(models,
                   text_field(tm_json_field(manifest, "claude", json_type_object), "version"));

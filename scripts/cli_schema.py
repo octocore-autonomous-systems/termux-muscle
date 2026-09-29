@@ -135,8 +135,10 @@ def parser() -> tuple[argparse.ArgumentParser, dict[str, argparse.ArgumentParser
     p = command("repair")
     p.add_argument("--offline", action="store_true", help="use verified cached archives")
     p = command("versions", (
-        "--available reads the official npm registry and never installs anything. Only "
-        "the pinned release has passed Termux Muscle acceptance; install another with "
+        "--available reads the official npm registry and never installs anything. The "
+        "pinned release passed acceptance with this Termux Muscle version, a formerly "
+        "pinned release passed with the Termux Muscle releases shown, and every other "
+        "version is unverified; install any version other than the pin with "
         "update --claude-version X.Y.Z --allow-unverified."
     ))
     p.add_argument("--available", action="store_true", help="list installable Claude Code releases")
