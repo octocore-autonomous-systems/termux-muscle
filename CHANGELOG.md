@@ -1,5 +1,11 @@
 # Changes
 
+## 0.8.0
+
+- Move the default pin from Claude Code **2.1.283** to **2.1.284**, the current upstream release, recording its official npm tarball URL, the registry SHA-512 integrity value and the SHA-256 of the extracted vendor executable. Both digests were confirmed against registry.npmjs.org and by a real acquisition run on a Galaxy S26 Ultra, and the executable digest was reproduced by extracting the cached archive again. The payload is unmodified; musl stays at **1.2.6-r2** with unchanged digests.
+- Document **Sonnet 5.5** (`claude-sonnet-5-5`), which Anthropic's model configuration reference documents as requiring Claude Code **2.1.284 or later**. The 2.1.283 pin was below that minimum, so a default installation could not select the model. Refresh the documentation review date to 2026-09-29.
+- Claim no verified model for 0.8.0 until its device acceptance is registered. The Opus 5.5 results for 0.4.0 through 0.7.0 remain evidence for those releases on the 2.1.283 pin.
+
 ## 0.7.0
 
 - Regroup `termux-muscle --help` by what each command acts on: **Claude Code** (install, run, update, rollback, repair, versions, cleanup, link), **Termux Muscle** itself (self-update, uninstall, help) and **Troubleshooting** (doctor, test, migration), which checks the device, the manager and Claude Code together. The overview adds default paths for `--root` and `--prefix` and a short list of common tasks. Command names and options are unchanged.
