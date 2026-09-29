@@ -8,7 +8,7 @@
 
 An independent community project from [Octocore Autonomous Systems](https://github.com/octocore-autonomous-systems) (OAS). **Not affiliated with, endorsed by, sponsored by, or authorized by Anthropic.** Claude and Claude Code are Anthropic products; your use of them remains subject to Anthropic's terms and account access.
 
-> **0.8.0 pins Claude Code 2.1.284** on Android **ARM64 / aarch64**, the first default pin that satisfies Sonnet 5.5's minimum client version. Private source installation, startup, update, rollback, removal and an authenticated **Opus 5.5** tool workflow passed on **Samsung Galaxy S26 Ultra, Android 16, Termux 0.118.3 (GitHub)**. See the scoped [0.8.0 report](compatibility/galaxy-s26-ultra-0.8.0-20260929.md); other configurations need volunteer evidence.
+> **0.9.0 pins Claude Code 2.1.284** on Android **ARM64 / aarch64** and carries the Claude Code pin history, so `versions --available` shows a formerly pinned version as such instead of unverified. **0.9.0 has no device acceptance yet and is not published**; the newest published release is **0.8.0**, which pins Claude Code 2.1.284 and passed private source installation, startup, update, rollback, removal and an authenticated **Opus 5.5** tool workflow on **Samsung Galaxy S26 Ultra, Android 16, Termux 0.118.3 (GitHub)**. See the scoped [0.8.0 report](compatibility/galaxy-s26-ultra-0.8.0-20260929.md); other configurations need volunteer evidence.
 
 [Install](#install) · [Commands](#everyday-use) · [Device matrix](#device-compatibility) · [Troubleshooting](docs/troubleshooting.md) · [Contribute](CONTRIBUTING.md)
 
@@ -155,7 +155,7 @@ Review the local JSON, then [open a Device compatibility issue](https://github.c
 
 ## Claude Code and models
 
-Project versions and Claude Code versions are separate. **0.8.0** moves the pin to **Claude Code 2.1.284**; **0.4.0** moved it to 2.1.283 and **0.5.0** through **0.7.0** kept it; 0.1.0 through 0.3.2 all pinned 2.1.270; every release keeps musl **1.2.6-r2**. [compatibility.json](compatibility.json) is the machine-readable record; each published release includes matching notes and checksums. Its `pin_history` names every earlier pin with the project releases that accepted it and the report that did so, and `claude.pinned_since` names the release that first pinned the current version, so `termux-muscle versions --available` shows a formerly pinned version as such rather than as unverified. A newer pin does not add a model or an account entitlement: it only makes a client version available that upstream documents as the minimum for a given model.
+Project versions and Claude Code versions are separate. **0.8.0** moved the pin to **Claude Code 2.1.284** and **0.9.0** keeps it; **0.4.0** moved it to 2.1.283 and **0.5.0** through **0.7.0** kept it; 0.1.0 through 0.3.2 all pinned 2.1.270; every release keeps musl **1.2.6-r2**. [compatibility.json](compatibility.json) is the machine-readable record; each published release includes matching notes and checksums. Its `pin_history` names every earlier pin with the project releases that accepted it and the report that did so, and `claude.pinned_since` names the release that first pinned the current version, so `termux-muscle versions --available` shows a formerly pinned version as such rather than as unverified. A newer pin does not add a model or an account entitlement: it only makes a client version available that upstream documents as the minimum for a given model.
 
 | Documented model | Model ID | Minimum Claude Code |
 | --- | --- | --- |
