@@ -159,9 +159,11 @@ options:
   --all         with --available, list every release
   --json        print machine readable output
 
---available reads the official npm registry and never installs anything. Only
-the pinned release has passed Termux Muscle acceptance; install another with
-update --claude-version X.Y.Z --allow-unverified.
+--available reads the official npm registry and never installs anything. The
+pinned release passed acceptance with this Termux Muscle version, a formerly
+pinned release passed with the Termux Muscle releases shown, and every other
+version is unverified; install any version other than the pin with update
+--claude-version X.Y.Z --allow-unverified.
 TM_SCHEMA_HELP_VERSIONS
             ;;
         doctor) cat <<'TM_SCHEMA_HELP_DOCTOR'

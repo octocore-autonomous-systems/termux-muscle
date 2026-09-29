@@ -3,6 +3,7 @@
   "project_version": "0.8.0",
   "claude": {
     "version": "2.1.284",
+    "pinned_since": "0.8.0",
     "package": "@anthropic-ai/claude-code-linux-arm64-musl",
     "tarball": "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-arm64-musl/-/claude-code-linux-arm64-musl-2.1.284.tgz",
     "integrity": "sha512-+d0msskdpE9fCwOaqBrxTpGmLA8v2Kby/OPZu7XmAaukjvGryWCotPwDC0m9WVNUzCV0G+DZRmDWr1GCce5yEA==",
@@ -14,6 +15,26 @@
     "sha256": "5e9674b7f41152fe2119093b5cb4c13eaaadb19c2d5422b2d7267913e663ee6e",
     "loader_sha256": "32377e6d71725bb019e9ff6d5e9f16b4d5156d6f2c36504191c2d6a7c4d4a44d"
   },
+  "pin_history": [
+    {
+      "version": "2.1.270",
+      "project_versions": {
+        "first": "0.1.0",
+        "last": "0.3.2"
+      },
+      "verified_on": "2026-09-24",
+      "report": "compatibility/galaxy-s26-ultra-0.3.2-20260924.json"
+    },
+    {
+      "version": "2.1.283",
+      "project_versions": {
+        "first": "0.4.0",
+        "last": "0.7.0"
+      },
+      "verified_on": "2026-09-27",
+      "report": "compatibility/galaxy-s26-ultra-0.7.0-20260927.json"
+    }
+  ],
   "backend": "unmodified-musl-proot",
   "models": {
     "checked_documentation_on": "2026-09-29",

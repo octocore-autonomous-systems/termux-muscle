@@ -171,22 +171,29 @@ List Claude Code releases published for the official ARM64 musl package,
 newest first, with their release dates.
 Each row is labelled
 .B pinned
-(the version this Termux Muscle release was accepted with) or
-.BR unverified ,
-and also
+(the version this Termux Muscle release was accepted with),
+.B formerly pinned
+(a version an earlier Termux Muscle release was accepted with; the label names
+the first and last such release, from the manifest's pin history) or
+.BR unverified
+(never accepted), and also
 .B active
 or
 .B retained
 when it is installed, plus upstream tags such as
 .BR latest .
-The ten newest releases are shown, together with every pinned, active or
-retained one;
+The ten newest releases are shown, together with every pinned, formerly
+pinned, active or retained one;
 .B \-\-all
 lists every release.
 .B \-\-json
 prints a
 .B termux-muscle.available.v1
-object.
+object; each release carries a
+.B formerly_pinned
+field with its history entry or null, and the object carries the manifest's
+.B pin_history
+array.
 The listing reads one document from the official npm registry over HTTPS
 without following redirects; it downloads no archive, changes no state and
 does not relax the

@@ -12,7 +12,14 @@ Every release states:
 - The exact tested device, Android/API, Termux build/source, kernel, page size and relevant package versions.
 - Known limitations, FAIL/SKIP outcomes and meaningful changes since the previous release.
 
-Update `VERSION`, the embedded `install.sh` version and `compatibility.json` together. Make supplies the C helper version from `VERSION`. Add the versioned `CHANGELOG.md` entry. Update README's device matrix only from reviewed evidence. A newer upstream model announcement is not an authenticated compatibility result.
+Update `VERSION`, the embedded `install.sh` version and `compatibility.json` together.
+
+When the Claude Code pin moves, append the outgoing pin to `pin_history` in the same commit:
+its exact version, `project_versions.first` and `.last` (the project releases that pinned it),
+`verified_on` and the `report` of the last of those releases, which must be a maintainer report
+passing every required lifecycle check. Set `claude.pinned_since` to the new project version. The
+release gate refuses a manifest whose history leaves any `docs/releases/X.Y.Z.md` older than
+`pinned_since` uncovered, so a moved pin cannot silently drop a verified version. Make supplies the C helper version from `VERSION`. Add the versioned `CHANGELOG.md` entry. Update README's device matrix only from reviewed evidence. A newer upstream model announcement is not an authenticated compatibility result.
 
 ## Build and verify
 
