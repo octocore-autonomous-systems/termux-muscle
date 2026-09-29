@@ -4,7 +4,9 @@
 
 - Move the default pin from Claude Code **2.1.283** to **2.1.284**, the current upstream release, recording its official npm tarball URL, the registry SHA-512 integrity value and the SHA-256 of the extracted vendor executable. Both digests were confirmed against registry.npmjs.org and by a real acquisition run on a Galaxy S26 Ultra, and the executable digest was reproduced by extracting the cached archive again. The payload is unmodified; musl stays at **1.2.6-r2** with unchanged digests.
 - Document **Sonnet 5.5** (`claude-sonnet-5-5`), which Anthropic's model configuration reference documents as requiring Claude Code **2.1.284 or later**. The 2.1.283 pin was below that minimum, so a default installation could not select the model. Refresh the documentation review date to 2026-09-29.
-- Claim no verified model for 0.8.0 until its device acceptance is registered. The Opus 5.5 results for 0.4.0 through 0.7.0 remain evidence for those releases on the 2.1.283 pin.
+- Verify **Opus 5.5** on the new pin with an exact authenticated Bash-tool workflow. Sonnet 5.5 and Fable 5.1 are documented, not verified.
+
+[Galaxy S26 Ultra evidence from 2026-09-29 UTC](compatibility/galaxy-s26-ultra-0.8.0-20260929.md) covers `make check` (all 15 test programs passed in a native Termux shell) and maintainer acceptance from a clean checkout of the tested commit, including one bounded authenticated Opus 5.5 shell-tool workflow, with the live installation unchanged.
 
 ## 0.7.0
 
