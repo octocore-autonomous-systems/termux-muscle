@@ -1,13 +1,13 @@
 {
   "schema": 1,
-  "project_version": "0.12.0",
+  "project_version": "0.13.0",
   "claude": {
-    "version": "2.1.287",
-    "pinned_since": "0.12.0",
+    "version": "2.1.288",
+    "pinned_since": "0.13.0",
     "package": "@anthropic-ai/claude-code-linux-arm64-musl",
-    "tarball": "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-arm64-musl/-/claude-code-linux-arm64-musl-2.1.287.tgz",
-    "integrity": "sha512-sdFvq6Aasxv1BzkqkUVPZyGaKxALdTmo0B03K7zsB7Lt8RDzOn/yQj6vPluS/464XkLyqlesTsziYtkdOpjocw==",
-    "binary_sha256": "83d95a9fa28b1fadd8c012fda873aed8f8998e23dfabe6dd4efd05bcdd7383ba"
+    "tarball": "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-arm64-musl/-/claude-code-linux-arm64-musl-2.1.288.tgz",
+    "integrity": "sha512-bIg7uTc4wRX0LTEOwnPWV0K3kksPo6f2IEtTSPd05PPQUVu8EQ9EklPIz2bZ6Tc/ccbZWi1oshS2D2siZ/Bdbg==",
+    "binary_sha256": "6b9816b225b303dacc17acc9d83016055274498effdbce6227e62d5dbaa762b9"
   },
   "musl": {
     "version": "1.2.6-r2",
@@ -60,6 +60,15 @@
       },
       "verified_on": "2026-09-30",
       "report": "compatibility/galaxy-s26-ultra-0.11.0-20260930.json"
+    },
+    {
+      "version": "2.1.287",
+      "project_versions": {
+        "first": "0.12.0",
+        "last": "0.12.0"
+      },
+      "verified_on": "2026-10-02",
+      "report": "compatibility/galaxy-s26-ultra-0.12.0-20261002.json"
     }
   ],
   "backend": "unmodified-musl-proot",
@@ -98,13 +107,8 @@
         "minimum_claude_version": "2.1.197"
       }
     ],
-    "verified": [
-      "claude-opus-5-5"
-    ],
-    "availability_note": "Documented minimum client versions come from Anthropic's model configuration reference, reviewed on 2026-09-29. Sonnet 5.5 requires Claude Code 2.1.284 or later and Opus 5.5 requires 2.1.280 or later. Opus 5.5 passed an exact authenticated Bash-tool workflow on 2026-10-02 with 0.12.0 on the 2.1.287 pin on the reported Galaxy S26 Ultra. Earlier 0.11.0 checks on 2.1.286, 0.10.0 checks on 2.1.285, 0.8.0 and 0.9.0 checks on 2.1.284 and 0.4.0 through 0.7.0 checks on 2.1.283 remain dated evidence. Sonnet 5.5 and Fable 5.1 are documented, not verified. Historical Sonnet 5 and mixed Fable observations retain their original scope. Model availability depends on account, provider and organization policy."
+    "verified": [],
+    "availability_note": "Documented minimum client versions come from Anthropic's model configuration reference, reviewed on 2026-09-29. Sonnet 5.5 requires Claude Code 2.1.284 or later and Opus 5.5 requires 2.1.280 or later. Model acceptance for 0.13.0 is pending. Earlier reports retain their dated results for their own project and client versions. Model availability depends on account, provider and organization policy."
   },
-  "reports": [
-    "compatibility/galaxy-s26-ultra-0.12.0-20261002.json"
-  ],
-  "verified_on": "2026-10-02"
+  "reports": []
 }
