@@ -6,7 +6,9 @@
 - Preserve **2.1.291** in `pin_history` as formerly pinned by **0.15.0**, backed by the 0.15.0 maintainer report; set `claude.pinned_since` to **0.16.0**.
 - Add maintainer helpers for pin-move releases (`scripts/release_validate.sh`, `release_prepare.py`, `release_register.py`, `release_public_verify.sh`, `release_live_upgrade.sh`), described in `docs/releasing.md`, with an offline regression test in CI that replays the next pin move. They ship in the source archive for the first time; the installed harness is unchanged.
 
-Fresh device and authenticated tool acceptance for this release is pending.
+- Verify **Opus 5.5** on the new pin with an exact authenticated Bash-tool fixture.
+
+[Galaxy S26 Ultra evidence from 2026-10-06 UTC](compatibility/galaxy-s26-ultra-0.16.0-20261006.md) covers all 15 test programs and fresh maintainer acceptance from clean commit `60df571`, with install, isolated startup, authenticated tools, offline update/rollback and removal passing. The live installation was unchanged. Optional runtime host probes and the unavailable cross-UID fixture were skipped in the deterministic suite; real vendor startup and namespace checks passed in acceptance. Claude Code 2.1.292 exposed no Termux Muscle defects, so this release changes no harness code.
 
 ## 0.15.0
 
