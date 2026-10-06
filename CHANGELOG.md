@@ -1,5 +1,13 @@
 # Changes
 
+## 0.16.0
+
+- Move the default pin from Claude Code **2.1.291** to **2.1.292**, the current upstream release. Record the official ARM64 musl npm tarball, its registry SHA-512 integrity and the extracted executable SHA-256, independently checked against the downloaded archive. The vendor payload is unmodified; musl stays at **1.2.6-r2**.
+- Preserve **2.1.291** in `pin_history` as formerly pinned by **0.15.0**, backed by the 0.15.0 maintainer report; set `claude.pinned_since` to **0.16.0**.
+- Add maintainer helpers for pin-move releases (`scripts/release_validate.sh`, `release_prepare.py`, `release_register.py`, `release_public_verify.sh`, `release_live_upgrade.sh`), described in `docs/releasing.md`, with an offline regression test in CI that replays the next pin move. They ship in the source archive for the first time; the installed harness is unchanged.
+
+Fresh device and authenticated tool acceptance for this release is pending.
+
 ## 0.15.0
 
 - Move the default pin from Claude Code **2.1.289** to **2.1.291**, the current upstream release. Record the official ARM64 musl npm tarball, its registry SHA-512 integrity and the extracted executable SHA-256, independently checked against the downloaded archive. The vendor payload is unmodified; musl stays at **1.2.6-r2**.
