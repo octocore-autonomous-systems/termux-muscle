@@ -80,7 +80,7 @@ rejects redirects, bounds metadata size and network wait time, validates package
 identity/platform, canonical archive URLs, stable versions and SHA-512 syntax.
 
 Use `-B` to avoid leaving bytecode artifacts in the source tree; the release
-builder accepts the two maintainer Python source files but rejects generated
+builder accepts only the allowlisted maintainer Python source files but rejects generated
 bytecode and arbitrary extra Python files.
 
 We considered Renovate's npm/custom-manager support. Our target is a tested

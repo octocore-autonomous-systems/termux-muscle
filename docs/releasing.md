@@ -34,6 +34,30 @@ The release build rejects inconsistent versions, missing notices/model metadata,
 
 Artifacts are `termux-muscle-VERSION.tar.gz` containing project source, `install.sh`, `compatibility.json`, generated `RELEASE_NOTES.md` and `SHA256SUMS`. Verify that no vendor executable, credential, private log or personal path has entered the source or release. Build the same commit twice and compare source-archive checksums. Installed helpers are compiled locally; binary reproducibility across different toolchains is not claimed. Do not mutate release assets after publishing; fix a release with a new semantic version.
 
+## Pin-move helpers
+
+When a release only moves the Claude Code pin, five maintainer scripts do the mechanical steps.
+Each checks its own preconditions, stops at the first failure, and never commits, tags or
+publishes. They are written for the maintainer's reference device and an Opus 5.5 model check;
+review every diff they produce.
+
+| Step | Command | Effect |
+| --- | --- | --- |
+| Validate the candidate | `bash scripts/release_validate.sh X OUT` | Installs Claude Code X through the unverified-version path, runs `doctor` and one authenticated model test, and matches the cached npm archive and extracted executable to the registry and install receipt. Prints the two digests. |
+| Prepare | `python3 -B scripts/release_prepare.py P X INTEGRITY BINARY_SHA256 WHY_FILE` | Writes the version, installer, manual, manifest (including `pin_history`), changelog, release note and README edits for a release whose device evidence is still pending. |
+| Register | `python3 -B scripts/release_register.py` | After `make check` and `scripts/maintainer_acceptance.sh` pass from the clean preparation commit, renames the report, writes its notes and fills the manifest, README, changelog and release note from the report. |
+| Verify publication | `bash scripts/release_public_verify.sh P LOCAL_SHA256SUMS OUT` | Compares the public assets with the local build and runs the public installer in a disposable root, proving the live installation unchanged. |
+| Upgrade the device | `bash scripts/release_live_upgrade.sh P X OUT` | Runs `self-update`, re-registers X as the project pin, and records versions and `doctor`. |
+
+The shell helpers need a native, untraced Termux shell. `release_register.py` writes that the
+release changes no harness code and that the deterministic suite skipped only the optional host
+probes and the cross-UID fixture; edit those sentences when either is untrue. The "Why" paragraph
+in `WHY_FILE` is always written by hand from the upstream release notes.
+
+`python3 -B -m unittest discover -s tests/dev -p 'test_release_helpers.py' -v` replays the next
+pin move on a copy of the tree. It fails when an edit removes a README, changelog or manifest
+anchor the helpers depend on.
+
 ## Publish
 
 Use the reviewed source commit after both branch CI compiler jobs pass. Add reviewed human notes at `docs/releases/VERSION.md`; they are combined with the generated, verified metadata on the release page. Preserve mixed model results, failed features and untested workflows explicitly.

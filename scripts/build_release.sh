@@ -64,6 +64,7 @@ while IFS= read -r file; do
     esac
     case "$file" in
         scripts/track_upstream.py|scripts/cli_schema.py|tests/dev/test_track_upstream.py) ;; # Maintainer-only source; never run by bootstrap.
+        scripts/release_prepare.py|scripts/release_register.py|tests/dev/test_release_helpers.py) ;; # Maintainer release helpers; never run by bootstrap.
         *.c|*.h|*.sh|*.md|*.yml|*.yaml|*.json|Makefile|VERSION|LICENSE|.gitignore|.clang-format|.githooks/pre-commit|docs/man/termux-muscle.1|docs/images/termux-muscle-hero.png|bin/termux-muscle) ;;
         *) fail "unexpected source file type (vendor/build artifacts are excluded): $file";;
     esac
