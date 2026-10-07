@@ -1,5 +1,14 @@
 # Changes
 
+## 0.17.0
+
+- Move the default pin from Claude Code **2.1.292** to **2.1.293**, the current upstream release. Record the official ARM64 musl npm tarball, its registry SHA-512 integrity and the extracted executable SHA-256, independently checked against the downloaded archive. The vendor payload is unmodified; musl stays at **1.2.6-r2**.
+- Preserve **2.1.292** in `pin_history` as formerly pinned by **0.16.0**, backed by the 0.16.0 maintainer report; set `claude.pinned_since` to **0.17.0**.
+
+- Verify **Opus 5.5** on the new pin with an exact authenticated Bash-tool fixture.
+
+[Galaxy S26 Ultra evidence from 2026-10-07 UTC](compatibility/galaxy-s26-ultra-0.17.0-20261007.md) covers all 15 test programs and fresh maintainer acceptance from clean commit `a55bf32`, with install, isolated startup, authenticated tools, offline update/rollback and removal passing. The live installation was unchanged. Optional runtime host probes and the unavailable cross-UID fixture were skipped in the deterministic suite; real vendor startup and namespace checks passed in acceptance. Claude Code 2.1.293 exposed no Termux Muscle defects, so this release changes no harness code.
+
 ## 0.16.0
 
 - Move the default pin from Claude Code **2.1.291** to **2.1.292**, the current upstream release. Record the official ARM64 musl npm tarball, its registry SHA-512 integrity and the extracted executable SHA-256, independently checked against the downloaded archive. The vendor payload is unmodified; musl stays at **1.2.6-r2**.
