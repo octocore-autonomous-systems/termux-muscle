@@ -13,7 +13,9 @@ Keep the hidden `termux-muscle:upstream-claude` version marker when editing;
 deleting the issue or its marker permits recreation. Reopen manually to reconsider.
 
 The tracker observes `latest` at each check, not every intervening release.
-A backward-moving tag never proposes a downgrade. Prereleases and invalid or
+A backward-moving tag never proposes a downgrade. The maintainer's pin can be ahead of this
+tag, because releases follow Anthropic's download channel (see [releasing.md](releasing.md));
+the tracker then reports `registry_behind_pin` and opens nothing. Prereleases and invalid or
 mismatched package responses fail the run. Maintainers close superseded issues;
 the tracker does not discard their evidence automatically.
 

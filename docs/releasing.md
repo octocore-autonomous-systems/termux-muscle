@@ -83,6 +83,17 @@ contain registry metadata, not compatibility approval. Resolve candidates throug
 the existing device-evidence and release gates; the tracker never advances the
 pin or publishes a release.
 
+Since 0.18.0 the maintainer moves the pin when Anthropic's own download channel
+(`https://downloads.claude.ai/claude-code-releases/latest`) names a newer version. That is the
+version `claude update` installs on natively supported platforms, and it can lead npm's `latest`
+tag by hours, during which npm lists the same version under `next`. Following it keeps Termux
+users level with everyone else, for example when a new model needs a newer client. Only the
+timing changes: the ARM64 musl package is still acquired from npm, verified against the
+registry's SHA-512 integrity and the recorded executable SHA-256, and accepted on a device before
+release. "The current upstream release" in the changelog means that channel's version. A version
+Anthropic withdraws before promoting it on npm is replaced by the next release; `termux-muscle
+rollback` restores the previous runtime meanwhile.
+
 Prefer a tested upstream pin to an unattended upgrade that silently changes compatibility. Candidate checks must run before activation. Preserve a rollback option and bound retained storage without deleting a leased release. A failed check is a reason to keep the working runtime, not to lower the gate.
 
 If an upstream release changes package format, loader requirements, subprocess behavior or model selection, add a regression and fresh device evidence before calling it supported. Explicit experimental-version installation remains labeled as such. An urgent fix still needs evidence for the behavior it changes.
