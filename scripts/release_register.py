@@ -8,7 +8,7 @@ Run from the root of the release worktree, after the preparation commit and a pa
     python3 -B scripts/release_register.py [--tests 15]
 
 It finds the single report under compatibility/reports/, renames it to the device-and-date
-convention, writes its .md notes, and fills compatibility.json, README, CHANGELOG and the
+convention, writes its .md notes, and fills compatibility.json, README, the device matrix, CHANGELOG and the
 release notes. Every number comes from the report or the tree. It assumes a pin-only release
 (no harness code changed), the Galaxy S26 Ultra, an Opus 5.5 model check, and the same two
 deterministic-suite skips as 0.12.0-0.15.0 (runtime host probes, cross-UID fixture): check
@@ -121,23 +121,24 @@ c["reports"] = [base + ".json"]
 c["verified_on"] = date
 pathlib.Path("compatibility.json").write_text(json.dumps(c, indent=2, ensure_ascii=False) + "\n")
 
-# README
-readme = pathlib.Path("README.md").read_text()
-row = re.search(rf"^\| \*\*{re.escape(prevP)}, .*?PASS([⁰¹²³⁴-⁹]+) .*$", readme, flags=re.M)
+# Device matrix and README
+matrix_path = "docs/device-compatibility.md"
+matrix = pathlib.Path(matrix_path).read_text()
+row = re.search(rf"^\| \*\*{re.escape(prevP)}, .*?PASS([⁰¹²³⁴-⁹]+) .*$", matrix, flags=re.M)
 if not row:
-    die("README: previous device matrix row not found")
+    die(f"{matrix_path}: previous device matrix row not found")
 sup = "⁰¹²³⁴⁵⁶⁷⁸⁹"
 n = int("".join(str(sup.index(ch)) for ch in row.group(1))) + 1
 mark = "".join(sup[int(d)] for d in str(n))
 sub1("README.md", rf"^> \*\*{re.escape(P)} prepares the Claude Code {re.escape(X)} pin\*\*.*$",
      f"> **{P} pins Claude Code {X}** on Android **ARM64 / aarch64** and preserves {prevX} as formerly pinned by {pinned_by}. Private source installation, startup, update, rollback, removal and an authenticated **{MODEL_NAME}** tool workflow passed on **{env['device_name']}, Android {env['android_version']}, {termux} ({src})**. See the scoped [{P} report]({base}.md); other configurations need volunteer evidence.",
      regex=True)
-sub1("README.md", row.group(0),
-     f"| **{P}, {date} UTC** · {env['device_name']} · {env['model']} · {android} · {termux} ({src}) | PASS{mark} | PASS | PASS | PASS | — | PASS | PASS | PASS | [Maintainer report]({base}.md) · [JSON]({base}.json) |\n" + row.group(0))
-foot = re.search(rf"^{row.group(1)} Version {re.escape(prevP)} .*$", pathlib.Path("README.md").read_text(), flags=re.M)
+sub1(matrix_path, row.group(0),
+     f"| **{P}, {date} UTC** · {env['device_name']} · {env['model']} · {android} · {termux} ({src}) | PASS{mark} | PASS | PASS | PASS | — | PASS | PASS | PASS | [Maintainer report](../{base}.md) · [JSON](../{base}.json) |\n" + row.group(0))
+foot = re.search(rf"^{row.group(1)} Version {re.escape(prevP)} .*$", pathlib.Path(matrix_path).read_text(), flags=re.M)
 if not foot:
-    die("README: previous footnote not found")
-sub1("README.md", foot.group(0),
+    die(f"{matrix_path}: previous footnote not found")
+sub1(matrix_path, foot.group(0),
      f"{mark} Version {P} moves the pin to Claude Code {X} and retains {prevX} in pin history. All {a.tests} test programs passed in a native Termux shell; optional host probes and the unavailable cross-UID executable fixture were skipped as detailed in the report. Acceptance ran from a clean checkout and verified {MODEL_NAME} on the new pin, with the live installation unchanged. Command takeover, indexed manual discovery and public HTTPS delivery were not retested.\n\n" + foot.group(0))
 anchor = "it is documented, not verified. Opus 5.5 passed exact authenticated tool acceptance with "
 sub1("README.md", anchor, f"{anchor}{P} on the {X} pin on {date} UTC, with ")

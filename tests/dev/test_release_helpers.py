@@ -14,7 +14,8 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-COPIED = ["VERSION", "install.sh", "compatibility.json", "CHANGELOG.md", "README.md"]
+COPIED = ["VERSION", "install.sh", "compatibility.json", "CHANGELOG.md", "README.md",
+          "docs/device-compatibility.md"]
 INTEGRITY = "sha512-" + "A" * 86 + "=="
 BINARY = "ab" * 32
 GIT = ["git", "-c", "user.name=fixture", "-c", "user.email=fixture@example.invalid",
@@ -36,6 +37,7 @@ class ReleaseHelpers(unittest.TestCase):
         self.tree = Path(self.scratch.name) / "tree"
         self.tree.mkdir()
         for name in COPIED:
+            (self.tree / name).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(ROOT / name, self.tree / name)
         (self.tree / "docs/man").mkdir(parents=True)
         shutil.copy2(ROOT / "docs/man/termux-muscle.1", self.tree / "docs/man/termux-muscle.1")
@@ -135,10 +137,21 @@ class ReleaseHelpers(unittest.TestCase):
                       manifest["models"]["availability_note"])
         readme = self.read("README.md")
         self.assertIn(f"> **{self.new_version} pins Claude Code {self.new_claude}**", readme)
-        rows = [line for line in readme.splitlines() if line.startswith("| **")]
+        matrix = self.read("docs/device-compatibility.md")
+        rows = [line for line in matrix.splitlines() if line.startswith("| **")]
         self.assertTrue(rows[0].startswith(f"| **{self.new_version}, 2030-01-02 UTC**"))
         self.assertTrue(rows[1].startswith(f"| **{self.old_version}, "))
-        self.assertEqual(readme.count(f" Version {self.new_version} moves the pin to Claude Code {self.new_claude}"), 1)
+        self.assertEqual(matrix.count(f" Version {self.new_version} moves the pin to Claude Code {self.new_claude}"), 1)
+        self.assertIn("[device compatibility matrix](docs/device-compatibility.md)", readme)
+        self.assertNotIn("| Tested configuration |", readme)
+        self.assertNotIn(f" Version {self.new_version} moves the pin", readme)
+        previous_rows = [line for line in (ROOT / "docs/device-compatibility.md").read_text().splitlines()
+                         if line.startswith("| **")]
+        self.assertEqual(rows[1:], previous_rows)
+        for suffix in ("md", "json"):
+            relative = f"../{base}.{suffix}"
+            self.assertIn(f"]({relative})", rows[0])
+            self.assertTrue((self.tree / "docs" / relative).is_file())
         self.assertIn(f"acceptance with {self.new_version} on the {self.new_claude} pin on 2030-01-02 UTC, with ",
                       readme)
         for name in ("CHANGELOG.md", f"docs/releases/{self.new_version}.md", "README.md"):
@@ -174,7 +187,7 @@ class ReleaseHelpers(unittest.TestCase):
         result = self.helper("release_register.py")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("clean checkout of HEAD", result.stderr)
-        self.assertEqual(self.git("status", "--porcelain", "--", "README.md", "compatibility.json"), "")
+        self.assertEqual(self.git("status", "--porcelain", "--", "README.md", "docs/device-compatibility.md", "compatibility.json"), "")
 
 
 if __name__ == "__main__":
