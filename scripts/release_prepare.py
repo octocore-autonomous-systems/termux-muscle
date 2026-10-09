@@ -18,6 +18,8 @@ import pathlib
 import re
 import sys
 
+from readme_compatibility import update_readme
+
 ap = argparse.ArgumentParser()
 ap.add_argument("P")
 ap.add_argument("X")
@@ -143,7 +145,6 @@ sub1("README.md", rf"^> \*\*{re.escape(prevP)} pins Claude Code {re.escape(prevX
      f"> **{P} prepares the Claude Code {X} pin** on Android **ARM64 / aarch64**. Fresh device and authenticated tool acceptance is pending; earlier release reports retain their original scope.",
      regex=True)
 sub1("README.md", f"releases/download/v{prevP}/install.sh", f"releases/download/v{P}/install.sh")
-sub1("README.md", f"**{prevP}** moves the pin to **Claude Code {prevX}**;",
-     f"**{P}** moves the pin to **Claude Code {X}**; **{prevP}** moved it to **{prevX}**;")
+update_readme(pathlib.Path.cwd())
 
 print(f"prepared {P} with Claude Code {X} (outgoing: {prevP} with {prevX}, pinned since {since})")

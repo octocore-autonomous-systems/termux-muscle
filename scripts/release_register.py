@@ -23,6 +23,8 @@ import re
 import subprocess
 import sys
 
+from readme_compatibility import update_readme
+
 ap = argparse.ArgumentParser()
 ap.add_argument("--tests", type=int, default=15, help="test programs reported by make check")
 a = ap.parse_args()
@@ -140,8 +142,7 @@ if not foot:
     die(f"{matrix_path}: previous footnote not found")
 sub1(matrix_path, foot.group(0),
      f"{mark} Version {P} moves the pin to Claude Code {X} and retains {prevX} in pin history. All {a.tests} test programs passed in a native Termux shell; optional host probes and the unavailable cross-UID executable fixture were skipped as detailed in the report. Acceptance ran from a clean checkout and verified {MODEL_NAME} on the new pin, with the live installation unchanged. Command takeover, indexed manual discovery and public HTTPS delivery were not retested.\n\n" + foot.group(0))
-anchor = "it is documented, not verified. Opus 5.5 passed exact authenticated tool acceptance with "
-sub1("README.md", anchor, f"{anchor}{P} on the {X} pin on {date} UTC, with ")
+update_readme(pathlib.Path.cwd())
 
 # CHANGELOG
 sub1("CHANGELOG.md", "Fresh device and authenticated tool acceptance for this release is pending.\n",

@@ -56,7 +56,7 @@ in `WHY_FILE` is always written by hand from the upstream release notes.
 
 `python3 -B -m unittest discover -s tests/dev -p 'test_release_helpers.py' -v` replays the next
 pin move on a copy of the tree. It fails when an edit removes a README, device matrix, changelog or manifest
-anchor the helpers depend on.
+anchor the helpers depend on. Both preparation and registration regenerate README’s release and model tables with `scripts/readme_compatibility.py`. The release-note filenames enumerate releases; `compatibility.json` supplies their pin ranges and model requirements. Model Termux Muscle minimums are derived from the earliest eligible release, including when several models share a requirement. Run `python3 -B scripts/readme_compatibility.py --check` to detect stale tables, or omit `--check` to regenerate the section. This is a maintainer tool; installation requires no Python.
 
 ## Publish
 

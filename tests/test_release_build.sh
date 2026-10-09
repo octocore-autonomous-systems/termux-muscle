@@ -13,6 +13,7 @@ mkdir -p "$source/tests/dev"
 printf '# maintainer tracker fixture\n' > "$source/scripts/track_upstream.py"
 printf '# maintainer tracker test fixture\n' > "$source/tests/dev/test_track_upstream.py"
 printf '# maintainer CLI schema generator fixture\n' > "$source/scripts/cli_schema.py"
+printf '# maintainer README generator fixture\n' > "$source/scripts/readme_compatibility.py"
 printf '# maintainer release preparation fixture\n' > "$source/scripts/release_prepare.py"
 printf '# maintainer release registration fixture\n' > "$source/scripts/release_register.py"
 printf '# maintainer release helper test fixture\n' > "$source/tests/dev/test_release_helpers.py"
@@ -72,7 +73,7 @@ grep -q '/.githooks/pre-commit$' "$work/names" || fail 'contributor hook omitted
 tar -tvzf "$work/dist/$asset" > "$work/modes"
 grep -Eq '^-rwxr-xr-x .*[/]\.githooks/pre-commit$' "$work/modes" || fail 'contributor hook is not executable'
 if grep -Eq '/build/|\.pyz$|\.pyc$|tm-core$' "$work/names"; then fail 'archive included compiler output or bytecode'; fi
-for approved in scripts/track_upstream.py scripts/cli_schema.py tests/dev/test_track_upstream.py \
+for approved in scripts/track_upstream.py scripts/cli_schema.py scripts/readme_compatibility.py tests/dev/test_track_upstream.py \
     scripts/release_prepare.py scripts/release_register.py tests/dev/test_release_helpers.py; do
     tar -xOzf "$work/dist/$asset" "termux-muscle-$fixture_version/$approved" > "$work/python-source"
     cmp "$work/python-source" "$source/$approved" || fail 'maintainer Python source omitted or changed'

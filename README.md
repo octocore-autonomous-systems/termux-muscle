@@ -113,18 +113,51 @@ Have a different phone, tablet, Android release or Termux build? The [compatibil
 
 ## Claude Code and models
 
-Project versions and Claude Code versions are separate. **0.19.0** moves the pin to **Claude Code 2.1.295**; **0.18.0** moved it to **2.1.294**; **0.17.0** moved it to **2.1.293**; **0.16.0** moved it to **2.1.292**; **0.15.0** moved it to **2.1.291**; **0.14.0** moved it to **2.1.289**; **0.13.0** moved it to **2.1.288**; **0.12.0** moved it to **2.1.287**; **0.11.0** moved it to **2.1.286**; **0.10.0** moved it to **2.1.285**; **0.8.0** moved it to **2.1.284** and **0.9.0** kept it; **0.4.0** moved it to 2.1.283 and **0.5.0** through **0.7.0** kept it; 0.1.0 through 0.3.2 all pinned 2.1.270; every release keeps musl **1.2.6-r2**. [compatibility.json](compatibility.json) is the machine-readable record; each published release includes matching notes and checksums. Its `pin_history` names every earlier pin with the project releases that accepted it and the report that did so, and `claude.pinned_since` names the release that first pinned the current version, so `termux-muscle versions --available` shows a formerly pinned version as such rather than as unverified. A newer pin does not add a model or an account entitlement: it only makes a client version available that upstream documents as the minimum for a given model.
+Termux Muscle and Claude Code have independent version numbers. Each Termux Muscle release selects a Claude Code client version.
 
-| Documented model | Model ID | Minimum Claude Code |
-| --- | --- | --- |
-| Fable 5.1 | `claude-fable-5-1` | 2.1.257 |
-| Fable 5 | `claude-fable-5` | 2.1.219 |
-| Opus 5.5 | `claude-opus-5-5` | 2.1.280 |
-| Opus 5 | `claude-opus-5` | 2.1.219 |
-| Sonnet 5.5 | `claude-sonnet-5-5` | 2.1.284 |
-| Sonnet 5 | `claude-sonnet-5` | 2.1.197 |
+| Termux Muscle version | Pinned Claude Code version |
+| --- | --- |
+| [0.1.0](docs/releases/0.1.0.md) | 2.1.270 |
+| [0.2.0](docs/releases/0.2.0.md) | 2.1.270 |
+| [0.3.0](docs/releases/0.3.0.md) | 2.1.270 |
+| [0.3.1](docs/releases/0.3.1.md) | 2.1.270 |
+| [0.3.2](docs/releases/0.3.2.md) | 2.1.270 |
+| [0.4.0](docs/releases/0.4.0.md) | 2.1.283 |
+| [0.5.0](docs/releases/0.5.0.md) | 2.1.283 |
+| [0.5.1](docs/releases/0.5.1.md) | 2.1.283 |
+| [0.6.0](docs/releases/0.6.0.md) | 2.1.283 |
+| [0.7.0](docs/releases/0.7.0.md) | 2.1.283 |
+| [0.8.0](docs/releases/0.8.0.md) | 2.1.284 |
+| [0.9.0](docs/releases/0.9.0.md) | 2.1.284 |
+| [0.10.0](docs/releases/0.10.0.md) | 2.1.285 |
+| [0.11.0](docs/releases/0.11.0.md) | 2.1.286 |
+| [0.12.0](docs/releases/0.12.0.md) | 2.1.287 |
+| [0.13.0](docs/releases/0.13.0.md) | 2.1.288 |
+| [0.14.0](docs/releases/0.14.0.md) | 2.1.289 |
+| [0.15.0](docs/releases/0.15.0.md) | 2.1.291 |
+| [0.16.0](docs/releases/0.16.0.md) | 2.1.292 |
+| [0.17.0](docs/releases/0.17.0.md) | 2.1.293 |
+| [0.18.0](docs/releases/0.18.0.md) | 2.1.294 |
+| [0.19.0](docs/releases/0.19.0.md) | 2.1.295 |
 
-Model documentation was checked **2026-09-29** against [Anthropic's model configuration documentation](https://code.claude.com/docs/en/model-config). **Sonnet 5.5 requires client 2.1.284 or later, which is why 0.8.0 moves the pin; it is documented, not verified. Opus 5.5 passed exact authenticated tool acceptance with 0.19.0 on the 2.1.295 pin on 2026-10-08 UTC, with 0.18.0 on the 2.1.294 pin on 2026-10-08 UTC, with 0.17.0 on the 2.1.293 pin on 2026-10-07 UTC, with 0.16.0 on the 2.1.292 pin on 2026-10-06 UTC, with 0.15.0 on the 2.1.291 pin on 2026-10-06 UTC, with 0.14.0 on the 2.1.289 pin on 2026-10-04 UTC, with 0.13.0 on the 2.1.288 pin and 0.12.0 on the 2.1.287 pin on 2026-10-02 UTC, with 0.11.0 on the 2.1.286 pin on 2026-09-30 UTC, and with 0.10.0 on the 2.1.285 pin and 0.9.0 and 0.8.0 on the 2.1.284 pin on 2026-09-29 UTC.** **Opus 5.5 requires client 2.1.280 or later, which is why 0.4.0 moved the pin. Opus 5.5 passed exact authenticated tool acceptance with 0.7.0, 0.6.0, 0.5.1, 0.5.0 and 0.4.0 on 2026-09-27 UTC.** **Sonnet 5 passed exact authenticated tool acceptance with 0.3.2, 0.3.1 and 0.3.0 on 2026-09-24 UTC, and with 0.2.0 on 2026-09-15 UTC.** The dated **0.1.0** report separately retains Opus 5/Sonnet 5 PASS results and a direct Fable 5.1 response with automated upstream fallback/refusal; those observations remain visible in the [historical report](compatibility/galaxy-s26-ultra-20260914.md#model-observations). Opus and Fable were not newly verified for 0.3.2. Availability depends on your account, provider and organization policy; no Opus 5.1 identifier was established by the evidence.
+The [compatibility manifest](compatibility.json) records the current pin and pin history; `termux-muscle versions --available` identifies formerly pinned clients. The musl loader remains **1.2.6-r2**.
+
+Model minimums describe client requirements. The Termux Muscle minimum is derived from the earliest release whose pin meets that requirement; it does not establish the model's introduction date or device verification. **—** means no listed release meets the requirement.
+
+| Model | Model ID | Claude Code min. version | Termux Muscle min. version |
+| --- | --- | --- | --- |
+| Sonnet 5 | `claude-sonnet-5` | 2.1.197 | [0.1.0](docs/releases/0.1.0.md) |
+| Fable 5 | `claude-fable-5` | 2.1.219 | [0.1.0](docs/releases/0.1.0.md) |
+| Opus 5 | `claude-opus-5` | 2.1.219 | [0.1.0](docs/releases/0.1.0.md) |
+| Fable 5.1 | `claude-fable-5-1` | 2.1.257 | [0.1.0](docs/releases/0.1.0.md) |
+| Opus 5.5 | `claude-opus-5-5` | 2.1.280 | [0.4.0](docs/releases/0.4.0.md) |
+| Sonnet 5.5 | `claude-sonnet-5-5` | 2.1.284 | [0.8.0](docs/releases/0.8.0.md) |
+
+Model requirements were documented on **2026-09-29** against [Anthropic's model configuration documentation](https://code.claude.com/docs/en/model-config). Availability depends on your account, provider and organization policy; a newer client does not grant model access.
+
+**Opus 5.5** passed authenticated tool acceptance with Termux Muscle **0.19.0** and Claude Code **2.1.295** on **2026-10-08** ([scoped report](compatibility/galaxy-s26-ultra-0.19.0-20261008.md)). Other listed models are not verified by that report.
+
+Earlier measurements, including mixed Fable observations, retain their dated scope in the [device compatibility reports](docs/device-compatibility.md).
 
 ## Help build something dependable
 
