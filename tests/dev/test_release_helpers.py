@@ -2,7 +2,7 @@
 """Offline regressions for the maintainer release helpers; no network, account, or vendor code.
 
 They replay the next pin move on a copy of this tree, so an edit that removes an anchor the
-helpers rely on (README banner, device matrix row, footnote, model sentence, changelog heading)
+helpers rely on (README banner/tables, device matrix row, footnote, changelog heading)
 fails here instead of during a release.
 """
 import json
@@ -41,7 +41,7 @@ class ReleaseHelpers(unittest.TestCase):
             shutil.copy2(ROOT / name, self.tree / name)
         (self.tree / "docs/man").mkdir(parents=True)
         shutil.copy2(ROOT / "docs/man/termux-muscle.1", self.tree / "docs/man/termux-muscle.1")
-        (self.tree / "docs/releases").mkdir()
+        shutil.copytree(ROOT / "docs/releases", self.tree / "docs/releases")
         (self.tree / "compatibility").mkdir()
         self.old_report = self.manifest["reports"][0]
         shutil.copy2(ROOT / self.old_report, self.tree / self.old_report)
@@ -106,6 +106,9 @@ class ReleaseHelpers(unittest.TestCase):
         self.assertIn("is a fixture release.", note)
         self.assertIn("acceptance is pending", note)
         self.assertEqual(self.git("status", "--porcelain", "--", "compatibility").strip(), "")
+        self.assertIn(f"| [{self.new_version}](docs/releases/{self.new_version}.md) | {self.new_claude} |", self.read("README.md"))
+        self.assertIn(f"Model acceptance for **{self.new_version}** is pending", self.read("README.md"))
+        self.assertEqual(self.helper("readme_compatibility.py", "--check").returncode, 0)
 
         head = self.commit("prepared")
         report = json.loads(self.read(self.old_report))
@@ -152,8 +155,9 @@ class ReleaseHelpers(unittest.TestCase):
             relative = f"../{base}.{suffix}"
             self.assertIn(f"]({relative})", rows[0])
             self.assertTrue((self.tree / "docs" / relative).is_file())
-        self.assertIn(f"acceptance with {self.new_version} on the {self.new_claude} pin on 2030-01-02 UTC, with ",
-                      readme)
+        self.assertIn(f"| [{self.new_version}](docs/releases/{self.new_version}.md) | {self.new_claude} |", readme)
+        self.assertIn(f"authenticated tool acceptance with Termux Muscle **{self.new_version}**", readme)
+        self.assertEqual(self.helper("readme_compatibility.py", "--check").returncode, 0)
         for name in ("CHANGELOG.md", f"docs/releases/{self.new_version}.md", "README.md"):
             self.assertNotIn("acceptance is pending", self.read(name))
             self.assertNotIn("for this release is pending", self.read(name))

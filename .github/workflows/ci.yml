@@ -73,7 +73,10 @@ jobs:
         run: python3 -B -m unittest discover -s tests/dev -p 'test_track_upstream.py' -v
       - name: Test maintainer release helpers offline
         if: matrix.compiler == 'gcc'
-        run: python3 -B -m unittest discover -s tests/dev -p 'test_release_helpers.py' -v
+        run: |
+          python3 -B scripts/readme_compatibility.py --check
+          python3 -B -m unittest discover -s tests/dev -p 'test_release_helpers.py' -v
+          python3 -B -m unittest discover -s tests/dev -p 'test_readme_compatibility.py' -v
       - name: Run offline unit and regression tests
         run: make check
       - name: Build source assets twice and verify reproducibility
