@@ -8,7 +8,7 @@
 
 An independent community project from [Octocore Autonomous Systems](https://github.com/octocore-autonomous-systems) (OAS). **Not affiliated with, endorsed by, sponsored by, or authorized by Anthropic.** Claude and Claude Code are Anthropic products; your use of them remains subject to Anthropic's terms and account access.
 
-> **0.20.0 prepares the Claude Code 2.1.296 pin** on Android **ARM64 / aarch64**. Fresh device and authenticated tool acceptance is pending; earlier release reports retain their original scope.
+> **0.20.0 pins Claude Code 2.1.296** on Android **ARM64 / aarch64** and preserves 2.1.295 as formerly pinned by 0.19.0. Private source installation, startup, update, rollback, removal and an authenticated **Opus 5.5** tool workflow passed on **Samsung Galaxy S26 Ultra, Android 17, Termux 0.118.3 (GitHub)**. See the scoped [0.20.0 report](compatibility/galaxy-s26-ultra-0.20.0-20261009.md); other configurations need volunteer evidence.
 
 [Install](#install) · [Commands](#everyday-use) · [Device matrix](docs/device-compatibility.md) · [Troubleshooting](docs/troubleshooting.md) · [Contribute](CONTRIBUTING.md)
 
@@ -156,7 +156,7 @@ Model minimums describe client requirements. The Termux Muscle minimum is derive
 
 Model requirements were documented on **2026-09-29** against [Anthropic's model configuration documentation](https://code.claude.com/docs/en/model-config). Availability depends on your account, provider and organization policy; a newer client does not grant model access.
 
-Model acceptance for **0.20.0** is pending; the tables do not assert verification for this release.
+**Opus 5.5** passed authenticated tool acceptance with Termux Muscle **0.20.0** and Claude Code **2.1.296** on **2026-10-09** ([scoped report](compatibility/galaxy-s26-ultra-0.20.0-20261009.md)). Other listed models are not verified by that report.
 
 Earlier measurements, including mixed Fable observations, retain their dated scope in the [device compatibility reports](docs/device-compatibility.md).
 
