@@ -19,7 +19,7 @@ its exact version, `project_versions.first` and `.last` (the project releases th
 `verified_on` and the `report` of the last of those releases, which must be a maintainer report
 passing every required lifecycle check. Set `claude.pinned_since` to the new project version. The
 release gate refuses a manifest whose history leaves any `docs/releases/X.Y.Z.md` older than
-`pinned_since` uncovered, so a moved pin cannot silently drop a verified version. Make supplies the C helper version from `VERSION`. Add the versioned `CHANGELOG.md` entry. Update README's device matrix only from reviewed evidence. A newer upstream model announcement is not an authenticated compatibility result.
+`pinned_since` uncovered, so a moved pin cannot silently drop a verified version. Make supplies the C helper version from `VERSION`. Add the versioned `CHANGELOG.md` entry. Update the [device compatibility matrix](device-compatibility.md) only from reviewed evidence. A newer upstream model announcement is not an authenticated compatibility result.
 
 ## Build and verify
 
@@ -45,7 +45,7 @@ review every diff they produce.
 | --- | --- | --- |
 | Validate the candidate | `bash scripts/release_validate.sh X OUT` | Installs Claude Code X through the unverified-version path, runs `doctor` and one authenticated model test, and matches the cached npm archive and extracted executable to the registry and install receipt. Prints the two digests. |
 | Prepare | `python3 -B scripts/release_prepare.py P X INTEGRITY BINARY_SHA256 WHY_FILE` | Writes the version, installer, manual, manifest (including `pin_history`), changelog, release note and README edits for a release whose device evidence is still pending. |
-| Register | `python3 -B scripts/release_register.py` | After `make check` and `scripts/maintainer_acceptance.sh` pass from the clean preparation commit, renames the report, writes its notes and fills the manifest, README, changelog and release note from the report. |
+| Register | `python3 -B scripts/release_register.py` | After `make check` and `scripts/maintainer_acceptance.sh` pass from the clean preparation commit, renames the report, writes its notes and fills the manifest, README, device compatibility matrix, changelog and release note from the report. |
 | Verify publication | `bash scripts/release_public_verify.sh P LOCAL_SHA256SUMS OUT` | Compares the public assets with the local build and runs the public installer in a disposable root, proving the live installation unchanged. |
 | Upgrade the device | `bash scripts/release_live_upgrade.sh P X OUT` | Runs `self-update`, re-registers X as the project pin, and records versions and `doctor`. |
 
@@ -55,7 +55,7 @@ probes and the cross-UID fixture; edit those sentences when either is untrue. Th
 in `WHY_FILE` is always written by hand from the upstream release notes.
 
 `python3 -B -m unittest discover -s tests/dev -p 'test_release_helpers.py' -v` replays the next
-pin move on a copy of the tree. It fails when an edit removes a README, changelog or manifest
+pin move on a copy of the tree. It fails when an edit removes a README, device matrix, changelog or manifest
 anchor the helpers depend on.
 
 ## Publish

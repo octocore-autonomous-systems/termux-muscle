@@ -697,7 +697,7 @@ static void render_notes(json_object *manifest, json_object *models) {
         fputc('\n', stdout);
     }
     fputs(
-        "\nSee the README capability matrix and CHANGELOG at this source tag for configurations, PASS/FAIL/SKIP outcomes and known limitations. A passing version probe does not certify tool workflows or every Android device.\n\nIndependent OAS community project. Not affiliated with, endorsed by, sponsored by, or authorized by Anthropic.\n",
+        "\nSee the docs/device-compatibility.md capability matrix and CHANGELOG at this source tag for configurations, PASS/FAIL/SKIP outcomes and known limitations. A passing version probe does not certify tool workflows or every Android device.\n\nIndependent OAS community project. Not affiliated with, endorsed by, sponsored by, or authorized by Anthropic.\n",
         stdout);
 }
 int tm_release_main(int argc, char **argv) {

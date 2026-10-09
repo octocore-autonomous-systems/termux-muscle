@@ -10,7 +10,7 @@ An independent community project from [Octocore Autonomous Systems](https://gith
 
 > **0.19.0 pins Claude Code 2.1.295** on Android **ARM64 / aarch64** and preserves 2.1.294 as formerly pinned by 0.18.0. Private source installation, startup, update, rollback, removal and an authenticated **Opus 5.5** tool workflow passed on **Samsung Galaxy S26 Ultra, Android 17, Termux 0.118.3 (GitHub)**. See the scoped [0.19.0 report](compatibility/galaxy-s26-ultra-0.19.0-20261008.md); other configurations need volunteer evidence.
 
-[Install](#install) · [Commands](#everyday-use) · [Device matrix](#device-compatibility) · [Troubleshooting](docs/troubleshooting.md) · [Contribute](CONTRIBUTING.md)
+[Install](#install) · [Commands](#everyday-use) · [Device matrix](docs/device-compatibility.md) · [Troubleshooting](docs/troubleshooting.md) · [Contribute](CONTRIBUTING.md)
 
 ## Why this exists
 
@@ -107,84 +107,9 @@ failure visibility and scheduling limits.
 
 ## Device compatibility
 
-A configuration is **device + Android/API + Termux build**, with ABI, kernel, page size and dependency versions in its report. Android version affects available system interfaces; hardware and vendor firmware can change the kernel and process behavior. Neither dimension alone proves compatibility.
+See the [device compatibility matrix](docs/device-compatibility.md) for tested device, Android/API and Termux configurations, per-check results, evidence reports and limitations. **PASS** means the named check passed; **FAIL** means it failed; **SKIP** means untested.
 
-The capability matrix grows only when someone supplies a report. **PASS** means that named check passed; **FAIL** means it failed; **SKIP** means untested. A maintainer report is distinguished from a community report.
-
-| Tested configuration | Install | Start | Shell namespace | Claude tools | Manual | Update | Rollback | Removal | Evidence |
-| --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | --- |
-| **0.19.0, 2026-10-08 UTC** · Samsung Galaxy S26 Ultra · SM-S948U · Android 17 / API 37 · Termux 0.118.3 (GitHub) | PASS²¹ | PASS | PASS | PASS | — | PASS | PASS | PASS | [Maintainer report](compatibility/galaxy-s26-ultra-0.19.0-20261008.md) · [JSON](compatibility/galaxy-s26-ultra-0.19.0-20261008.json) |
-| **0.18.0, 2026-10-08 UTC** · Samsung Galaxy S26 Ultra · SM-S948U · Android 17 / API 37 · Termux 0.118.3 (GitHub) | PASS²⁰ | PASS | PASS | PASS | — | PASS | PASS | PASS | [Maintainer report](compatibility/galaxy-s26-ultra-0.18.0-20261008.md) · [JSON](compatibility/galaxy-s26-ultra-0.18.0-20261008.json) |
-| **0.17.0, 2026-10-07 UTC** · Samsung Galaxy S26 Ultra · SM-S948U · Android 17 / API 37 · Termux 0.118.3 (GitHub) | PASS¹⁹ | PASS | PASS | PASS | — | PASS | PASS | PASS | [Maintainer report](compatibility/galaxy-s26-ultra-0.17.0-20261007.md) · [JSON](compatibility/galaxy-s26-ultra-0.17.0-20261007.json) |
-| **0.16.0, 2026-10-06 UTC** · Samsung Galaxy S26 Ultra · SM-S948U · Android 17 / API 37 · Termux 0.118.3 (GitHub) | PASS¹⁸ | PASS | PASS | PASS | — | PASS | PASS | PASS | [Maintainer report](compatibility/galaxy-s26-ultra-0.16.0-20261006.md) · [JSON](compatibility/galaxy-s26-ultra-0.16.0-20261006.json) |
-| **0.15.0, 2026-10-06 UTC** · Samsung Galaxy S26 Ultra · SM-S948U · Android 17 / API 37 · Termux 0.118.3 (GitHub) | PASS¹⁷ | PASS | PASS | PASS | — | PASS | PASS | PASS | [Maintainer report](compatibility/galaxy-s26-ultra-0.15.0-20261006.md) · [JSON](compatibility/galaxy-s26-ultra-0.15.0-20261006.json) |
-| **0.14.0, 2026-10-04 UTC** · Samsung Galaxy S26 Ultra · SM-S948U · Android 17 / API 37 · Termux 0.118.3 (GitHub) | PASS¹⁶ | PASS | PASS | PASS | — | PASS | PASS | PASS | [Maintainer report](compatibility/galaxy-s26-ultra-0.14.0-20261004.md) · [JSON](compatibility/galaxy-s26-ultra-0.14.0-20261004.json) |
-| **0.13.0, 2026-10-02 UTC** · Samsung Galaxy S26 Ultra · SM-S948U · Android 17 / API 37 · Termux 0.118.3 (GitHub) | PASS¹⁵ | PASS | PASS | PASS | — | PASS | PASS | PASS | [Maintainer report](compatibility/galaxy-s26-ultra-0.13.0-20261002.md) · [JSON](compatibility/galaxy-s26-ultra-0.13.0-20261002.json) |
-| **0.12.0, 2026-10-02 UTC** · Samsung Galaxy S26 Ultra · SM-S948U · Android 17 / API 37 · Termux 0.118.3 (GitHub) | PASS¹⁴ | PASS | PASS | PASS | — | PASS | PASS | PASS | [Maintainer report](compatibility/galaxy-s26-ultra-0.12.0-20261002.md) · [JSON](compatibility/galaxy-s26-ultra-0.12.0-20261002.json) |
-| **0.11.0, 2026-09-30 UTC** · Samsung Galaxy S26 Ultra · SM-S948U · Android 16 / API 36 · Termux 0.118.3 (GitHub) | PASS¹³ | PASS | PASS | PASS | — | PASS | PASS | PASS | [Maintainer report](compatibility/galaxy-s26-ultra-0.11.0-20260930.md) · [JSON](compatibility/galaxy-s26-ultra-0.11.0-20260930.json) |
-| **0.10.0, 2026-09-29 UTC** · Samsung Galaxy S26 Ultra · SM-S948U · Android 16 / API 36 · Termux 0.118.3 (GitHub) | PASS¹² | PASS | PASS | PASS | — | PASS | PASS | PASS | [Maintainer report](compatibility/galaxy-s26-ultra-0.10.0-20260929.md) · [JSON](compatibility/galaxy-s26-ultra-0.10.0-20260929.json) |
-| **0.9.0, 2026-09-29 UTC** · Samsung Galaxy S26 Ultra · SM-S948U · Android 16 / API 36 · Termux 0.118.3 (GitHub) | PASS¹¹ | PASS | PASS | PASS | — | PASS | PASS | PASS | [Maintainer report](compatibility/galaxy-s26-ultra-0.9.0-20260929.md) · [JSON](compatibility/galaxy-s26-ultra-0.9.0-20260929.json) |
-| **0.8.0, 2026-09-29 UTC** · Samsung Galaxy S26 Ultra · SM-S948U · Android 16 / API 36 · Termux 0.118.3 (GitHub) | PASS¹⁰ | PASS | PASS | PASS | — | PASS | PASS | PASS | [Maintainer report](compatibility/galaxy-s26-ultra-0.8.0-20260929.md) · [JSON](compatibility/galaxy-s26-ultra-0.8.0-20260929.json) |
-| **0.7.0, 2026-09-27 UTC** · Samsung Galaxy S26 Ultra · SM-S948U · Android 16 / API 36 · Termux 0.118.3 (GitHub) | PASS⁹ | PASS | PASS | PASS | — | PASS | PASS | PASS | [Maintainer report](compatibility/galaxy-s26-ultra-0.7.0-20260927.md) · [JSON](compatibility/galaxy-s26-ultra-0.7.0-20260927.json) |
-| **0.6.0, 2026-09-27 UTC** · Samsung Galaxy S26 Ultra · SM-S948U · Android 16 / API 36 · Termux 0.118.3 (GitHub) | PASS⁸ | PASS | PASS | PASS | — | PASS | PASS | PASS | [Maintainer report](compatibility/galaxy-s26-ultra-0.6.0-20260927.md) · [JSON](compatibility/galaxy-s26-ultra-0.6.0-20260927.json) |
-| **0.5.1, 2026-09-27 UTC** · Samsung Galaxy S26 Ultra · SM-S948U · Android 16 / API 36 · Termux 0.118.3 (GitHub) | PASS⁷ | PASS | PASS | PASS | — | PASS | PASS | PASS | [Maintainer report](compatibility/galaxy-s26-ultra-0.5.1-20260927.md) · [JSON](compatibility/galaxy-s26-ultra-0.5.1-20260927.json) |
-| **0.5.0, 2026-09-27 UTC** · Samsung Galaxy S26 Ultra · SM-S948U · Android 16 / API 36 · Termux 0.118.3 (GitHub) | PASS⁶ | PASS | PASS | PASS | — | PASS | PASS | PASS | [Maintainer report](compatibility/galaxy-s26-ultra-0.5.0-20260927.md) · [JSON](compatibility/galaxy-s26-ultra-0.5.0-20260927.json) |
-| **0.4.0, 2026-09-27 UTC** · Samsung Galaxy S26 Ultra · SM-S948U · Android 16 / API 36 · Termux 0.118.3 (GitHub) | PASS⁵ | PASS | PASS | PASS | — | PASS | PASS | PASS | [Maintainer report](compatibility/galaxy-s26-ultra-0.4.0-20260927.md) · [JSON](compatibility/galaxy-s26-ultra-0.4.0-20260927.json) |
-| **0.3.2, 2026-09-24 UTC** · Samsung Galaxy S26 Ultra · SM-S948U · Android 16 / API 36 · Termux 0.118.3 (GitHub) | PASS⁴ | PASS | PASS | PASS | — | PASS | PASS | PASS | [Maintainer report](compatibility/galaxy-s26-ultra-0.3.2-20260924.md) · [JSON](compatibility/galaxy-s26-ultra-0.3.2-20260924.json) |
-| **0.3.1, 2026-09-24 UTC** · Samsung Galaxy S26 Ultra · SM-S948U · Android 16 / API 36 · Termux 0.118.3 (GitHub) | PASS³ | PASS | PASS | PASS | — | PASS | PASS | PASS | [Maintainer report](compatibility/galaxy-s26-ultra-0.3.1-20260924.md) · [JSON](compatibility/galaxy-s26-ultra-0.3.1-20260924.json) |
-| **0.3.0, 2026-09-24 UTC** · Samsung Galaxy S26 Ultra · SM-S948U · Android 16 / API 36 · Termux 0.118.3 (GitHub) | PASS² | PASS | PASS | PASS | — | PASS | PASS | PASS | [Maintainer report](compatibility/galaxy-s26-ultra-0.3.0-20260924.md) · [JSON](compatibility/galaxy-s26-ultra-0.3.0-20260924.json) |
-| **0.2.0, 2026-09-15 UTC** · Samsung Galaxy S26 Ultra · SM-S948U · Android 16 / API 36 · Termux 0.118.3 (GitHub) | PASS¹ | PASS | PASS | PASS | PASS | PASS | PASS | PASS | [Maintainer report](compatibility/galaxy-s26-ultra-0.2.0-20260915.md) · [JSON](compatibility/galaxy-s26-ultra-0.2.0-20260915.json) |
-| **0.1.0, 2026-09-14** · Samsung Galaxy S26 Ultra · SM-S948U · Android 16 / API 36 · Termux 0.118.3 (GitHub) | PASS | PASS | PASS | PASS | — | PASS | PASS | PASS | [Historical report](compatibility/galaxy-s26-ultra-20260914.md) · [JSON](compatibility/galaxy-s26-ultra-20260914.json) |
-
-²¹ Version 0.19.0 moves the pin to Claude Code 2.1.295 and retains 2.1.294 in pin history. All 15 test programs passed in a native Termux shell; optional host probes and the unavailable cross-UID executable fixture were skipped as detailed in the report. Acceptance ran from a clean checkout and verified Opus 5.5 on the new pin, with the live installation unchanged. Command takeover, indexed manual discovery and public HTTPS delivery were not retested.
-
-²⁰ Version 0.18.0 moves the pin to Claude Code 2.1.294 and retains 2.1.293 in pin history. All 15 test programs passed in a native Termux shell; optional host probes and the unavailable cross-UID executable fixture were skipped as detailed in the report. Acceptance ran from a clean checkout and verified Opus 5.5 on the new pin, with the live installation unchanged. Command takeover, indexed manual discovery and public HTTPS delivery were not retested.
-
-¹⁹ Version 0.17.0 moves the pin to Claude Code 2.1.293 and retains 2.1.292 in pin history. All 15 test programs passed in a native Termux shell; optional host probes and the unavailable cross-UID executable fixture were skipped as detailed in the report. Acceptance ran from a clean checkout and verified Opus 5.5 on the new pin, with the live installation unchanged. Command takeover, indexed manual discovery and public HTTPS delivery were not retested.
-
-¹⁸ Version 0.16.0 moves the pin to Claude Code 2.1.292 and retains 2.1.291 in pin history. All 15 test programs passed in a native Termux shell; optional host probes and the unavailable cross-UID executable fixture were skipped as detailed in the report. Acceptance ran from a clean checkout and verified Opus 5.5 on the new pin, with the live installation unchanged. Command takeover, indexed manual discovery and public HTTPS delivery were not retested.
-
-¹⁷ Version 0.15.0 moves the pin to Claude Code 2.1.291 and retains 2.1.289 in pin history. All 15 test programs passed in a native Termux shell; optional host probes and the unavailable cross-UID executable fixture were skipped as detailed in the report. Acceptance ran from a clean checkout and verified Opus 5.5 on the new pin, with the live installation unchanged. Command takeover, indexed manual discovery and public HTTPS delivery were not retested.
-
-¹⁶ Version 0.14.0 moves the pin to Claude Code 2.1.289 and retains 2.1.288 in pin history. All 15 test programs passed in a native Termux shell; optional host probes and the unavailable cross-UID executable fixture were skipped as detailed in the report. Acceptance ran from a clean checkout and verified Opus 5.5 on the new pin, with the live installation unchanged. Command takeover, indexed manual discovery and public HTTPS delivery were not retested.
-
-¹⁵ Version 0.13.0 moves the pin to Claude Code 2.1.288 and retains 2.1.287 in pin history. All 15 test programs passed in a native Termux shell; optional host probes and the unavailable cross-UID executable fixture were skipped as detailed in the report. Acceptance ran from a clean checkout and verified Opus 5.5 on the new pin, with the live installation unchanged. Command takeover, indexed manual discovery and public HTTPS delivery were not retested.
-
-¹⁴ Version 0.12.0 moves the pin to Claude Code 2.1.287 and retains 2.1.286 in pin history. It is the first acceptance on Android 17 / API 37. All 15 test programs passed in a native Termux shell; optional host probes and the unavailable cross-UID executable fixture were skipped as detailed in the report. Acceptance ran from a clean checkout and verified Opus 5.5 on the new pin, with the live installation unchanged. Command takeover, indexed manual discovery and public HTTPS delivery were not retested.
-
-¹³ Version 0.11.0 moves the pin to Claude Code 2.1.286 and retains 2.1.285 in pin history. All 15 test programs passed in a native Termux shell; optional host probes and the unavailable cross-UID executable fixture were skipped as detailed in the report. Acceptance ran from a clean checkout and verified Opus 5.5 on the new pin, with the live installation unchanged. Command takeover, indexed manual discovery and public HTTPS delivery were not retested.
-
-¹² Version 0.10.0 moves the pin to Claude Code 2.1.285 and retains 2.1.284 in pin history. All 15 test programs passed in a native Termux shell; optional host probes and the unavailable cross-UID executable fixture were skipped as detailed in the report. Acceptance ran from a clean checkout and verified Opus 5.5 on the new pin, with the live installation unchanged. Command takeover, indexed manual discovery and public HTTPS delivery were not retested.
-
-¹¹ Version 0.9.0 keeps the 2.1.284 pin and carries the Claude Code pin history in `compatibility.json`, with a release-gate guard for moved pins and formerly pinned labels in `versions --available`. Its `make check` passed in a native Termux shell, and acceptance ran `scripts/maintainer_acceptance.sh` from a clean checkout of the tested commit and verified Opus 5.5 again. Command takeover, indexed manual discovery and public HTTPS delivery were not retested.
-
-¹⁰ Version 0.8.0 moves the pin to Claude Code 2.1.284 and documents Sonnet 5.5. Its `make check` passed in a native Termux shell, and acceptance ran `scripts/maintainer_acceptance.sh` from a clean checkout of the tested commit and verified Opus 5.5 on the new pin. Command takeover, indexed manual discovery and public HTTPS delivery were not retested.
-
-⁹ Version 0.7.0 groups the command help, adds `help COMMAND`, an active Claude Code line in `--version` and `versions --available`. Its `make check` passed in a native Termux shell, and acceptance ran `scripts/maintainer_acceptance.sh` from a clean checkout of the tested commit and verified Opus 5.5 again. Command takeover, indexed manual discovery and public HTTPS delivery were not retested.
-
-⁸ Version 0.6.0 adds live self-update progress on a terminal. Its `make check` ran under a simulated quiet self-update with the live test status on a real terminal, and acceptance ran `scripts/maintainer_acceptance.sh` from a clean checkout of the tested commit and verified Opus 5.5 again. Command takeover, indexed manual discovery and public HTTPS delivery were not retested.
-
-⁷ Version 0.5.1 fixes quiet and JSON `self-update` from 0.5.0, which failed during tests. Its `make check` also ran under a simulated quiet self-update, and acceptance ran `scripts/maintainer_acceptance.sh` from a clean checkout of the tested commit and verified Opus 5.5 again. Command takeover, indexed manual discovery and public HTTPS delivery were not retested.
-
-⁶ Version 0.5.0 keeps the 2.1.283 pin and adds quiet self-update, `--verbose`, `--json` and Bash completion. Its acceptance ran `scripts/maintainer_acceptance.sh` from a clean checkout of the tested commit, with a private root and `--no-link`, and verified Opus 5.5 again with an exact authenticated Bash-tool fixture. Command takeover, indexed manual discovery and public HTTPS delivery were not retested; the quiet self-update output is checked after publication.
-
-⁵ Version 0.4.0 moves the pin to Claude Code 2.1.283. Its acceptance ran `scripts/maintainer_acceptance.sh` from a clean checkout of the tested commit, with a private root and `--no-link`, and verified Opus 5.5 with an exact authenticated Bash-tool fixture. Command takeover, indexed manual discovery and public HTTPS delivery were not retested.
-
-⁴ Version 0.3.2 verifies the distinct self-update exit statuses in addition to private source lifecycle acceptance. Public installer delivery is checked after publication.
-
-³ Version 0.3.1 corrects the installer test helper selection when self-updating from an older manager. The 0.3.0 self-update from 0.2.0 stopped before installation because its migration test selected the old helper. The published 0.3.0 files are preserved.
-
-² The fresh **0.3.0** source installation used a private root and `--no-link`. It passed a separate authenticated Sonnet 5 shell-tool fixture. Command takeover, indexed manual discovery and public HTTPS delivery were not retested for 0.3.0.
-
-¹ The fresh **0.2.0** installation result covers the real native source bootstrap with private command/manual destinations and verified original vendor archives. It does not claim public HTTPS delivery. Its local namespace probe passed; a separate authenticated Sonnet 5 fixture also passed actual Bash tool execution, native shell, portable shebang, ripgrep and nested launcher checks. The indexed manual installed, refreshed and was removed correctly; 0.1.0 did not ship this manual. Reports include exact Claude Code, loader, compiler, C libraries, PRoot, Bash, ripgrep and package versions, including `mandoc` for 0.2.0. See [testing](docs/testing.md) for each check's scope. Background/screen-off behavior and actual MCP tool calls remain untested; the older report records the vendor's default cross-session messaging UID-mapping failure.
-
-**Have a different phone, tablet, Android release or Termux version? Please help test.** We especially need other manufacturers, Android/kernel releases, 4 KiB and 16 KiB page-size devices, and different Termux distributions/builds.
-
-```sh
-termux-muscle test --output report.json
-```
-
-Review the local JSON, then [open a Device compatibility issue](https://github.com/octocore-autonomous-systems/termux-muscle/issues/new?template=device-compatibility.yml) and attach or paste it. Nothing is uploaded automatically. The report uses an allowlist of platform details and check results; do not add tokens, complete environment dumps or private session logs. No account is needed for the default checks. An explicit `--model MODEL_ID` test uses your authenticated account and may incur usage.
+Have a different phone, tablet, Android release or Termux build? The [compatibility guide](docs/device-compatibility.md) explains how to submit a local report.
 
 ## Claude Code and models
 
