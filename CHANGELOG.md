@@ -1,5 +1,16 @@
 # Changes
 
+## 0.21.0
+
+- **Updates follow Anthropic's release channel.** `termux-muscle update` (and `claude update`) installs the version Anthropic's `latest` channel names; `--claude-version stable`, `pinned` or `X.Y.Z` chooses otherwise. A release other than the pin is admitted only when Anthropic's detached signature on its `manifest.json` verifies against the release key built into the manager and the executable has the SHA-256 that manifest signs; `--allow-unverified` is the only way past that. A channel never replaces the active release with an older one. A new Claude Code version no longer needs a Termux Muscle release.
+- **Claude Code runs without PRoot by default.** The new native backend prepares a release once, at installation: it sets the executable's loader path, configures a private copy of the musl loader and installs a small resolver object. Claude Code and the commands it runs are then ordinary, untraced Termux processes. Measured through the Bash tool on the reference device, 300 process starts take 3.1 s against 10.0 s under PRoot, and `git status` 26 ms against 120 ms. The PRoot backend is unchanged and selectable per release with `--backend proot`; `versions` shows each release's backend. Three differences are documented: hooks run through Android's `/bin/sh`, a script started without a shell cannot use a `/usr/bin/env` shebang, and `/tmp` is not writable.
+- **The source cache is pruned.** `update` and `cleanup` remove cached archives that neither the pin nor a retained release refers to. Earlier versions kept every archive they ever downloaded.
+- The pin stays at Claude Code **2.1.296**, now as the device-tested baseline, and `claude.pinned_since` stays **0.20.0**. Musl stays at **1.2.6-r2**; `musl.native_loader_sha256` pins the configured loader.
+- `gpgv` and `patchelf` become prerequisites, and the installer adds them. Device reports record the backend and both package versions.
+- Removed: the scheduled upstream tracker and the pin-only release helpers (`release_validate.sh`, `release_prepare.py`, `release_register.py`). `release_live_upgrade.sh` now follows the channel, and `tm-core native-loader-sha256` names the digest to pin for a loader.
+
+Fresh device and authenticated tool acceptance for this release is pending.
+
 ## 0.20.0
 
 - Move the default pin from Claude Code **2.1.295** to **2.1.296**, the current upstream release. Record the official ARM64 musl npm tarball, its registry SHA-512 integrity and the extracted executable SHA-256, independently checked against the downloaded archive. The vendor payload is unmodified; musl stays at **1.2.6-r2**.
