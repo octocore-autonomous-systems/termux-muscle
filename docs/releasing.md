@@ -4,7 +4,7 @@ Project releases use [Semantic Versioning](https://semver.org/), independently o
 
 ## When to release
 
-Release when Termux Muscle itself changes. A new Claude Code version is not a reason: installations follow Anthropic's release channel and admit each version on Anthropic's signature, so `termux-muscle update` reaches it without us. From 0.8.0 to 0.20.0 the project cut a release for every upstream build, thirteen in eleven days, none of which changed the harness; that practice ended with channel-following updates.
+Release when Termux Muscle itself changes. A new Claude Code version is not a reason: installations follow Anthropic's release channel and admit each version on Anthropic's signature, so `termux-muscle update` reaches it without us. From 0.8.0 to 0.20.0 the project released thirteen times in eleven days. Twelve of those releases existed to move the pin to a new Claude Code version (0.9.0 added pin history), and the nine from 0.12.0 on state that no harness code changed. That practice ended with channel-following updates.
 
 Each release still names one Claude Code version as its pin: the version its device acceptance ran against, installable offline and with `--claude-version pinned`. Move the pin to the current upstream release when cutting a release for another reason, so the tested baseline stays close to what installations run. A release that only moves the pin is worth cutting in two cases: an upstream change breaks installation or startup and needs a harness fix anyway, or the pin has aged so far that a fresh installation with `--claude-version pinned` is no longer useful.
 
