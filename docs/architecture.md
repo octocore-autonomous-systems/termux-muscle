@@ -12,6 +12,18 @@ Pinning an old JavaScript client restored startup but prevented use of required 
 
 The downloader accepts the official ARM64 musl package, validates archive integrity and ELF requirements, and extracts only selected members into an owned candidate. Selected members must be regular files at their expected archive paths; duplicate or unsafe selected entries are rejected. Unselected archive entries are skipped, including Alpine's libc symlink. Decoded archive data remains bounded even for skipped entries. The Alpine loader has separately pinned archive and loader digests. Cached archives are verified again before reuse. No downloaded npm lifecycle script runs.
 
+### Which release is installed
+
+`install` and `update` follow Anthropic's release channel unless a version is named: `latest` by default, `stable` on request. The channel file only names a version and authenticates nothing. For any version other than the project pin, the manager downloads that release's `manifest.json` and its detached signature from Anthropic's release bucket, and `gpgv` verifies the signature against Anthropic's release signing key. That key and its fingerprint are compiled into the helper (`src/release_key.h`), so no key is fetched at install time. The manifest lists the SHA-256 of every platform executable, and the executable extracted from the npm package must equal its `linux-arm64-musl` entry.
+
+The verdict comes from `gpgv`'s machine-readable status, read strictly: exactly one good signature, made by the built-in key, over a binary document, with a successful exit. The same key also signs inline documents such as Anthropic's package indexes, so the helper first requires the signature file to be a bare signature packet; a signed document offered in its place is refused whatever the installed `gpgv` would make of it. A good signature from any other key, a damaged signature, a manifest for a different version and an executable with a different digest all leave the current release selected. The receipt of an accepted release records `compatibility_status: signed`, the manifest's SHA-256 and the key fingerprint, and `repair` rebuilds it from that receipt. The project pin needs no signature at install time, because its digests ship in the verified source release. `--allow-unverified` skips the signature for one explicit request and labels the receipt `unverified`.
+
+A channel moves an installation forward only. When it names a release older than the active one, nothing changes; an older release has to be named exactly. If Anthropic replaces its signing key, signed installs fail closed until a Termux Muscle release carries the new key; the pin and `--allow-unverified` remain available meanwhile.
+
+Source archives stay in the cache for the project pin and for every retained release, so those rebuild offline. `update` and `cleanup` remove archives that nothing retained refers to.
+
+### Launch
+
 The runtime keeps the executable and loader bytes unchanged. PRoot maps only the needed paths:
 
 | Process-visible path | Source |

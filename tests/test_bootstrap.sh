@@ -42,12 +42,12 @@ case "${0##*/}" in
         mkdir -p "$source/build"
         printf '#!/bin/sh\nexit 0\n' > "$source/build/tm-core"
         chmod +x "$source/build/tm-core";;
-    proot|rg|cc|man) :;;
+    proot|rg|gpgv|cc|man) :;;
     *) exit 99;;
 esac
 MOCK
 chmod +x "$work/mock"
-for tool in uname getprop pkg-config curl pkg make proot rg cc man; do ln -s "$work/mock" "$mock_bin/$tool"; done
+for tool in uname getprop pkg-config curl pkg make proot rg gpgv cc man; do ln -s "$work/mock" "$mock_bin/$tool"; done
 fixture="$work/fixture/termux-muscle-0.1.0"
 mkdir -p "$fixture/bin" "$fixture/src"
 mkdir -p "$fixture/.githooks"

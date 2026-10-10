@@ -59,10 +59,17 @@ tm_probe_candidate() (
     fi
     "$TM_CORE" state "$TM_ROOT" validate "$id" "$release/candidate-acceptance.json"
 )
+# Source archives nothing retained refers to are removed; the project pin and
+# every retained release keep theirs for offline repair. The helper reports
+# what it removed on stderr.
+tm_prune_cache() {
+    "$TM_CORE" acquire-prune "$TM_ROOT" "$TM_SOURCE/compatibility.json" "$@" >/dev/null
+}
 tm_install_release() (
     set -euo pipefail
     local operation=$1; shift
-    local selector=pinned policy=pinned offline=false no_link=false arg manifest=$TM_SOURCE/compatibility.json
+    local selector='' policy=signed offline=false no_link=false arg manifest=$TM_SOURCE/compatibility.json
+    local channel='' active='' newest
     while (($#)); do
         arg=$1; shift
         case $arg in
@@ -82,6 +89,34 @@ tm_install_release() (
         selector=pinned
         policy=allow-unverified
     fi
+    # Without a version, follow Anthropic's release channel. Offline work can
+    # only rebuild from the verified cache, so it stays with the project pin.
+    if [[ -z $selector ]]; then
+        if [[ $offline == true ]]; then selector=pinned; else selector=latest; fi
+    fi
+    case $selector in
+        latest|stable)
+            [[ $offline == false ]] ||
+                tm_error offline_unavailable "Reading the $selector channel needs the network; name a version or use --claude-version pinned."
+            channel=$selector
+            selector=$(tm_channel_version "$channel")
+            if [[ $operation == update ]] && active=$("$TM_CORE" state "$TM_ROOT" current 2>/dev/null); then
+                active=${active%%-*}
+                if [[ $active == "$selector" ]]; then
+                    printf 'Claude Code %s is active and current (%s channel).\n' "$active" "$channel"
+                    return 0
+                fi
+                # A channel never moves an installation backwards: an older
+                # version has to be named explicitly.
+                newest=$(printf '%s\n%s\n' "$active" "$selector" | LC_ALL=C sort -V | tail -n 1)
+                if [[ $newest != "$selector" ]]; then
+                    printf 'The %s channel names Claude Code %s, which is older than the active %s. Nothing was changed.\n' "$channel" "$selector" "$active"
+                    printf 'To install it anyway: termux-muscle update --claude-version %s\n' "$selector"
+                    return 0
+                fi
+            fi
+            ;;
+    esac
     local work id version
     work=$(mktemp -d "$TM_ROOT/cache/.lifecycle.XXXXXXXX")
     trap 'rm -rf -- "$work"' EXIT
@@ -93,13 +128,13 @@ tm_install_release() (
     "$TM_CORE" context "$TM_ROOT" "$TM_PREFIX" "$id"
     tm_probe_candidate "$id" "$version"
     "$TM_CORE" state "$TM_ROOT" activate "$id"
-    if [[ $("$TM_CORE" json-get "$TM_ROOT/releases/$id/payload.json" compatibility_status) == pinned ]]; then
-        printf 'Claude Code %s is active (project pin).\n' "$version"
-    else
-        printf 'Claude Code %s is active (unverified upstream version; local startup checks passed).\n' "$version"
-    fi
+    case $("$TM_CORE" json-get "$TM_ROOT/releases/$id/payload.json" compatibility_status) in
+        pinned) printf 'Claude Code %s is active (project pin).\n' "$version" ;;
+        signed) printf "Claude Code %s is active (verified by Anthropic's release signature; local startup checks passed).\n" "$version" ;;
+        *) printf 'Claude Code %s is active (unverified upstream version; local startup checks passed).\n' "$version" ;;
+    esac
     if [[ $operation == install && $no_link == false ]]; then tm_default_claude_links; fi
-    if ! "$TM_CORE" state "$TM_ROOT" cleanup 2 >/dev/null; then
+    if ! "$TM_CORE" state "$TM_ROOT" cleanup 2 >/dev/null || ! tm_prune_cache; then
         printf '%s\n' 'Claude Code is active, but old-release cleanup needs attention. Run termux-muscle cleanup.' >&2
     fi
 )
@@ -127,6 +162,7 @@ tm_locked() {
                 esac
             done
             "$TM_CORE" state "$TM_ROOT" cleanup "$keep" "${dry[@]}"
+            tm_prune_cache "${dry[@]}"
             ;;
         link)
             local path=$TM_PREFIX/bin/claude replace=()

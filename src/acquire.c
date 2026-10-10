@@ -1,8 +1,10 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "tm.h"
+#include "release_key.h"
 #include <archive.h>
 #include <archive_entry.h>
 #include <ctype.h>
+#include <dirent.h>
 #include <elf.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -16,11 +18,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #define PACKAGE "@anthropic-ai/claude-code-linux-arm64-musl"
 #define REGISTRY "https://registry.npmjs.org/"
 #define ALPINE "https://dl-cdn.alpinelinux.org/alpine/"
+#define RELEASES "https://downloads.claude.ai/claude-code-releases/"
+#define PLATFORM "linux-arm64-musl"
+#define MAX_SIGNATURE_STATUS 16384U
 #define INTERPRETER "/lib/ld-musl-aarch64.so.1"
 #define LIBC "libc.musl-aarch64.so.1"
 #define MAX_ARCHIVE (384ULL * 1024 * 1024)
@@ -82,6 +88,7 @@ static json_object *claude_source(json_object *source, bool require_binary) {
     const char *url = tm_json_string(source, "tarball");
     const char *integrity = tm_json_string(source, "integrity");
     const char *hash = tm_json_optional_string(source, "binary_sha256");
+    const char *signed_manifest = tm_json_optional_string(source, "signed_manifest_sha256");
     char *expected = tarball_url(version), decoded[129];
     if (strcmp(package, PACKAGE) || strcmp(url, expected))
         tm_die("invalid_source",
@@ -90,6 +97,8 @@ static json_object *claude_source(json_object *source, bool require_binary) {
     sri_hex(integrity, decoded);
     if ((hash && !tm_hex_valid(hash, 64)) || (require_binary && !hash))
         tm_die("invalid_integrity", "The project pin needs a valid original-binary SHA-256.");
+    if (signed_manifest && (!hash || !tm_hex_valid(signed_manifest, 64)))
+        tm_die("invalid_integrity", "A signed release needs its manifest and executable digests.");
     json_object *out = json_object_new_object();
     add_string(out, "version", version);
     add_string(out, "package", package);
@@ -97,6 +106,10 @@ static json_object *claude_source(json_object *source, bool require_binary) {
     add_string(out, "integrity", integrity);
     if (hash)
         add_string(out, "binary_sha256", hash);
+    if (signed_manifest) {
+        add_string(out, "signed_manifest_sha256", signed_manifest);
+        add_string(out, "signing_key", TM_RELEASE_KEY_FINGERPRINT);
+    }
     return out;
 }
 static json_object *musl_source(json_object *source) {
@@ -130,7 +143,8 @@ static json_object *musl_source(json_object *source) {
 }
 static bool source_unverified(json_object *manifest) {
     const char *status = tm_json_optional_string(manifest, "compatibility_status");
-    if (status && strcmp(status, "pinned") && strcmp(status, "unverified"))
+    if (status && strcmp(status, "pinned") && strcmp(status, "signed") &&
+        strcmp(status, "unverified"))
         tm_die("invalid_metadata", "Unknown compatibility status in the source receipt.");
     json_object *verified;
     bool flagged = false;
@@ -174,6 +188,8 @@ static json_object *ready_plan(json_object *manifest) {
         tm_die("invalid_metadata",
                "Resolve source metadata before verifying or extracting artifacts.");
     bool unverified = source_unverified(manifest);
+    const char *label = tm_json_optional_string(manifest, "compatibility_status");
+    bool by_signature = label && !strcmp(label, "signed");
     json_object *out = json_object_new_object();
     json_object_object_add(out, "schema", json_object_new_int(1));
     add_string(out, "status", "ready");
@@ -183,17 +199,175 @@ static json_object *ready_plan(json_object *manifest) {
     json_object_object_add(out, "claude", claude);
     json_object_object_add(out, "musl",
                            musl_source(tm_json_field(manifest, "musl", json_type_object)));
+    if (by_signature != (tm_json_optional_string(claude, "signed_manifest_sha256") != NULL))
+        tm_die("invalid_metadata",
+               "A release is signed exactly when it records Anthropic's signed manifest.");
     add_string(out, "version", tm_json_string(claude, "version"));
-    add_string(out, "compatibility_status", unverified ? "unverified" : "pinned");
+    add_string(out, "compatibility_status",
+               unverified     ? "unverified"
+               : by_signature ? "signed"
+                              : "pinned");
     json_object_object_add(out, "verified", json_object_new_boolean(!unverified));
     add_downloads(out);
     return out;
 }
+/* The release key also signs inline documents such as package indexes. A
+ * detached signature starts with a signature packet (OpenPGP tag 2), bare or
+ * inside "PGP SIGNATURE" armor; a signed document offered in its place does
+ * not, and is refused here whatever the installed gpgv would make of it. */
+static bool detached_signature(const char *path) {
+    static const char armor[] = "-----BEGIN PGP SIGNATURE-----";
+    size_t size;
+    char *text = tm_read_file(path, 65536, &size);
+    unsigned char first = size ? (unsigned char)text[0] : 0, decoded[4];
+    if (size >= sizeof armor && !memcmp(text, armor, sizeof armor - 1)) {
+        /* Armor headers end at the first empty line; base64 packets follow. */
+        const char *body = strstr(text, "\n\n"), *wide = strstr(text, "\r\n\r\n");
+        body = body && (!wide || body < wide) ? body + 2 : wide ? wide + 4 : "";
+        first = strlen(body) >= 4 && EVP_DecodeBlock(decoded, (const unsigned char *)body, 4) == 3
+                    ? decoded[0]
+                    : 0;
+    }
+    free(text);
+    return first == 0x88 || first == 0x89 || first == 0x8a || first == 0xc2;
+}
+/* Anthropic signs each release's manifest.json, and the manifest names the
+ * SHA-256 of every platform executable. gpgv checks the detached signature
+ * against the built-in release key alone, so a good signature from any other
+ * key, an expired or revoked key and a damaged signature are all rejected. */
+static void verify_signature(const char *manifest, const char *signature) {
+    tm_regular(manifest);
+    tm_regular(signature);
+    if (!detached_signature(signature))
+        tm_die(
+            "signature_invalid",
+            "The release signature is not a detached signature; the existing runtime was preserved.");
+    char *home = tm_strdup(signature), *slash = strrchr(home, '/');
+    if (!slash || slash == home)
+        tm_die("unsafe_path", "Signature files need a private working directory.");
+    *slash = 0;
+    char *key = tm_alloc(strlen(signature) + 5);
+    snprintf(key, strlen(signature) + 5, "%s.key", signature);
+    int fd = open(key, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
+    if (fd < 0)
+        tm_die("unsafe_path", "Cannot stage the release key in the working directory.");
+    tm_write_all(fd, tm_release_key, sizeof tm_release_key);
+    if (close(fd))
+        tm_die("unsafe_path", "Cannot stage the release key in the working directory.");
+    int output[2];
+    if (pipe2(output, O_CLOEXEC))
+        tm_die("signature_failed", "Cannot start signature verification.");
+    pid_t child = fork();
+    if (child < 0)
+        tm_die("signature_failed", "Cannot start signature verification.");
+    if (!child) {
+        int null = open("/dev/null", O_RDWR | O_CLOEXEC);
+        if (null < 0 || dup2(null, 0) < 0 || dup2(output[1], 1) < 0 || dup2(null, 2) < 0)
+            _exit(126);
+        char *arguments[] = {"gpgv",
+                             "--homedir",
+                             home,
+                             "--keyring",
+                             key,
+                             "--status-fd",
+                             "1",
+                             (char *)signature,
+                             (char *)manifest,
+                             NULL};
+        execvp(arguments[0], arguments);
+        _exit(127);
+    }
+    close(output[1]);
+    char status[MAX_SIGNATURE_STATUS + 1];
+    size_t used = 0;
+    bool rejected = false;
+    for (;;) {
+        ssize_t n = read(output[0], status + used, MAX_SIGNATURE_STATUS - used);
+        if (n < 0 && errno == EINTR)
+            continue;
+        if (n <= 0)
+            break;
+        used += (size_t)n;
+        if (used == MAX_SIGNATURE_STATUS) {
+            rejected = true; /* Never judge a truncated verification report. */
+            break;
+        }
+    }
+    close(output[0]);
+    int code = 0;
+    while (waitpid(child, &code, 0) < 0)
+        if (errno != EINTR)
+            tm_die("signature_failed", "Cannot finish signature verification.");
+    unlink(key);
+    free(key);
+    free(home);
+    if (WIFEXITED(code) && WEXITSTATUS(code) == 127)
+        tm_die("prerequisites", "Signature verification needs gpgv (Termux package: gpgv).");
+    rejected = rejected || !WIFEXITED(code) || WEXITSTATUS(code) != 0;
+    status[used] = 0;
+    unsigned int good = 0, valid = 0;
+    char *save = NULL;
+    for (char *line = strtok_r(status, "\n", &save); line; line = strtok_r(NULL, "\n", &save)) {
+        if (strncmp(line, "[GNUPG:] ", 9))
+            continue;
+        char *word = line + 9;
+        if (!strncmp(word, "GOODSIG ", 8))
+            good++;
+        else if (!strncmp(word, "VALIDSIG ", 9)) {
+            /* The last field names the primary key that owns the signing key;
+             * the one before it is the signature class, 00 for a signature
+             * over a binary document such as the manifest. */
+            char *primary = strrchr(word, ' ');
+            if (strcmp(primary + 1, TM_RELEASE_KEY_FINGERPRINT))
+                rejected = true;
+            *primary = 0;
+            const char *class = strrchr(word, ' ');
+            if (!class || strcmp(class + 1, "00"))
+                rejected = true;
+            valid++;
+        } else if (!strncmp(word, "BADSIG ", 7) || !strncmp(word, "ERRSIG ", 7) ||
+                   !strncmp(word, "EXPSIG ", 7) || !strncmp(word, "EXPKEYSIG ", 10) ||
+                   !strncmp(word, "REVKEYSIG ", 10) || !strncmp(word, "NO_PUBKEY ", 10))
+            rejected = true;
+    }
+    if (rejected || good != 1 || valid != 1)
+        tm_die("signature_invalid",
+               "Anthropic's release signature did not verify; the existing runtime was preserved.");
+}
+/* Verify a release manifest and return the executable digest it signs. The
+ * manifest is compared before and after verification so the bytes parsed are
+ * the bytes gpgv accepted. */
+static void signed_digest(const char *manifest, const char *signature, const char *version,
+                          char digest[65], char manifest_hash[65]) {
+    size_t size, again_size;
+    char *text = tm_read_file(manifest, TM_METADATA_MAX, &size);
+    verify_signature(manifest, signature);
+    char *again = tm_read_file(manifest, TM_METADATA_MAX, &again_size);
+    if (size != again_size || memcmp(text, again, size))
+        tm_die("signature_invalid", "The release manifest changed during verification.");
+    free(again);
+    tm_sha256(manifest, manifest_hash);
+    json_object *parsed = tm_json_parse(text, size);
+    free(text);
+    if (!json_object_is_type(parsed, json_type_object) ||
+        strcmp(tm_json_string(parsed, "version"), version))
+        tm_die("invalid_metadata",
+               "The signed manifest describes a different Claude Code version.");
+    json_object *platform = tm_json_field(tm_json_field(parsed, "platforms", json_type_object),
+                                          PLATFORM, json_type_object);
+    const char *checksum = tm_json_string(platform, "checksum");
+    if (strcmp(tm_json_string(platform, "binary"), "claude") || !tm_hex_valid(checksum, 64))
+        tm_die("invalid_metadata",
+               "The signed manifest has no usable Linux ARM64 musl executable digest.");
+    memcpy(digest, checksum, 65);
+    json_object_put(parsed);
+}
 static json_object *make_plan(const char *path, const char *selector, const char *policy,
-                              const char *metadata_path) {
-    bool allow = !strcmp(policy, "allow-unverified");
-    if (!allow && strcmp(policy, "pinned"))
-        tm_die("invalid_policy", "Use pinned or allow-unverified acquisition policy.");
+                              const char *metadata_path, const char *signed_manifest,
+                              const char *signature) {
+    bool allow = !strcmp(policy, "allow-unverified"), by_signature = !strcmp(policy, "signed");
+    if (!allow && !by_signature && strcmp(policy, "pinned"))
+        tm_die("invalid_policy", "Use pinned, signed or allow-unverified acquisition policy.");
     json_object *manifest = tm_json_read(path), *plan = ready_plan(manifest);
     if (source_unverified(plan) && !allow)
         tm_die("unverified_version",
@@ -205,9 +379,12 @@ static json_object *make_plan(const char *path, const char *selector, const char
     }
     if (strcmp(selector, "latest") && !tm_version_valid(selector))
         tm_die("invalid_version", "Use pinned, latest, or an exact X.Y.Z version.");
-    if (!allow)
+    if (!allow && !by_signature)
         tm_die("unverified_version",
                "Explicitly allow an unverified release before selecting another version.");
+    /* A signature covers one exact version, so a channel name is resolved first. */
+    if (by_signature && !tm_version_valid(selector))
+        tm_die("invalid_version", "A signed release needs an exact X.Y.Z version.");
     if (!metadata_path) {
         json_object *pending = json_object_new_object();
         char url[256];
@@ -217,6 +394,12 @@ static json_object *make_plan(const char *path, const char *selector, const char
         add_string(pending, "status", "metadata_required");
         add_string(pending, "metadata_url", url);
         add_string(pending, "selector", selector);
+        if (by_signature) {
+            snprintf(url, sizeof url, RELEASES "%s/manifest.json", selector);
+            add_string(pending, "manifest_url", url);
+            snprintf(url, sizeof url, RELEASES "%s/manifest.json.sig", selector);
+            add_string(pending, "signature_url", url);
+        }
         json_object_put(plan);
         json_object_put(manifest);
         return pending;
@@ -236,12 +419,20 @@ static json_object *make_plan(const char *path, const char *selector, const char
     add_string(source, "package", PACKAGE);
     add_string(source, "tarball", tm_json_string(dist, "tarball"));
     add_string(source, "integrity", tm_json_string(dist, "integrity"));
+    if (by_signature) {
+        if (!signed_manifest || !signature)
+            tm_die("invalid_arguments", "A signed release needs its manifest and signature.");
+        char digest[65], manifest_hash[65];
+        signed_digest(signed_manifest, signature, version, digest, manifest_hash);
+        add_string(source, "binary_sha256", digest);
+        add_string(source, "signed_manifest_sha256", manifest_hash);
+    }
     json_object *validated = claude_source(source, false);
     if (strcmp(version, pinned)) {
         json_object_object_add(plan, "claude", validated);
         add_string(plan, "version", version);
-        add_string(plan, "compatibility_status", "unverified");
-        json_object_object_add(plan, "verified", json_object_new_boolean(false));
+        add_string(plan, "compatibility_status", by_signature ? "signed" : "unverified");
+        json_object_object_add(plan, "verified", json_object_new_boolean(by_signature));
         add_downloads(plan);
     } else
         json_object_put(validated); /* Keep the stronger original pin, not mutable metadata. */
@@ -664,6 +855,10 @@ static void print_field(const char *path, const char *field) {
             puts("metadata_required");
         else if (!strcmp(field, "metadata-url"))
             printf(REGISTRY "@anthropic-ai%%2fclaude-code-linux-arm64-musl/%s\n", selector);
+        else if (!strcmp(field, "manifest-url") && tm_version_valid(selector))
+            printf(RELEASES "%s/manifest.json\n", selector);
+        else if (!strcmp(field, "signature-url") && tm_version_valid(selector))
+            printf(RELEASES "%s/manifest.json.sig\n", selector);
         else
             tm_die("invalid_arguments", "A version must be resolved before reading source fields.");
     } else {
@@ -959,8 +1154,10 @@ static void list_available(const char *manifest_path, const char *metadata_path,
                    registry_count);
         puts("\nThe pinned release passed acceptance with this Termux Muscle version; a formerly\n"
              "pinned release passed with the Termux Muscle releases shown. Every other version\n"
-             "is unverified. To install any version other than the pin:\n"
-             "  termux-muscle update --claude-version X.Y.Z --allow-unverified");
+             "is unverified by this project and is installed only when Anthropic's release\n"
+             "signature verifies:\n"
+             "  termux-muscle update                          newest release (latest channel)\n"
+             "  termux-muscle update --claude-version X.Y.Z   one exact release");
     }
     for (size_t i = 0; i < count; i++)
         json_object_put(list[i].tags);
@@ -971,11 +1168,112 @@ static void list_available(const char *manifest_path, const char *metadata_path,
     json_object_put(metadata);
     json_object_put(manifest);
 }
+/* The cache names each source archive by its digest, so a receipt's recorded
+ * digests say which archives can rebuild that release offline. Returns false
+ * when a receipt does not record them; the caller then removes nothing. */
+static bool keep_sources(json_object *keep, const char *path) {
+    json_object *receipt = tm_json_read(path), *claude, *musl;
+    bool known = false;
+    if (json_object_object_get_ex(receipt, "claude", &claude) &&
+        json_object_is_type(claude, json_type_object) &&
+        json_object_object_get_ex(receipt, "musl", &musl) &&
+        json_object_is_type(musl, json_type_object)) {
+        const char *integrity = tm_json_optional_string(claude, "integrity"),
+                   *archive = tm_json_optional_string(musl, "sha256");
+        unsigned char bytes[68];
+        if (integrity && matches(integrity, "^sha512-[A-Za-z0-9+/]{86}==$") && archive &&
+            tm_hex_valid(archive, 64) &&
+            EVP_DecodeBlock(bytes, (const unsigned char *)integrity + 7, 88) == 66) {
+            char key[160] = "sha512-";
+            for (size_t i = 0; i < 64; i++)
+                snprintf(key + 7 + i * 2, 3, "%02x", bytes[i]);
+            strcat(key, ".archive");
+            json_object_object_add(keep, key, json_object_new_boolean(true));
+            snprintf(key, sizeof key, "sha256-%s.archive", archive);
+            json_object_object_add(keep, key, json_object_new_boolean(true));
+            known = true;
+        }
+    }
+    json_object_put(receipt);
+    return known;
+}
+/* Every installed version once left its source archive in the cache for good.
+ * Keep the archives of the project pin and of each retained release, so those
+ * still rebuild offline, and remove the rest. Links, foreign files and
+ * anything not named like a cache entry are never touched. */
+static void prune_cache(const char *root_argument, const char *manifest, bool dry_run) {
+    char *root = tm_store_root(root_argument);
+    tm_store_require_lock(root);
+    json_object *keep = json_object_new_object(), *state = tm_store_state(root),
+                *removed = json_object_new_array();
+    bool complete = keep_sources(keep, manifest);
+    json_object *history = tm_json_field(state, "history", json_type_array);
+    for (size_t i = 0; complete && i < json_object_array_length(history); i++) {
+        char *release = tm_store_release(
+                 root, json_object_get_string(json_object_array_get_idx(history, i))),
+             *receipt = tm_path(release, "payload.json");
+        complete = keep_sources(keep, receipt);
+        free(receipt);
+        free(release);
+    }
+    char *cache = tm_path(root, "cache");
+    int fd = complete ? open(cache, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC) : -1;
+    DIR *dir = fd >= 0 ? fdopendir(fd) : NULL;
+    int64_t bytes = 0;
+    struct dirent *entry;
+    while (dir && (entry = readdir(dir))) {
+        struct stat st;
+        if (!matches(entry->d_name, "^sha(256|512)-[0-9a-f]+\\.archive$") ||
+            json_object_object_get_ex(keep, entry->d_name, NULL) ||
+            fstatat(fd, entry->d_name, &st, AT_SYMLINK_NOFOLLOW) || !S_ISREG(st.st_mode) ||
+            st.st_uid != getuid())
+            continue;
+        if (!dry_run && unlinkat(fd, entry->d_name, 0))
+            tm_die("cleanup_failed", "Cannot remove an unused source archive.");
+        json_object_array_add(removed, json_object_new_string(entry->d_name));
+        bytes += (int64_t)st.st_size;
+    }
+    if (dir)
+        closedir(dir);
+    else if (fd >= 0)
+        close(fd);
+    if (json_object_array_length(removed))
+        fprintf(stderr, "%s %zu unused source archive(s), %lld MiB.\n",
+                dry_run ? "Would remove" : "Removed", json_object_array_length(removed),
+                (long long)(bytes / (1024 * 1024)));
+    json_object *result = json_object_new_object();
+    json_object_object_add(result, "complete", json_object_new_boolean(complete));
+    json_object_object_add(result, "count",
+                           json_object_new_int64((int64_t)json_object_array_length(removed)));
+    json_object_object_add(result, "bytes", json_object_new_int64(bytes));
+    json_object_object_add(result, "removed", removed);
+    tm_json_print(result);
+    json_object_put(result);
+    json_object_put(keep);
+    json_object_put(state);
+    free(cache);
+    free(root);
+}
 int tm_acquire_main(int argc, char **argv) {
-    if (!strcmp(argv[0], "acquire-plan") && (argc == 4 || argc == 5)) {
-        json_object *plan = make_plan(argv[1], argv[2], argv[3], argc == 5 ? argv[4] : NULL);
+    if (!strcmp(argv[0], "acquire-plan") && (argc == 4 || argc == 5 || argc == 7)) {
+        json_object *plan = make_plan(argv[1], argv[2], argv[3], argc >= 5 ? argv[4] : NULL,
+                                      argc == 7 ? argv[5] : NULL, argc == 7 ? argv[6] : NULL);
         tm_json_print(plan);
         json_object_put(plan);
+        return 0;
+    }
+    /* The channel pointer only names a version. Nothing is installed on its
+     * word alone: the named version still needs Anthropic's signature. */
+    if (!strcmp(argv[0], "acquire-channel") && argc == 2) {
+        if (strcmp(argv[1], "latest") && strcmp(argv[1], "stable"))
+            tm_die("invalid_channel", "Choose the latest or stable release channel.");
+        printf(RELEASES "%s\n", argv[1]);
+        return 0;
+    }
+    if (!strcmp(argv[0], "acquire-prune") && (argc == 3 || argc == 4)) {
+        if (argc == 4 && strcmp(argv[3], "--dry-run"))
+            tm_die("invalid_arguments", "Unknown cache cleanup argument.");
+        prune_cache(argv[1], argv[2], argc == 4);
         return 0;
     }
     if (!strcmp(argv[0], "acquire-available") && argc == 6) {

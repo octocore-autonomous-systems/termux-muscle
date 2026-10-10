@@ -75,10 +75,10 @@ _termux_muscle_complete() {
         help/--prefix) kind=directory ;;
         install/--root) kind=directory ;;
         install/--prefix) kind=directory ;;
-        install/--claude-version) kind=latest ;;
+        install/--claude-version) kind=selector ;;
         update/--root) kind=directory ;;
         update/--prefix) kind=directory ;;
-        update/--claude-version) kind=latest ;;
+        update/--claude-version) kind=selector ;;
         rollback/--root) kind=directory ;;
         rollback/--prefix) kind=directory ;;
         repair/--root) kind=directory ;;
@@ -109,7 +109,7 @@ _termux_muscle_complete() {
     case $kind in
         directory) mapfile -t COMPREPLY < <(compgen -d -- "$current"); return 0 ;;
         file) mapfile -t COMPREPLY < <(compgen -f -- "$current"); return 0 ;;
-        latest) mapfile -t COMPREPLY < <(compgen -W latest -- "$current"); return 0 ;;
+        selector) mapfile -t COMPREPLY < <(compgen -W 'latest stable pinned' -- "$current"); return 0 ;;
         none) return 0 ;;
     esac
     if [[ -z $command ]]; then

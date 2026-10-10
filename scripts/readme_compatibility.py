@@ -60,7 +60,7 @@ def render_section(root):
     releases = release_pins(root, manifest)
     models = model_minimums(manifest, releases)
     lines = [START.rstrip(), "",
-             "Termux Muscle and Claude Code have independent version numbers. Each Termux Muscle release selects a Claude Code client version.",
+             "Termux Muscle and Claude Code have independent version numbers. Each Termux Muscle release is device-tested with one Claude Code version, its pin; `termux-muscle update` moves beyond the pin to any release Anthropic has signed.",
              "", "| Termux Muscle version | Pinned Claude Code version |", "| --- | --- |"]
     for version, pin in releases:
         lines.append(f"| [{version}](docs/releases/{version}.md) | {pin} |")

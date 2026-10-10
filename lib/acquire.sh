@@ -40,12 +40,41 @@ tm_acquire_plan() (
         fi
         tm_url=$("$TM_CORE" acquire-field "$tm_plan_work/plan.json" metadata-url) || exit 1
         tm_acquire_download "$tm_url" "$tm_plan_work/metadata.json" 1048576 || exit 1
-        "$TM_CORE" acquire-plan "$tm_manifest" "$tm_selector" "$tm_policy" "$tm_plan_work/metadata.json" > "$tm_plan_work/resolved.json" || exit 1
+        if [[ $tm_policy == signed ]]; then
+            # Anthropic's signed manifest names the executable's SHA-256. The
+            # helper verifies the signature before it reads that digest.
+            tm_url=$("$TM_CORE" acquire-field "$tm_plan_work/plan.json" manifest-url) || exit 1
+            tm_acquire_download "$tm_url" "$tm_plan_work/manifest.json" 1048576 || exit 1
+            tm_url=$("$TM_CORE" acquire-field "$tm_plan_work/plan.json" signature-url) || exit 1
+            tm_acquire_download "$tm_url" "$tm_plan_work/manifest.json.sig" 65536 || exit 1
+            "$TM_CORE" acquire-plan "$tm_manifest" "$tm_selector" "$tm_policy" "$tm_plan_work/metadata.json" \
+                "$tm_plan_work/manifest.json" "$tm_plan_work/manifest.json.sig" > "$tm_plan_work/resolved.json" || exit 1
+        else
+            "$TM_CORE" acquire-plan "$tm_manifest" "$tm_selector" "$tm_policy" "$tm_plan_work/metadata.json" > "$tm_plan_work/resolved.json" || exit 1
+        fi
         mv -fT -- "$tm_plan_work/resolved.json" "$tm_plan_work/plan.json" || exit 1
     fi
     [[ $("$TM_CORE" acquire-field "$tm_plan_work/plan.json" status) == ready ]] || exit 1
     # noclobber rejects an output file created between the check and this write.
     (umask 077; set -o noclobber; cat -- "$tm_plan_work/plan.json" > "$tm_output")
+)
+
+# Print the exact version a release channel names. The channel file is a bare
+# version string; it selects a version and authenticates nothing.
+tm_channel_version() (
+    set -euo pipefail
+    [[ $# == 1 ]] || { printf '%s\n' 'termux-muscle: invalid_arguments: channel lookup needs one channel.' >&2; exit 1; }
+    local tm_url tm_channel_work tm_version=''
+    tm_url=$("$TM_CORE" acquire-channel "$1") || exit 1
+    tm_channel_work=$(mktemp -d "${TMPDIR:-/tmp}/termux-muscle-channel.XXXXXXXX") || exit 1
+    trap 'rm -rf -- "$tm_channel_work"' EXIT
+    tm_acquire_download "$tm_url" "$tm_channel_work/version" 64 || exit 1
+    IFS= read -r tm_version < "$tm_channel_work/version" || [[ -n $tm_version ]] || :
+    "$TM_CORE" version-check "$tm_version" 2>/dev/null || {
+        printf '%s\n' 'termux-muscle: invalid_channel: The release channel did not name an exact X.Y.Z version.' >&2
+        exit 1
+    }
+    printf '%s\n' "$tm_version"
 )
 
 tm_acquire() (

@@ -25,6 +25,8 @@ It does not compile or modify the Claude Code executable.
 .PP
 Runtime installation, update and repair verify source archives and selected
 files before testing a candidate's version and help output.
+A release other than the one this project version was tested with must also
+carry Anthropic's signature; see VERSION SELECTION.
 Only an accepted candidate becomes current.
 The previous release remains available for rollback, and running sessions
 hold leases that protect their files from cleanup.
@@ -97,12 +99,14 @@ Completion stops at
 whose following arguments belong to Claude Code.
 .TP
 .BR install " [" OPTIONS "]"
-Install the project's pinned Claude Code version.
+Install Claude Code: by default the release that Anthropic's latest channel
+names.
 If an owned installation already exists, prepare and validate a candidate
 before selecting it.
-The default pin and source digests come from the installed project's
+The project pin and its source digests come from the installed project's
 .I compatibility.json
-file.
+file; select it with
+.BR "\-\-claude-version pinned" .
 After activation, installation normally manages the Claude convenience entries,
 backing up an existing command before replacing it.
 .B \-\-no-link
@@ -138,9 +142,16 @@ Claude's unmanaged background updater is disabled for this backend.
 .BR update " [" OPTIONS "]"
 Prepare, verify and probe a runtime candidate before changing the active
 release.
-Without a version selector, use the project pin; this does not automatically
-select every new upstream release.
-A failed download or candidate probe leaves the current release selected.
+Without a version selector, follow Anthropic's latest release channel.
+When the active release is already the one the channel names, report that and
+change nothing.
+A channel never replaces the active release with an older one; name an older
+release exactly to install it.
+A failed download, signature check or candidate probe leaves the current
+release selected.
+The managed
+.B claude update
+runs this command.
 Update Termux Muscle itself with
 .BR self-update .
 .TP
@@ -153,7 +164,7 @@ release.
 .BR repair " [\-\-offline]"
 Rebuild the current runtime from its recorded original sources and digests,
 then validate and activate the replacement.
-Preserve its exact version and pinned/unverified provenance.
+Preserve its exact version and pinned, signed or unverified provenance.
 Repair does not silently select latest, change credentials or repair account
 access.
 Offline repair requires the necessary verified cached archives.
@@ -176,7 +187,7 @@ Each row is labelled
 (a version an earlier Termux Muscle release was accepted with; the label names
 the first and last such release, from the manifest's pin history) or
 .BR unverified
-(never accepted), and also
+(never accepted by this project), and also
 .B active
 or
 .B retained
@@ -195,10 +206,10 @@ field with its history entry or null, and the object carries the manifest's
 .B pin_history
 array.
 The listing reads one document from the official npm registry over HTTPS
-without following redirects; it downloads no archive, changes no state and
-does not relax the
-.B \-\-allow-unverified
-requirement for installing a version other than the pin.
+without following redirects; it downloads no archive and changes no state.
+The labels describe this project's device acceptance.
+Installing a listed release still requires Anthropic's signature on it,
+whatever its label.
 .TP
 .BR doctor " [\-\-output FILE]"
 Check local resolver configuration, managed link ownership, runtime integrity,
@@ -246,8 +257,10 @@ to run the managed runtime directly while investigating.
 Remove owned, inactive runtime releases outside the retention set.
 The default retention count is 2; N must be at least 2.
 Current, previous and leased releases remain protected.
+Then remove cached source archives that neither the project pin nor a
+retained release refers to; install and update do the same after activation.
 .B \-\-dry-run
-reports eligible release identifiers without deleting them.
+reports eligible release identifiers and archives without deleting them.
 This command does not remove account data or uninstall Termux packages.
 .TP
 .BR self-update " [\-\-version X.Y.Z] [\-f|\-\-force] [\-V|\-\-verbose] [\-\-json]"
@@ -316,30 +329,58 @@ The following options apply to
 and
 .BR update :
 .TP
-.BI \-\-claude-version " X.Y.Z|latest"
-Select an exact upstream release or resolve upstream latest.
-An exact project-pinned version retains pinned status.
-A different upstream selection requires
-.BR \-\-allow-unverified .
+.BI \-\-claude-version " X.Y.Z|latest|stable|pinned"
+Choose the Claude Code release.
+.B latest
+(the default) and
+.B stable
+read Anthropic's release channel at
+.IR https://downloads.claude.ai/claude-code-releases/ ;
+stable is Anthropic's delayed channel.
+.B pinned
+is the release this Termux Muscle version was device-tested with, and
+.I X.Y.Z
+names one exact release.
+.PP
+.RS
+A release other than the pin is installed only when two things hold.
+Anthropic's detached signature on that release's
+.I manifest.json
+must verify, with
+.BR gpgv (1),
+against Anthropic's release signing key, which is built into the manager
+with fingerprint 31DD DE24 DDFA B679 F42D 7BD2 BAA9 29FF 1A7E CACE.
+The executable extracted from the official ARM64 musl npm package must have
+the SHA-256 that manifest lists for linux-arm64-musl.
+Such a release is labelled
+.B signed
+in its receipt and in
+.BR versions .
+The channel file itself only names a version; it admits nothing.
+.RE
 .TP
 .B \-\-allow-unverified
-Explicitly permit an upstream runtime beyond this project's compatibility pin.
-Source integrity and local candidate startup checks still apply.
-The receipt and version display retain an unverified label.
-This flag does not establish full device/workflow compatibility or grant
-account/model access.
+Install the selected release without checking Anthropic's signature.
+The npm registry's archive integrity and the local candidate startup checks
+still apply.
+The receipt and version display keep an unverified label.
+This flag does not establish device or workflow compatibility or grant
+account or model access.
 .TP
 .B \-\-offline
 Use only verified cached artifacts.
 No missing metadata or archive is downloaded.
-It cannot resolve upstream latest without the required source information.
+Without a version selector it rebuilds the project pin; it cannot read a
+release channel.
 It is also accepted by
 .BR repair .
 .SH INSTALLATION AND MANUAL
 The versioned source installer obtains missing native Termux prerequisites
 with the Termux package manager, builds the helper and runs offline tests.
-It installs the management tool, normally installs the pinned runtime, and
-provides this manual page for
+It installs the management tool, normally installs the newest signed Claude
+Code release (the installer's
+.B \-\-claude-version
+option chooses another), and provides this manual page for
 .BR "man termux-muscle" .
 The Termux package supplying
 .B man
@@ -489,7 +530,8 @@ Owned executable, loader, receipt, runtime context and private temporary files.
 Recorded source identities, file hashes, version and compatibility provenance.
 .TP
 .I ROOT/cache/
-Content-addressed archives, reverified before reuse.
+Content-addressed source archives, reverified before reuse.
+Only the archives of the project pin and of retained releases are kept.
 .TP
 .I ROOT/tools/current
 Atomic symlink selecting the active management-tool directory.
@@ -558,7 +600,7 @@ Explicitly probe a model available to the account:
   termux-muscle test --model MODEL_ID --output model-report.json
 .fi
 .PP
-Maintain the pinned runtime and recover locally:
+Move to the newest Claude Code release and recover locally:
 .PP
 .nf
   termux-muscle update
@@ -574,10 +616,12 @@ See which Claude Code versions can be installed:
   termux-muscle versions --available --all
 .fi
 .PP
-Opt into testing a newer upstream version:
+Choose a particular Claude Code release:
 .PP
 .nf
-  termux-muscle update --claude-version latest --allow-unverified
+  termux-muscle update --claude-version stable
+  termux-muscle update --claude-version 2.1.295
+  termux-muscle update --claude-version pinned
 .fi
 .PP
 Upgrade the management tool separately:
@@ -616,6 +660,7 @@ MCP transports, hooks and authenticated tool workflows require separate tests.
 .BR man (1),
 .BR mandoc (1),
 .BR proot (1),
+.BR gpgv (1),
 .BR bash (1)
 .PP
 Project, device reports and issue templates:

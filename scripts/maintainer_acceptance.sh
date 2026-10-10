@@ -169,7 +169,8 @@ trap cleanup EXIT
 # ----------------------------------------------------------------- install
 say 'install: source bootstrap into a disposable root (--no-link)'
 installed=''
-if lifecycle bootstrap --source-dir "$SRC" --build-dir "$SRC/build" --no-link; then
+# Acceptance describes the project pin; an ordinary install follows the channel.
+if lifecycle bootstrap --source-dir "$SRC" --build-dir "$SRC/build" --no-link --claude-version pinned; then
     installed=$(state_field current)
     receipt=$root/releases/$installed/payload.json
     if [[ -n $installed && $(jq -r .version "$receipt") == "$pin" &&

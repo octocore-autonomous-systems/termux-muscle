@@ -35,9 +35,9 @@ GROUPS = (
 )
 SUMMARIES = {
     "help": "Show this overview, or 'help <command>' for one command",
-    "install": "Install the pinned Claude Code release and put claude on PATH",
+    "install": "Install Claude Code and put claude on PATH",
     "run": "Run Claude Code, passing all following arguments through",
-    "update": "Validate a newer Claude Code release, then switch to it",
+    "update": "Move to the newest Claude Code release once it passes local checks",
     "rollback": "Switch back to the previous validated release",
     "repair": "Rebuild the active release from verified original artifacts",
     "versions": "List installed releases; --available lists installable ones",
@@ -62,9 +62,9 @@ Global options:
 
 Common tasks:
   termux-muscle versions --available    what can I install?
-  termux-muscle update                  move to the current pinned release
-  termux-muscle update --claude-version latest --allow-unverified
-                                        try a release beyond the pin
+  termux-muscle update                  move to the newest Claude Code release
+  termux-muscle update --claude-version pinned
+                                        use the release this project tested
   termux-muscle rollback                undo the last update
   termux-muscle doctor                  something's wrong; start here
   termux-muscle self-update             upgrade the manager
@@ -75,9 +75,13 @@ Full manual: man termux-muscle
 Termux Muscle is an independent open-source project, not affiliated with or
 authorized by Anthropic."""
 SELECTION_EPILOG = (
-    "Without --claude-version, the project pin is used. Any other version, including "
-    "latest, also needs --allow-unverified. Run 'versions --available' to see "
-    "installable versions."
+    "Without --claude-version, the release named by Anthropic's latest channel is used "
+    "(the project pin with --offline). stable names Anthropic's delayed channel and "
+    "pinned the release this Termux Muscle version was tested with. A release other "
+    "than the pin is installed only when Anthropic's signature on its release manifest "
+    "verifies and the executable matches the signed SHA-256; --allow-unverified skips "
+    "that check. A channel never replaces the active release with an older one. Run "
+    "'versions --available' to see installable versions."
 )
 
 
@@ -120,26 +124,30 @@ def parser() -> tuple[argparse.ArgumentParser, dict[str, argparse.ArgumentParser
     p = command("help")
     p.add_argument("topic", nargs="?", metavar="COMMAND", help="show help for this command")
     p = command("install", SELECTION_EPILOG)
-    p.add_argument("--claude-version", metavar="X.Y.Z|latest", help="select an upstream version")
-    p.add_argument("--allow-unverified", action="store_true", help="permit a version beyond the project pin")
+    p.add_argument("--claude-version", metavar="X.Y.Z|latest|stable|pinned",
+                   help="choose the Claude Code release (default: latest)")
+    p.add_argument("--allow-unverified", action="store_true",
+                   help="skip Anthropic's signature check for this release")
     p.add_argument("--offline", action="store_true", help="use verified cached archives")
     p.add_argument("--no-link", action="store_true", help="preserve existing Claude command entries")
     p = command("run")
     p.usage = "termux-muscle run [--] CLAUDE_ARGUMENTS..."
     p.add_argument("claude_arguments", nargs=argparse.REMAINDER, metavar="CLAUDE_ARGUMENTS")
     p = command("update", SELECTION_EPILOG)
-    p.add_argument("--claude-version", metavar="X.Y.Z|latest", help="select an upstream version")
-    p.add_argument("--allow-unverified", action="store_true", help="permit a version beyond the project pin")
+    p.add_argument("--claude-version", metavar="X.Y.Z|latest|stable|pinned",
+                   help="choose the Claude Code release (default: latest)")
+    p.add_argument("--allow-unverified", action="store_true",
+                   help="skip Anthropic's signature check for this release")
     p.add_argument("--offline", action="store_true", help="use verified cached archives")
     command("rollback")
     p = command("repair")
     p.add_argument("--offline", action="store_true", help="use verified cached archives")
     p = command("versions", (
         "--available reads the official npm registry and never installs anything. The "
-        "pinned release passed acceptance with this Termux Muscle version, a formerly "
-        "pinned release passed with the Termux Muscle releases shown, and every other "
-        "version is unverified; install any version other than the pin with "
-        "update --claude-version X.Y.Z --allow-unverified."
+        "pinned release passed device acceptance with this Termux Muscle version and a "
+        "formerly pinned release passed with the Termux Muscle releases shown; every "
+        "other version is unverified by this project. update --claude-version X.Y.Z "
+        "installs any of them once Anthropic's release signature verifies."
     ))
     p.add_argument("--available", action="store_true", help="list installable Claude Code releases")
     p.add_argument("--all", action="store_true", help="with --available, list every release")
@@ -203,7 +211,7 @@ def generate_completion(root: argparse.ArgumentParser, commands: dict[str, argpa
         for action in p._actions:
             if action.option_strings and action.nargs != 0:
                 pattern = "|".join(f"{name}/{flag}" for flag in action.option_strings)
-                kind = "directory" if action.dest in ("root", "prefix") else "file" if action.dest in ("output", "path") else "latest" if action.dest == "claude_version" else "none"
+                kind = "directory" if action.dest in ("root", "prefix") else "file" if action.dest in ("output", "path") else "selector" if action.dest == "claude_version" else "none"
                 value_cases.append(f"        {pattern}) kind={kind} ;;")
     return f'''#!/usr/bin/env bash
 # SPDX-License-Identifier: MPL-2.0
@@ -250,7 +258,7 @@ _termux_muscle_complete() {{
     case $kind in
         directory) mapfile -t COMPREPLY < <(compgen -d -- "$current"); return 0 ;;
         file) mapfile -t COMPREPLY < <(compgen -f -- "$current"); return 0 ;;
-        latest) mapfile -t COMPREPLY < <(compgen -W latest -- "$current"); return 0 ;;
+        selector) mapfile -t COMPREPLY < <(compgen -W 'latest stable pinned' -- "$current"); return 0 ;;
         none) return 0 ;;
     esac
     if [[ -z $command ]]; then

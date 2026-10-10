@@ -42,12 +42,16 @@ tm_completion_remove() {
 tm_bootstrap() (
     set -euo pipefail
     local source_dir='' build_dir='' no_install=false link_claude=true
+    local -a selection=()
     while (($#)); do
         case $1 in
             --source-dir|--build-dir)
                 (($# > 1)) || tm_error usage "$1 needs a directory."
                 if [[ $1 == --source-dir ]]; then source_dir=$2; else build_dir=$2; fi
                 shift 2 ;;
+            --claude-version)
+                (($# > 1)) || tm_error usage '--claude-version needs a value.'
+                selection=(--claude-version "$2"); shift 2 ;;
             --no-install) no_install=true; shift ;;
             --link) link_claude=true; shift ;;
             --no-link) link_claude=false; shift ;;
@@ -93,7 +97,7 @@ tm_bootstrap() (
     fi
     tm_completion_install
     if [[ $no_install == false ]]; then
-        tm_install_release install --no-link
+        tm_install_release install --no-link "${selection[@]}"
         if [[ $link_claude == true ]]; then tm_default_claude_links; fi
     fi
     "$TM_CORE" tooling "$TM_ROOT" cleanup
