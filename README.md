@@ -16,6 +16,7 @@ An independent community project from [Octocore Autonomous Systems](https://gith
 
 A Claude Code update can leave Termux with a launcher and no usable binary. Termux Muscle manages that installation boundary and the work that follows:
 
+- Follows Anthropic's release channel: `termux-muscle update` installs a new Claude Code release as soon as Anthropic's signature on it verifies, without waiting for a Termux Muscle release.
 - Downloads Anthropic's official ARM64 musl package and verifies its bytes before use.
 - Supplies a small PRoot environment with the musl loader, Termux shell, live DNS and certificates.
 - Checks a candidate before making it current; keeps a previous release for rollback.
@@ -33,7 +34,7 @@ Run this in a **native Termux shell on an ARM64 Android device**:
 curl -fsSL https://github.com/octocore-autonomous-systems/termux-muscle/releases/download/v0.20.0/install.sh | sh
 ```
 
-The installer adds missing Termux prerequisites with `pkg`, verifies the release's source archive, builds the C helper locally and runs its offline tests before installation. Bash manages the lifecycle; the helper uses json-c, libarchive and OpenSSL. Build and test tools are Clang, make, pkg-config and diffutils; tar and gzip unpack the source. Runtime tools are Bash, PRoot, coreutils, ripgrep, curl and CA certificates. Termux's `mandoc` package provides the manual viewer. The installed project requires no Python, npm or Ubuntu installation. Contributors can regenerate the checked-in CLI help and completion files from the standard-library `argparse` definition with `python3 scripts/cli_schema.py`; add `--check` to verify they are current.
+The installer adds missing Termux prerequisites with `pkg`, verifies the release's source archive, builds the C helper locally and runs its offline tests before installation. Bash manages the lifecycle; the helper uses json-c, libarchive and OpenSSL. Build and test tools are Clang, make, pkg-config and diffutils; tar and gzip unpack the source. Runtime tools are Bash, PRoot, coreutils, ripgrep, curl, gpgv and CA certificates. Termux's `mandoc` package provides the manual viewer. The installed project requires no Python, npm or Ubuntu installation. Contributors can regenerate the checked-in CLI help and completion files from the standard-library `argparse` definition with `python3 scripts/cli_schema.py`; add `--check` to verify they are current.
 
 Local compilation requires downloading a C toolchain when one is not already installed. It builds our helper against your Termux environment; Anthropic's proprietary Claude Code executable is downloaded separately and remains unmodified.
 
@@ -78,14 +79,17 @@ normal launches still do. See [startup acceptance](docs/testing.md#isolated-star
 | Inspect installed and retained releases | `termux-muscle versions` |
 | See which Claude Code versions can be installed | `termux-muscle versions --available` |
 | Check installation health | `termux-muscle doctor` |
-| Install the version tested for this project release | `termux-muscle update` |
+| Move to the newest Claude Code release | `termux-muscle update` (or `claude update`) |
+| Use the Claude Code release this project version was tested with | `termux-muscle update --claude-version pinned` |
 | Restore the previous local release | `termux-muscle rollback` |
 | Rebuild from verified cached downloads | `termux-muscle repair --offline` |
 | Update this management tool | `termux-muscle self-update` (`--force` to reinstall a compatible version) |
 | Write a device report for review | `termux-muscle test --output report.json` |
 | Remove this installation and restore eligible commands/manual | `termux-muscle uninstall` |
 
-Default updates stay with the project's compatibility pin. An explicitly requested upstream version is experimental until tested on your device; see `update --help`. Installation and ordinary health checks make no paid model requests. Uninstall restores replaced commands only while their installed entries remain unchanged and owned; it preserves later foreign changes and keeps the recovery evidence. Claude account data, settings, sessions, projects and installed Termux packages remain intact.
+`termux-muscle update` follows Anthropic's `latest` release channel, the one `claude update` uses on supported platforms; `--claude-version stable` follows Anthropic's delayed channel and `--claude-version X.Y.Z` names one release. A release other than the project pin is installed only when Anthropic's signature on that release's manifest verifies against the release key built into the manager and the downloaded executable matches the SHA-256 that manifest signs. It then has to pass the same local startup checks as any candidate before it becomes current, and `rollback` returns to the previous release. A channel never replaces the active release with an older one. `--claude-version pinned` selects the release this project version was device-tested with, `--offline` rebuilds it from the verified cache, and `--allow-unverified` is the only way to install a release without the signature check. See `update --help`.
+
+Source archives are kept for the project pin and for each retained release, so those can be rebuilt offline; `update` and `cleanup` remove the archives nothing retained refers to. Installation and ordinary health checks make no paid model requests. Uninstall restores replaced commands only while their installed entries remain unchanged and owned; it preserves later foreign changes and keeps the recovery evidence. Claude account data, settings, sessions, projects and installed Termux packages remain intact.
 
 `rollback` restores a previous **Claude Code runtime**. Management-tool self-update is separate: an equal version reports `already_current` and exits 2; an older target reports `target_older` and exits 3. Exit 0 means an update or forced reinstall completed; other update failures exit 1. `-f` or `--force` deliberately reinstalls a compatible version after the normal integrity checks. In-place updates below 0.2.0 remain incompatible even with `--force`, because those managers cannot read the manual ownership records. Do not run an old installer over a newer installation. An intentional downgrade below 0.2.0 requires uninstalling with the current manager first.
 
@@ -100,8 +104,9 @@ Ordinary self-update output shows release verification, local build, tests and i
 The repository's scheduled tracker checks Anthropic's ARM64 musl package every
 six hours and opens a deduplicated compatibility-testing issue when it observes
 a version newer than the project pin. Discovery does not approve compatibility
-or update installations. Maintainers still test and publish a verified pin;
-users then run `termux-muscle self-update` followed by `termux-muscle update`.
+or update installations, and installations do not wait for it: `termux-muscle
+update` installs a signed release directly. The issue reminds maintainers to
+refresh the device-tested pin.
 See [release tracking](docs/release-tracking.md) for activation, manual checks,
 failure visibility and scheduling limits.
 
@@ -113,7 +118,7 @@ Have a different phone, tablet, Android release or Termux build? The [compatibil
 
 ## Claude Code and models
 
-Termux Muscle and Claude Code have independent version numbers. Each Termux Muscle release selects a Claude Code client version.
+Termux Muscle and Claude Code have independent version numbers. Each Termux Muscle release is device-tested with one Claude Code version, its pin; `termux-muscle update` moves beyond the pin to any release Anthropic has signed.
 
 | Termux Muscle version | Pinned Claude Code version |
 | --- | --- |

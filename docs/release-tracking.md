@@ -26,16 +26,16 @@ copy old device PASS results, publish a release, or update installed runtimes.
 SHA-512 integrity is registry metadata, not independent archive verification or
 an executable SHA-256. Discovery reports are marked `not_tested`.
 
-Promotion requires the existing acquisition/integrity checks, isolated Android
-startup and workflow acceptance, a reviewed compatibility PR with fresh evidence,
-and the verified-tag process in [releasing.md](releasing.md). Use disposable
+Promotion of a new pin requires the existing acquisition/integrity checks, isolated
+Android startup and workflow acceptance, a reviewed compatibility PR with fresh
+evidence, and the verified-tag process in [releasing.md](releasing.md). Use disposable
 installations following [testing.md](testing.md), not a user's working runtime.
-After a verified project release changes the pin, users run
-`termux-muscle self-update` followed by `termux-muscle update`.
 
-The explicit `update --claude-version latest --allow-unverified` path remains
-experimental. Neither it nor this tracker searches backward for the newest
-release compatible with a particular phone.
+Installations do not wait for a new pin. `termux-muscle update` follows Anthropic's
+release channel and installs a release once Anthropic's signature on its manifest
+verifies and the local startup checks pass. The pin is the release a Termux Muscle
+version was device-tested with, not a ceiling. Neither `update` nor this tracker
+searches backward for the newest release compatible with a particular phone.
 
 ## Activation and operation
 

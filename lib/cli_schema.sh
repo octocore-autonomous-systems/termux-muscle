@@ -10,9 +10,10 @@ usage: termux-muscle [--root DIR] [--prefix DIR] <command> [options]
 Install, run and maintain Claude Code on Termux.
 
 Claude Code:
-  install      Install the pinned Claude Code release and put claude on PATH
+  install      Install Claude Code and put claude on PATH
   run          Run Claude Code, passing all following arguments through
-  update       Validate a newer Claude Code release, then switch to it
+  update       Move to the newest Claude Code release once it passes local
+               checks
   rollback     Switch back to the previous validated release
   repair       Rebuild the active release from verified original artifacts
   versions     List installed releases; --available lists installable ones
@@ -42,9 +43,9 @@ Global options:
 
 Common tasks:
   termux-muscle versions --available    what can I install?
-  termux-muscle update                  move to the current pinned release
-  termux-muscle update --claude-version latest --allow-unverified
-                                        try a release beyond the pin
+  termux-muscle update                  move to the newest Claude Code release
+  termux-muscle update --claude-version pinned
+                                        use the release this project tested
   termux-muscle rollback                undo the last update
   termux-muscle doctor                  something's wrong; start here
   termux-muscle self-update             upgrade the manager
@@ -72,24 +73,29 @@ TM_SCHEMA_HELP_HELP
             ;;
         install) cat <<'TM_SCHEMA_HELP_INSTALL'
 usage: termux-muscle install [-h] [--root DIR] [--prefix DIR]
-                             [--claude-version X.Y.Z|latest]
+                             [--claude-version X.Y.Z|latest|stable|pinned]
                              [--allow-unverified] [--offline] [--no-link]
 
-Install the pinned Claude Code release and put claude on PATH.
+Install Claude Code and put claude on PATH.
 
 options:
   -h, --help            show this help message and exit
   --root DIR            managed installation root
   --prefix DIR          native Termux package prefix
-  --claude-version X.Y.Z|latest
-                        select an upstream version
-  --allow-unverified    permit a version beyond the project pin
+  --claude-version X.Y.Z|latest|stable|pinned
+                        choose the Claude Code release (default: latest)
+  --allow-unverified    skip Anthropic's signature check for this release
   --offline             use verified cached archives
   --no-link             preserve existing Claude command entries
 
-Without --claude-version, the project pin is used. Any other version,
-including latest, also needs --allow-unverified. Run 'versions --available' to
-see installable versions.
+Without --claude-version, the release named by Anthropic's latest channel is
+used (the project pin with --offline). stable names Anthropic's delayed
+channel and pinned the release this Termux Muscle version was tested with. A
+release other than the pin is installed only when Anthropic's signature on its
+release manifest verifies and the executable matches the signed SHA-256;
+--allow-unverified skips that check. A channel never replaces the active
+release with an older one. Run 'versions --available' to see installable
+versions.
 TM_SCHEMA_HELP_INSTALL
             ;;
         run) cat <<'TM_SCHEMA_HELP_RUN'
@@ -103,23 +109,28 @@ TM_SCHEMA_HELP_RUN
             ;;
         update) cat <<'TM_SCHEMA_HELP_UPDATE'
 usage: termux-muscle update [-h] [--root DIR] [--prefix DIR]
-                            [--claude-version X.Y.Z|latest]
+                            [--claude-version X.Y.Z|latest|stable|pinned]
                             [--allow-unverified] [--offline]
 
-Validate a newer Claude Code release, then switch to it.
+Move to the newest Claude Code release once it passes local checks.
 
 options:
   -h, --help            show this help message and exit
   --root DIR            managed installation root
   --prefix DIR          native Termux package prefix
-  --claude-version X.Y.Z|latest
-                        select an upstream version
-  --allow-unverified    permit a version beyond the project pin
+  --claude-version X.Y.Z|latest|stable|pinned
+                        choose the Claude Code release (default: latest)
+  --allow-unverified    skip Anthropic's signature check for this release
   --offline             use verified cached archives
 
-Without --claude-version, the project pin is used. Any other version,
-including latest, also needs --allow-unverified. Run 'versions --available' to
-see installable versions.
+Without --claude-version, the release named by Anthropic's latest channel is
+used (the project pin with --offline). stable names Anthropic's delayed
+channel and pinned the release this Termux Muscle version was tested with. A
+release other than the pin is installed only when Anthropic's signature on its
+release manifest verifies and the executable matches the signed SHA-256;
+--allow-unverified skips that check. A channel never replaces the active
+release with an older one. Run 'versions --available' to see installable
+versions.
 TM_SCHEMA_HELP_UPDATE
             ;;
         rollback) cat <<'TM_SCHEMA_HELP_ROLLBACK'
@@ -160,10 +171,10 @@ options:
   --json        print machine readable output
 
 --available reads the official npm registry and never installs anything. The
-pinned release passed acceptance with this Termux Muscle version, a formerly
-pinned release passed with the Termux Muscle releases shown, and every other
-version is unverified; install any version other than the pin with update
---claude-version X.Y.Z --allow-unverified.
+pinned release passed device acceptance with this Termux Muscle version and a
+formerly pinned release passed with the Termux Muscle releases shown; every
+other version is unverified by this project. update --claude-version X.Y.Z
+installs any of them once Anthropic's release signature verifies.
 TM_SCHEMA_HELP_VERSIONS
             ;;
         doctor) cat <<'TM_SCHEMA_HELP_DOCTOR'

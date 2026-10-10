@@ -51,7 +51,7 @@ Interactive TUI, terminal resizing, hooks, nested invocations, MCP transports an
 
 ## Deterministic tests for contributors
 
-From a checkout with a C11 compiler, make, pkg-config, json-c, libarchive and OpenSSL development files, plus Bash, coreutils, diffutils, tar and gzip (and `mandoc` for manual rendering/integration):
+From a checkout with a C11 compiler, make, pkg-config, json-c, libarchive and OpenSSL development files, plus Bash, coreutils, diffutils, gpgv, tar and gzip (and `mandoc` for manual rendering/integration):
 
 ```sh
 make
@@ -65,11 +65,13 @@ GitHub Actions checks the C/Bash suite with GCC and Clang on Linux and compares 
 
 Regression coverage includes checksum failures, invalid archives, interrupted downloads, hostile paths, launcher ownership, update interruption, mutation locks, leased releases, stale DNS, nested contexts, rollback and removal. Assertions should test the user-visible outcome and recovery, not repeat the implementation.
 
+Release signatures are tested against the real thing. `tests/fixtures/release-2.1.295.json` holds Anthropic's published manifest for one release and its detached signature, byte for byte, and the tests verify it with the release key compiled into the helper. They then check that an altered manifest, a valid signature made by another key, a damaged or empty signature, a genuine signature for a different version and an executable whose SHA-256 differs from the signed one are each rejected, and that the `signed` policy cannot be satisfied without a signature. The fixture also carries a document Anthropic signed inline with the same key (an apt index); it is genuine and must never pass as a manifest's detached signature. A stand-in `gpgv` replays the reports an older or untrustworthy verifier could produce, such as a text-document signature class, another primary key, a missing or duplicated verdict, a revoked or expired key and a failing exit, and each is refused. No private key exists in the repository: the other-key signature was made once with a throwaway key that was then destroyed. The update tests cover the channel rules: a current release is left alone, a channel never installs an older release, and offline or pinned requests never read a channel.
+
 New command/manual regressions must cover the normal executable PATH winner, prefix/home entries, reruns and opt-outs; foreign manager/manual preservation; regular-manual content/mode ownership; interrupted replacement; targeted manual-index refresh/removal; and rejecting old-manager self-update before download/publication. None of these checks requires account or model usage.
 
 ## Maintainer device acceptance
 
-Use dedicated disposable root, home and command/manual destinations. Normal 0.2.0 installation claims executable Claude entries, so a disposable data root alone does not isolate that behavior: the prefix, home-bin and executable PATH winner must all be controlled fixtures. Use `--no-link` for runtime-only checks that still share a real command prefix, and test automatic takeover separately with disposable commands. Record the exact installed package versions and source commit. Exercise the public bootstrap, `claude --version`, help, interactive session, shell/shebang and file tools, nested execution, optional package-manager/MCP fixtures, update failure, successful update, rollback, offline repair and uninstall.
+Acceptance installs the project pin (`bootstrap --claude-version pinned`), because the report describes the release this project version ships as its tested baseline; an ordinary installation follows Anthropic's channel instead. Use dedicated disposable root, home and command/manual destinations. Normal 0.2.0 installation claims executable Claude entries, so a disposable data root alone does not isolate that behavior: the prefix, home-bin and executable PATH winner must all be controlled fixtures. Use `--no-link` for runtime-only checks that still share a real command prefix, and test automatic takeover separately with disposable commands. Record the exact installed package versions and source commit. Exercise the public bootstrap, `claude --version`, help, interactive session, shell/shebang and file tools, nested execution, optional package-manager/MCP fixtures, update failure, successful update, rollback, offline repair and uninstall.
 
 Include sentinel files outside the owned root and a foreign launcher fixture so removal proves preservation, not just deletion. Check original vendor hashes. Exercise signal handling and interrupted maintenance using bounded fixtures. Review reports before committing them.
 

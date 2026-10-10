@@ -39,7 +39,7 @@ jobs:
       - name: Install build and test prerequisites
         run: |
           sudo apt-get update
-          sudo apt-get install --yes gcc clang make pkg-config libjson-c-dev libarchive-dev libssl-dev bash coreutils diffutils curl ca-certificates tar gzip proot ripgrep
+          sudo apt-get install --yes gcc clang make pkg-config libjson-c-dev libarchive-dev libssl-dev bash coreutils diffutils curl ca-certificates gpgv tar gzip proot ripgrep
       - name: Install Clang Format 21 from LLVM
         if: matrix.compiler == 'clang'
         run: |

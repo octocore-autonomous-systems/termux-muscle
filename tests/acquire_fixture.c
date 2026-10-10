@@ -169,7 +169,10 @@ int main(int argc, char **argv) {
     tm_atomic_write(binary_path, binary, sizeof binary, 0700);
     tm_atomic_write(loader_path, loader, sizeof loader, 0700);
     char *npm_path = tm_path(directory, "npm.tgz"), *apk_path = tm_path(directory, "musl.apk");
-    const char *version = !strcmp(mode, "unverified") ? "2.1.271" : "2.1.270";
+    /* "signed" matches the version of the real signed manifest in tests/fixtures. */
+    const char *version = !strcmp(mode, "unverified") ? "2.1.271"
+                          : !strcmp(mode, "signed")   ? "2.1.295"
+                                                      : "2.1.270";
     json_object *package = json_object_new_object();
     value(package, "name", PACKAGE);
     value(package, "version", !strcmp(mode, "manifest-mismatch") ? "9.9.9" : version);

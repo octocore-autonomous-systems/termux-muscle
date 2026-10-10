@@ -31,7 +31,12 @@ unset TM_FIXTURE_LOCK TM_FIXTURE_FAIL_PROBE TM_FIXTURE_FAIL_CLEANUP
 cat > "$source_dir/lib/acquire.sh" <<'SH'
 tm_acquire_plan() {
     printf '%s\n' acquisition-plan >> "$TM_FIXTURE_TRACE/events"
+    printf '%s\0' "${@:2:3}" > "$TM_FIXTURE_TRACE/plan.argv"
     printf '%s\n' '{"status":"ready","version":"2.1.270"}' > "$5"
+}
+tm_channel_version() {
+    printf 'channel-%s\n' "$1" >> "$TM_FIXTURE_TRACE/events"
+    printf '%s\n' "${TM_FIXTURE_CHANNEL:-2.1.270}"
 }
 tm_available_versions() {
     printf '%s\n' available-listing >> "$TM_FIXTURE_TRACE/events"
@@ -138,6 +143,7 @@ case $1 in
         printf '%s\n' '{"status":"PASS","version":"2.1.270","checks":[{"id":"startup_init","status":"PASS"}]}'
         ;;
     context) : ;;
+    acquire-prune) printf '%s\0' "$@" > "$TM_FIXTURE_TRACE/prune.argv"; printf '%s\n' '{}' ;;
     links) printf '%s\0' "$@" > "$TM_FIXTURE_TRACE/links.argv" ;;
     *) printf 'Unexpected fixture helper operation: %s\n' "$1" >&2; exit 84 ;;
 esac
@@ -232,6 +238,7 @@ reset_trace
 PATH="$restricted" "$host_bash" "$cli" cleanup --keep 7 --root "$root" --prefix "$missing_prefix" > "$trace/output"
 expect_argv "$trace/reexec.argv" "$host_bash" "$cli" _locked "$root" "$missing_prefix" cleanup --keep 7
 expect_argv "$trace/cleanup.argv" state "$root" cleanup 7
+expect_argv "$trace/prune.argv" acquire-prune "$root" "$source_dir/compatibility.json"
 has_event state-assert-lock || fail 'maintenance reexec omitted lock assertion'
 pass 'manager path options preserve arguments and reexec uses current Bash'
 
@@ -268,6 +275,7 @@ pass 'versions --available routes its flags to the read-only registry listing'
 reset_trace
 local_cli cleanup --dry-run --keep 0 > "$trace/cleanup"
 expect_argv "$trace/cleanup.argv" state "$root" cleanup 0 --dry-run
+expect_argv "$trace/prune.argv" acquire-prune "$root" "$source_dir/compatibility.json" --dry-run
 destination="$scratch/command with 'quotes' and \$(false)"
 local_cli link --path "$destination" --replace
 expect_argv "$trace/links.argv" links "$root" install "$destination" "$root/bin/claude" --replace
@@ -303,7 +311,57 @@ reset_trace
 PATH="$guards:$PATH" "$host_bash" "$cli" --root "$root" --prefix "$prefix" install --no-link > "$trace/no-link.out"
 has_event state-activate || fail 'no-link prevented runtime installation'
 if has_event default-claude-links; then fail 'no-link changed command entries'; fi
+has_event channel-latest || fail 'install without a version did not read the latest channel'
+expect_argv "$trace/plan.argv" 2.1.270 signed false
+has_event acquire-prune || fail 'install did not clean the source cache'
 pass 'explicit no-link installs a runtime without command takeover'
+
+# update follows Anthropic's release channel. The fixture's active release is 2.1.270.
+update_cli() { PATH="$guards:$PATH" "$host_bash" "$cli" --root "$root" --prefix "$prefix" update "$@"; }
+reset_trace
+update_cli > "$trace/current.out"
+grep -Fq 'Claude Code 2.1.270 is active and current (latest channel).' "$trace/current.out" || fail 'current release was not reported'
+has_event channel-latest || fail 'update did not read the latest channel'
+if has_event acquisition-plan || has_event state-activate; then fail 'a current release was reinstalled'; fi
+reset_trace
+TM_FIXTURE_CHANNEL=2.1.271 update_cli > "$trace/newer.out"
+expect_argv "$trace/plan.argv" 2.1.271 signed false
+has_event state-activate || fail 'a newer channel release was not installed'
+for older in 2.1.269 2.1.9 2.0.999 1.9.9; do
+    reset_trace
+    TM_FIXTURE_CHANNEL=$older update_cli --claude-version stable > "$trace/older.out"
+    grep -Fq "The stable channel names Claude Code $older, which is older than the active 2.1.270. Nothing was changed." "$trace/older.out" || fail "channel release $older was not recognised as older"
+    grep -Fq "termux-muscle update --claude-version $older" "$trace/older.out" || fail 'no way offered to install the older release deliberately'
+    has_event channel-stable || fail 'update did not read the stable channel'
+    if has_event acquisition-plan || has_event state-activate; then fail "channel moved the installation back to $older"; fi
+done
+reset_trace
+update_cli --claude-version 2.1.269 > /dev/null
+expect_argv "$trace/plan.argv" 2.1.269 signed false
+has_event state-activate || fail 'an explicitly named older release was refused'
+if has_event channel-latest || has_event channel-stable; then fail 'an exact version consulted a channel'; fi
+reset_trace
+TM_FIXTURE_NO_CURRENT=1 update_cli > /dev/null
+expect_argv "$trace/plan.argv" 2.1.270 signed false
+has_event state-activate || fail 'update without an active release did not install the channel release'
+pass 'update follows a channel forward only, reports a current release and honours an exact version'
+
+reset_trace
+update_cli --offline > /dev/null
+expect_argv "$trace/plan.argv" pinned signed true
+update_cli --claude-version pinned > /dev/null
+expect_argv "$trace/plan.argv" pinned signed false
+if has_event channel-latest; then fail 'the project pin or an offline update consulted a channel'; fi
+for channel in latest stable; do
+    if update_cli --claude-version "$channel" --offline > /dev/null 2> "$trace/offline.err"; then fail 'a channel was accepted offline'; fi
+    grep -Fq offline_unavailable "$trace/offline.err" || fail 'offline channel refusal was not explained'
+done
+if has_event "channel-latest" || has_event "channel-stable" || has_event forbidden-network; then fail 'an offline update reached for the network'; fi
+update_cli --claude-version 2.1.300 --allow-unverified > /dev/null
+expect_argv "$trace/plan.argv" 2.1.300 allow-unverified false
+TM_FIXTURE_CHANNEL=2.1.300 update_cli --claude-version latest --allow-unverified > /dev/null
+expect_argv "$trace/plan.argv" 2.1.300 allow-unverified false
+pass 'offline and pinned updates stay with the project pin; --allow-unverified is the only signature bypass'
 
 # Reset inherited ignored SIGINT before starting the async test controller.
 "${CC:-cc}" -x c -o "$scratch/reset-signals" - <<'C'
