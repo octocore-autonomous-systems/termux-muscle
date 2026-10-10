@@ -8,7 +8,7 @@
 
 An independent community project from [Octocore Autonomous Systems](https://github.com/octocore-autonomous-systems) (OAS). **Not affiliated with, endorsed by, sponsored by, or authorized by Anthropic.** Claude and Claude Code are Anthropic products; your use of them remains subject to Anthropic's terms and account access.
 
-> **0.20.0 pins Claude Code 2.1.296** on Android **ARM64 / aarch64** and preserves 2.1.295 as formerly pinned by 0.19.0. Private source installation, startup, update, rollback, removal and an authenticated **Opus 5.5** tool workflow passed on **Samsung Galaxy S26 Ultra, Android 17, Termux 0.118.3 (GitHub)**. See the scoped [0.20.0 report](compatibility/galaxy-s26-ultra-0.20.0-20261009.md); other configurations need volunteer evidence.
+> **0.21.0 follows Anthropic's release channel and runs Claude Code without PRoot.** Its tested pin is Claude Code 2.1.296 on Android **ARM64 / aarch64**. Private source installation, startup, update, rollback, removal and an authenticated **Opus 5.5** tool workflow passed on the native backend on **Samsung Galaxy S26 Ultra, Android 17, Termux 0.118.3 (GitHub)**, and the PRoot backend passed its startup checks. See the scoped [0.21.0 report](compatibility/galaxy-s26-ultra-0.21.0-20261010.md); other configurations need volunteer evidence.
 
 [Install](#install) · [Commands](#everyday-use) · [Device matrix](docs/device-compatibility.md) · [Troubleshooting](docs/troubleshooting.md) · [Contribute](CONTRIBUTING.md)
 
@@ -32,7 +32,7 @@ This is a **Claude Code lifecycle manager**, not a general agent runtime. It doe
 Run this in a **native Termux shell on an ARM64 Android device**:
 
 ```sh
-curl -fsSL https://github.com/octocore-autonomous-systems/termux-muscle/releases/download/v0.20.0/install.sh | sh
+curl -fsSL https://github.com/octocore-autonomous-systems/termux-muscle/releases/download/v0.21.0/install.sh | sh
 ```
 
 The installer adds missing Termux prerequisites with `pkg`, verifies the release's source archive, builds the C helper locally and runs its offline tests before installation. Bash manages the lifecycle; the helper uses json-c, libarchive and OpenSSL. Build and test tools are Clang, make, pkg-config and diffutils; tar and gzip unpack the source. Runtime tools are Bash, patchelf, PRoot, coreutils, ripgrep, curl, gpgv and CA certificates. Termux's `mandoc` package provides the manual viewer. The installed project requires no Python, npm or Ubuntu installation. Contributors can regenerate the checked-in CLI help and completion files from the standard-library `argparse` definition with `python3 scripts/cli_schema.py`; add `--check` to verify they are current.
@@ -108,7 +108,7 @@ A release runs in one of two ways, shown by `termux-muscle versions`:
 | | Native (default) | PRoot (`--backend proot`) |
 | --- | --- | --- |
 | Claude Code and its tools | Ordinary Termux processes | Traced by PRoot on every system call |
-| Measured through the Bash tool, Galaxy S26 Ultra | 300 process starts 3.1 s, `git status` 26 ms, reading a source tree 39 ms | 10.0 s, 120 ms, 154 ms |
+| Measured through the Bash tool, Galaxy S26 Ultra, [two runs](compatibility/galaxy-s26-ultra-0.21.0-20261010.md#timings) | 300 process starts 1.9 to 3.1 s; `git status` 21 to 27 ms; reading a source tree 25 to 39 ms | 5.1 to 10.1 s; 61 to 121 ms; 129 to 164 ms |
 | Downloaded files | Loader path set in the executable; three constants set in the private musl loader | Unchanged |
 | Hooks (`/bin/sh`) | Android's shell | Termux Bash |
 | `/tmp` | Not writable, as in any Termux shell; use `TMPDIR` | Private and writable |
@@ -150,6 +150,7 @@ Termux Muscle and Claude Code have independent version numbers. Each Termux Musc
 | [0.18.0](docs/releases/0.18.0.md) | 2.1.294 |
 | [0.19.0](docs/releases/0.19.0.md) | 2.1.295 |
 | [0.20.0](docs/releases/0.20.0.md) | 2.1.296 |
+| [0.21.0](docs/releases/0.21.0.md) | 2.1.296 |
 
 The [compatibility manifest](compatibility.json) records the current pin and pin history; `termux-muscle versions --available` identifies formerly pinned clients. The musl loader remains **1.2.6-r2**.
 
@@ -166,7 +167,7 @@ Model minimums describe client requirements. The Termux Muscle minimum is derive
 
 Model requirements were documented on **2026-09-29** against [Anthropic's model configuration documentation](https://code.claude.com/docs/en/model-config). Availability depends on your account, provider and organization policy; a newer client does not grant model access.
 
-**Opus 5.5** passed authenticated tool acceptance with Termux Muscle **0.20.0** and Claude Code **2.1.296** on **2026-10-09** ([scoped report](compatibility/galaxy-s26-ultra-0.20.0-20261009.md)). Other listed models are not verified by that report.
+**Opus 5.5** passed authenticated tool acceptance with Termux Muscle **0.21.0** and Claude Code **2.1.296** on **2026-10-10** ([scoped report](compatibility/galaxy-s26-ultra-0.21.0-20261010.md)). Other listed models are not verified by that report.
 
 Earlier measurements, including mixed Fable observations, retain their dated scope in the [device compatibility reports](docs/device-compatibility.md).
 
