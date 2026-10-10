@@ -25,33 +25,47 @@ static void execute(char **command) {
     exit(71);
 }
 
+/* Print the arguments from index first on, the environment a launch controls
+ * and whether the release lease survived exec. */
+static int report(int argc, char **argv, int first) {
+    for (int i = first; i < argc; ++i)
+        hex("arg", argv[i]);
+    const char *names[] = {"LD_PRELOAD",
+                           "LD_LIBRARY_PATH",
+                           "TM_PRELOAD",
+                           "TM_LIBRARY_PATH",
+                           "TM_RESOLV_CONF",
+                           "DISABLE_AUTOUPDATER",
+                           "USE_BUILTIN_RIPGREP",
+                           "TM_CUSTOM_TEST",
+                           "TMPDIR",
+                           "BUN_TMPDIR",
+                           "CLAUDE_CODE_TMPDIR",
+                           "SSL_CERT_FILE",
+                           "SHELL",
+                           "PATH"};
+    for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); ++i) {
+        const char *value = getenv(names[i]);
+        if (value)
+            hex(names[i], value);
+    }
+    const char *fd_text = getenv("TM_RELEASE_FD");
+    int flags = fd_text ? fcntl(atoi(fd_text), F_GETFD) : -1;
+    puts(flags >= 0 && !(flags & FD_CLOEXEC) ? "lease:inherited" : "lease:missing");
+    if (getenv("TM_PROBE_SIGNAL"))
+        raise(atoi(getenv("TM_PROBE_SIGNAL")));
+    return getenv("TM_PROBE_EXIT") ? atoi(getenv("TM_PROBE_EXIT")) : 0;
+}
+
 int main(int argc, char **argv) {
     const char *name = strrchr(argv[0], '/');
     name = name ? name + 1 : argv[0];
-    if (strcmp(name, "proot") == 0) {
-        for (int i = 1; i < argc; ++i)
-            hex("arg", argv[i]);
-        const char *names[] = {"LD_PRELOAD",
-                               "LD_LIBRARY_PATH",
-                               "DISABLE_AUTOUPDATER",
-                               "USE_BUILTIN_RIPGREP",
-                               "TM_CUSTOM_TEST",
-                               "TMPDIR",
-                               "BUN_TMPDIR",
-                               "SSL_CERT_FILE",
-                               "SHELL",
-                               "PATH"};
-        for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); ++i) {
-            const char *value = getenv(names[i]);
-            if (value)
-                hex(names[i], value);
-        }
-        const char *fd_text = getenv("TM_RELEASE_FD");
-        int flags = fd_text ? fcntl(atoi(fd_text), F_GETFD) : -1;
-        puts(flags >= 0 && !(flags & FD_CLOEXEC) ? "lease:inherited" : "lease:missing");
-        if (getenv("TM_PROBE_SIGNAL"))
-            raise(atoi(getenv("TM_PROBE_SIGNAL")));
-        return getenv("TM_PROBE_EXIT") ? atoi(getenv("TM_PROBE_EXIT")) : 0;
+    if (strcmp(name, "proot") == 0)
+        return report(argc, argv, 1);
+    /* A native release is started directly, so the fixture reports as itself. */
+    if (argc >= 2 && strcmp(argv[1], "--report") == 0) {
+        hex("self", argv[0]);
+        return report(argc, argv, 2);
     }
     if (argc >= 2 && strcmp(argv[1], "--shell") == 0) {
         char *command[] = {"/bin/sh", "-c", "test -n \"$BASH_VERSION\" && printf shell-ok", NULL};

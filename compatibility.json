@@ -13,7 +13,8 @@
     "version": "1.2.6-r2",
     "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/aarch64/musl-1.2.6-r2.apk",
     "sha256": "5e9674b7f41152fe2119093b5cb4c13eaaadb19c2d5422b2d7267913e663ee6e",
-    "loader_sha256": "32377e6d71725bb019e9ff6d5e9f16b4d5156d6f2c36504191c2d6a7c4d4a44d"
+    "loader_sha256": "32377e6d71725bb019e9ff6d5e9f16b4d5156d6f2c36504191c2d6a7c4d4a44d",
+    "native_loader_sha256": "3e80537b07eeb7509d4f45addd833d4770217a86b35c21064259de184622b1d3"
   },
   "pin_history": [
     {
@@ -134,7 +135,7 @@
       "report": "compatibility/galaxy-s26-ultra-0.19.0-20261008.json"
     }
   ],
-  "backend": "unmodified-musl-proot",
+  "backend": "musl-native",
   "models": {
     "checked_documentation_on": "2026-09-29",
     "source": "https://code.claude.com/docs/en/model-config",

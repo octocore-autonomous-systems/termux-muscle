@@ -84,7 +84,7 @@ Do not mass-rewrite conversations to make them appear migrated.
 ## What this does not prove
 
 Run installation and candidate validation outside another distribution's PRoot session.
-The existing runtime launcher validates its namespace marker and rejects foreign tracers;
+The PRoot backend's launcher validates its namespace marker and rejects foreign tracers;
 this preflight intentionally does not validate an active runtime. Passing these limited
 checks does not certify authenticated tools, MCP, DNS, performance, Android background survival,
 or compatibility on another device. Keep those checks separate in device evidence.

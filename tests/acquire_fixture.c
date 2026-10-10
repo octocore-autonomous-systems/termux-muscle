@@ -53,8 +53,20 @@ static void make_elf(unsigned char bytes[768], bool loader, const char *mode) {
     if (loader && !strcmp(mode, "loader-no-load"))
         load.p_type = PT_NOTE;
     memcpy(bytes + 64, &load, sizeof load);
-    if (loader)
+    if (loader) {
+        /* The constants the native backend configures, as a real loader has them. */
+        size_t offset = 400;
+        const char *constants[] = {"/etc/resolv.conf", "LD_PRELOAD", "LD_LIBRARY_PATH",
+                                   "/etc/resolv.conf"};
+        for (size_t i = 0; i < 4; i++) {
+            if ((i == 1 && !strcmp(mode, "native-missing-setting")) ||
+                (i == 3 && strcmp(mode, "native-duplicate-setting")))
+                continue;
+            memcpy(bytes + offset, constants[i], strlen(constants[i]) + 1);
+            offset += strlen(constants[i]) + 1;
+        }
         return;
+    }
     const char *interpreter =
         !strcmp(mode, "wrong-interpreter") ? "/lib/ld-linux-aarch64.so.1" : INTERPRETER;
     const char *needed = !strcmp(mode, "wrong-dependency") ? "libunavailable.so" : LIBC;
@@ -233,10 +245,27 @@ int main(int argc, char **argv) {
         if (stat(npm_path, &st) || truncate(npm_path, st.st_size - 9))
             tm_die("fixture_failed", "Cannot truncate source fixture.");
     }
-    char binary_hash[65], loader_hash[65], apk_hash[65];
+    char binary_hash[65], loader_hash[65], apk_hash[65], configured_hash[65];
     tm_sha256(binary_path, binary_hash);
     tm_sha256(loader_path, loader_hash);
     tm_sha256(apk_path, apk_hash);
+    /* The loader as the native backend configures it: three constants replaced
+     * by others of the same length, written out here independently of native.c. */
+    unsigned char configured[768];
+    memcpy(configured, loader, sizeof configured);
+    const char *settings[][2] = {{"/etc/resolv.conf", "/proc/self/fd/99"},
+                                 {"LD_PRELOAD", "TM_PRELOAD"},
+                                 {"LD_LIBRARY_PATH", "TM_LIBRARY_PATH"}};
+    for (size_t i = 0; i < 3; i++) {
+        unsigned char *match =
+            memmem(configured, sizeof configured, settings[i][0], strlen(settings[i][0]) + 1);
+        if (match)
+            memcpy(match, settings[i][1], strlen(settings[i][1]) + 1);
+    }
+    char *configured_path = tm_path(directory, "configured-loader");
+    tm_atomic_write(configured_path, configured, sizeof configured, 0700);
+    tm_sha256(configured_path, configured_hash);
+    free(configured_path);
     unsigned char digest[EVP_MAX_MD_SIZE], encoded[89];
     unsigned int length;
     tm_digest(npm_path, "sha512", digest, &length);
@@ -265,6 +294,11 @@ int main(int argc, char **argv) {
           !strcmp(mode, "wrong-loader-hash")
               ? "0000000000000000000000000000000000000000000000000000000000000000"
               : loader_hash);
+    if (strcmp(mode, "native-unpinned"))
+        value(musl, "native_loader_sha256",
+              !strcmp(mode, "native-wrong-loader-hash")
+                  ? "0000000000000000000000000000000000000000000000000000000000000000"
+                  : configured_hash);
     json_object_object_add(manifest, "claude", claude);
     json_object_object_add(manifest, "musl", musl);
     char *manifest_path = tm_path(directory, "compatibility.json");

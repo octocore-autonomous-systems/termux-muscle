@@ -117,6 +117,9 @@ static json_object *musl_source(json_object *source) {
     const char *url = tm_json_string(source, "url");
     const char *hash = tm_json_string(source, "sha256");
     const char *loader_hash = tm_json_string(source, "loader_sha256");
+    const char *native_hash = tm_json_optional_string(source, "native_loader_sha256");
+    if (native_hash && !tm_hex_valid(native_hash, 64))
+        tm_die("invalid_source", "The configured loader digest is not a SHA-256.");
     if (!matches(version, "^[0-9]+\\.[0-9]+\\.[0-9]+-r[0-9]+$") ||
         strncmp(url, ALPINE "v", strlen(ALPINE) + 1))
         tm_die("invalid_source", "The loader needs an exact official Alpine musl source pin.");
@@ -139,6 +142,8 @@ static json_object *musl_source(json_object *source) {
     add_string(out, "url", url);
     add_string(out, "sha256", hash);
     add_string(out, "loader_sha256", loader_hash);
+    if (native_hash)
+        add_string(out, "native_loader_sha256", native_hash);
     return out;
 }
 static bool source_unverified(json_object *manifest) {
@@ -191,14 +196,20 @@ static json_object *ready_plan(json_object *manifest) {
     const char *label = tm_json_optional_string(manifest, "compatibility_status");
     bool by_signature = label && !strcmp(label, "signed");
     json_object *out = json_object_new_object();
+    const char *backend = tm_json_optional_string(manifest, "backend");
+    if (!backend)
+        backend = TM_BACKEND_PROOT; /* Manifests written before the field existed. */
     json_object_object_add(out, "schema", json_object_new_int(1));
     add_string(out, "status", "ready");
-    add_string(out, "backend", "unmodified-musl-proot");
+    add_string(out, "backend", backend);
     json_object *claude =
         claude_source(tm_json_field(manifest, "claude", json_type_object), !unverified);
     json_object_object_add(out, "claude", claude);
-    json_object_object_add(out, "musl",
-                           musl_source(tm_json_field(manifest, "musl", json_type_object)));
+    json_object *musl = musl_source(tm_json_field(manifest, "musl", json_type_object));
+    json_object_object_add(out, "musl", musl);
+    if (tm_backend_native(backend) && !tm_json_optional_string(musl, "native_loader_sha256"))
+        tm_die("native_unsupported",
+               "This loader pin records no native configuration; use --backend proot.");
     if (by_signature != (tm_json_optional_string(claude, "signed_manifest_sha256") != NULL))
         tm_die("invalid_metadata",
                "A release is signed exactly when it records Anthropic's signed manifest.");
@@ -828,6 +839,12 @@ static void extract_payload(json_object *plan, const char *npm, const char *apk,
         tm_die("integrity_failed", "The extracted musl loader differs from its recorded SHA-256.");
     json_object_object_add(claude, "elf", inspect_elf(binary, false));
     json_object_object_add(musl, "elf", inspect_elf(loader, true));
+    /* Only now, with both originals verified byte for byte, is the release
+     * prepared to run without PRoot. */
+    if (tm_backend_native(tm_json_string(plan, "backend")))
+        json_object_object_add(
+            plan, "native",
+            tm_native_install(release, tm_json_string(musl, "native_loader_sha256")));
     if (fsync(lib) || fsync(licenses) || fsync(root))
         tm_die("sync_failed", "Cannot durably save the candidate directories.");
     close(lib);
@@ -1268,6 +1285,22 @@ int tm_acquire_main(int argc, char **argv) {
         if (strcmp(argv[1], "latest") && strcmp(argv[1], "stable"))
             tm_die("invalid_channel", "Choose the latest or stable release channel.");
         printf(RELEASES "%s\n", argv[1]);
+        return 0;
+    }
+    /* Choose how a planned release will run. The plan otherwise keeps the
+     * backend of the manifest or receipt it was made from. */
+    if (!strcmp(argv[0], "acquire-backend") && argc == 3) {
+        const char *backend = !strcmp(argv[2], "native")  ? TM_BACKEND_NATIVE
+                              : !strcmp(argv[2], "proot") ? TM_BACKEND_PROOT
+                                                          : NULL;
+        if (!backend)
+            tm_die("invalid_backend", "Unknown runtime backend; choose native or proot.");
+        json_object *input = tm_json_read(argv[1]);
+        json_object_object_add(input, "backend", json_object_new_string(backend));
+        json_object *plan = ready_plan(input);
+        tm_json_print(plan);
+        json_object_put(plan);
+        json_object_put(input);
         return 0;
     }
     if (!strcmp(argv[0], "acquire-prune") && (argc == 3 || argc == 4)) {

@@ -12,6 +12,10 @@
 #endif
 #define TM_METADATA_MAX (1024U * 1024U)
 #define TM_OWNER "termux-muscle"
+/* How a release runs: under PRoot with every downloaded byte unchanged, or as
+ * an ordinary process prepared once at installation (see native.c). */
+#define TM_BACKEND_PROOT "unmodified-musl-proot"
+#define TM_BACKEND_NATIVE "musl-native"
 
 /* Fatal errors are intentional at command boundaries: no untrusted payload is
  * executed after a failed validation. The kernel closes locks on exit. */
@@ -33,6 +37,7 @@ void tm_now(char out[32]);
 bool tm_version_valid(const char *s);
 bool tm_release_valid(const char *s);
 bool tm_hex_valid(const char *s, size_t length);
+bool tm_backend_native(const char *backend);
 json_object *tm_json_read(const char *path);
 json_object *tm_json_parse(const char *text, size_t size);
 void tm_json_write(const char *path, json_object *obj);
@@ -49,6 +54,8 @@ json_object *tm_store_state(const char *root);
 void tm_store_require_lock(const char *root);
 char *tm_store_release(const char *root, const char *id);
 void tm_store_verify(const char *release);
+void tm_store_installed(json_object *receipt, const char **binary, const char **loader);
+json_object *tm_native_install(const char *release, const char *expected_loader);
 int tm_store_lease(const char *root, const char *id, bool exclusive, bool nonblock);
 
 /* Dispatch argv[0] is the subcommand, e.g. "state", "run", "acquire-plan". */

@@ -18,10 +18,11 @@ Termux
 .RI [ CLAUDE_ARGUMENTS ...]
 .SH DESCRIPTION
 Termux Muscle manages Claude Code in native Android Termux on ARM64.
-It uses the official, unmodified Linux ARM64 musl executable and an Alpine
-musl loader in a small PRoot namespace.
+It installs the official Linux ARM64 musl executable with an Alpine musl
+loader and runs it as an ordinary Termux process, or, on request, inside a
+small PRoot namespace; see BACKENDS.
 Its management tool is Bash plus a C helper compiled on the device.
-It does not compile or modify the Claude Code executable.
+It does not compile Claude Code.
 .PP
 Runtime installation, update and repair verify source archives and selected
 files before testing a candidate's version and help output.
@@ -52,8 +53,8 @@ otherwise.
 An arbitrary directory is never treated as an owned installation to delete.
 .TP
 .BI \-\-prefix " DIR"
-Select the native Termux package prefix containing Bash, PRoot, ripgrep,
-certificates and other dependencies.
+Select the native Termux package prefix containing Bash, patchelf, PRoot,
+ripgrep, certificates and other dependencies.
 The default is PREFIX, or
 .I /data/data/com.termux/files/usr
 when PREFIX is unset.
@@ -213,7 +214,8 @@ whatever its label.
 .TP
 .BR doctor " [\-\-output FILE]"
 Check local resolver configuration, managed link ownership, runtime integrity,
-version/help startup and the mapped shell namespace.
+version/help startup and the shell environment the release's backend gives
+Claude Code.
 No model request, installation, update, link repair or upload is performed.
 Print JSON to standard output by default.
 See DIAGNOSTIC REPORTS for output-file behavior and limitations.
@@ -359,6 +361,12 @@ in its receipt and in
 The channel file itself only names a version; it admits nothing.
 .RE
 .TP
+.BI \-\-backend " native|proot"
+Choose how this release runs; see BACKENDS.
+Without the option a release uses the project default, native.
+.B repair
+keeps the backend of the release it rebuilds.
+.TP
 .B \-\-allow-unverified
 Install the selected release without checking Anthropic's signature.
 The npm registry's archive integrity and the local candidate startup checks
@@ -374,6 +382,61 @@ Without a version selector it rebuilds the project pin; it cannot read a
 release channel.
 It is also accepted by
 .BR repair .
+.SH BACKENDS
+Anthropic's executable expects a musl loader at
+.I /lib/ld-musl-aarch64.so.1
+and nameservers in
+.IR /etc/resolv.conf .
+Android has neither path.
+Each release records one of two ways of supplying them, shown by
+.BR "termux-muscle versions" .
+.TP
+.B native
+The default.
+The release is prepared once, at installation, after its downloads are
+verified.
+.BR patchelf (1)
+sets the installed executable's loader path to the release's own copy of the
+loader; Anthropic's code and data are left unchanged.
+Three constants in that private loader copy are replaced, so that it reads
+its nameservers from descriptor 99 and reads TM_PRELOAD and TM_LIBRARY_PATH
+in place of LD_PRELOAD and LD_LIBRARY_PATH.
+A small object,
+.IR lib/tm-resolver.so ,
+opens the resolver file on descriptor 99 when a Claude Code process starts.
+Claude Code and everything it starts then run as ordinary Termux processes,
+untraced and at full speed, with the caller's environment intact:
+termux-exec stays in LD_PRELOAD for the Android programs Claude Code runs,
+so #!/usr/bin/env scripts work as in any Termux shell.
+.PP
+.RS
+Three things differ from the PRoot backend.
+Hooks run through
+.IR /bin/sh ,
+which is Android's shell and not Bash.
+A script that Claude Code starts directly, without a shell, cannot begin
+with #!/usr/bin/env or #!/bin/sh; name its interpreter as the command.
+.I /tmp
+is not writable; TMPDIR is.
+.RE
+.TP
+.B proot
+The downloaded executable and loader run unchanged inside PRoot, which
+supplies the loader, the resolver file, Termux Bash as
+.IR /bin/sh ,
+.I /usr/bin/env
+and a private
+.IR /tmp .
+PRoot traces every system call of Claude Code and of every process it
+starts, which makes process creation and file access several times slower,
+and a release cannot start inside another traced process.
+.PP
+The backend belongs to a release.
+.B rollback
+returns to the previous release whatever its backend, and a running session
+keeps the backend it started with.
+To move a version to the other backend, install it again:
+.BR "termux-muscle update --claude-version X.Y.Z --backend proot" .
 .SH INSTALLATION AND MANUAL
 The versioned source installer obtains missing native Termux prerequisites
 with the Termux package manager, builds the helper and runs offline tests.
@@ -488,7 +551,9 @@ The Termux package prefix; overridden by
 .B TM_RESOLV_CONF
 Select a readable resolver configuration file instead of
 .IR $PREFIX/etc/resolv.conf .
-The runtime maps the selected live file into its PRoot namespace.
+The PRoot backend maps the selected live file into its namespace.
+The native backend passes its resolved path on in the same variable, and
+each Claude Code process opens that file when it starts.
 Valid resolver symlinks are supported.
 The manager does not replace it with a public DNS service.
 .TP
@@ -504,12 +569,23 @@ unavailable.
 .TP
 .B TMPDIR
 Selects temporary storage for management operations where applicable.
-Inside a Claude runtime, temporary files use that release's private runtime
+On the native backend Claude Code and its tools keep the caller's TMPDIR, or
+.I $PREFIX/tmp
+when it is unset, and CLAUDE_CODE_TMPDIR defaults to it.
+On the PRoot backend temporary files use that release's private runtime
 directory.
+.TP
+.B LD_PRELOAD, LD_LIBRARY_PATH
+The native backend leaves both as the caller set them; its private loader
+does not read them.
+When LD_PRELOAD is unset it supplies Termux's termux-exec library, as a
+Termux shell would.
+The PRoot backend clears both for the whole process tree.
 .PP
-The launcher clears incompatible LD_PRELOAD and LD_LIBRARY_PATH values for the
-vendor process, disables the unmanaged updater and selects native Termux
+The launcher disables the unmanaged updater and selects native Termux
 ripgrep.
+TM_PRELOAD and TM_LIBRARY_PATH belong to the native backend's private loader
+and are set by the launcher.
 Ordinary Claude environment and account settings otherwise remain under the
 user's control.
 Internal TM_* lease/context variables are not a public configuration interface.
@@ -524,10 +600,14 @@ Installation identity.
 Current/previous runtime selection and lifecycle state.
 .TP
 .I ROOT/releases/RELEASE_ID/
-Owned executable, loader, receipt, runtime context and private temporary files.
+Owned executable, loader, receipt, runtime context and private temporary files;
+for a native release also
+.IR lib/tm-resolver.so .
 .TP
 .I ROOT/releases/RELEASE_ID/payload.json
-Recorded source identities, file hashes, version and compatibility provenance.
+Recorded source identities, file hashes, version, backend and compatibility
+provenance.
+A native release also records the hashes of its prepared files.
 .TP
 .I ROOT/cache/
 Content-addressed source archives, reverified before reuse.
@@ -652,14 +732,19 @@ and the exact error category.
 Account authentication should use the upstream login flow; reinstalling a
 runtime does not refresh an OAuth token or grant access to a model.
 .PP
-Run maintenance from a fresh native Termux shell when an existing PRoot
-session is pinned to another release or installation.
+Run maintenance of a PRoot release from a fresh native Termux shell when an
+existing PRoot session is pinned to another release or installation.
+If something works under PRoot and not natively, see BACKENDS for the three
+differences, and reinstall the version with
+.B \-\-backend proot
+while reporting it.
 Android background-process limits, vendor restrictions, cross-session messaging,
 MCP transports, hooks and authenticated tool workflows require separate tests.
 .SH SEE ALSO
 .BR man (1),
 .BR mandoc (1),
 .BR proot (1),
+.BR patchelf (1),
 .BR gpgv (1),
 .BR bash (1)
 .PP

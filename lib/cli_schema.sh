@@ -74,7 +74,8 @@ TM_SCHEMA_HELP_HELP
         install) cat <<'TM_SCHEMA_HELP_INSTALL'
 usage: termux-muscle install [-h] [--root DIR] [--prefix DIR]
                              [--claude-version X.Y.Z|latest|stable|pinned]
-                             [--allow-unverified] [--offline] [--no-link]
+                             [--allow-unverified] [--backend native|proot]
+                             [--offline] [--no-link]
 
 Install Claude Code and put claude on PATH.
 
@@ -85,6 +86,8 @@ options:
   --claude-version X.Y.Z|latest|stable|pinned
                         choose the Claude Code release (default: latest)
   --allow-unverified    skip Anthropic's signature check for this release
+  --backend native|proot
+                        run without PRoot (native) or inside it (proot)
   --offline             use verified cached archives
   --no-link             preserve existing Claude command entries
 
@@ -110,7 +113,8 @@ TM_SCHEMA_HELP_RUN
         update) cat <<'TM_SCHEMA_HELP_UPDATE'
 usage: termux-muscle update [-h] [--root DIR] [--prefix DIR]
                             [--claude-version X.Y.Z|latest|stable|pinned]
-                            [--allow-unverified] [--offline]
+                            [--allow-unverified] [--backend native|proot]
+                            [--offline]
 
 Move to the newest Claude Code release once it passes local checks.
 
@@ -121,6 +125,8 @@ options:
   --claude-version X.Y.Z|latest|stable|pinned
                         choose the Claude Code release (default: latest)
   --allow-unverified    skip Anthropic's signature check for this release
+  --backend native|proot
+                        run without PRoot (native) or inside it (proot)
   --offline             use verified cached archives
 
 Without --claude-version, the release named by Anthropic's latest channel is
@@ -292,12 +298,14 @@ tm_schema_validate() {
             install/--prefix) (($# > 1)) || tm_error usage '--prefix needs a value.'; shift 2 ;;
             install/--claude-version) (($# > 1)) || tm_error usage '--claude-version needs a value.'; shift 2 ;;
             install/--allow-unverified) shift ;;
+            install/--backend) (($# > 1)) || tm_error usage '--backend needs a value.'; shift 2 ;;
             install/--offline) shift ;;
             install/--no-link) shift ;;
             update/--root) (($# > 1)) || tm_error usage '--root needs a value.'; shift 2 ;;
             update/--prefix) (($# > 1)) || tm_error usage '--prefix needs a value.'; shift 2 ;;
             update/--claude-version) (($# > 1)) || tm_error usage '--claude-version needs a value.'; shift 2 ;;
             update/--allow-unverified) shift ;;
+            update/--backend) (($# > 1)) || tm_error usage '--backend needs a value.'; shift 2 ;;
             update/--offline) shift ;;
             rollback/--root) (($# > 1)) || tm_error usage '--root needs a value.'; shift 2 ;;
             rollback/--prefix) (($# > 1)) || tm_error usage '--prefix needs a value.'; shift 2 ;;

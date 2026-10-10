@@ -1,6 +1,6 @@
 # Architecture and boundaries
 
-Termux Muscle manages Claude Code on native Android Termux. Version 0.3.2 retains the official Linux ARM64 musl executable and musl loader used by 0.1.0, inside one PRoot namespace. Bash sequences lifecycle commands, and a C helper handles parsing, integrity, owned filesystem state and execution. The helper is compiled on the target device. Vendor payloads are fetched separately with the URLs and digests in `compatibility.json`. The [fresh 0.3.2 report](../compatibility/galaxy-s26-ultra-0.3.2-20260924.md) records private source lifecycle and authenticated Sonnet tool acceptance; 0.2.0 command/manual and older 0.1.0 model observations remain historical evidence.
+Termux Muscle manages Claude Code on native Android Termux. It installs the official Linux ARM64 musl executable with Alpine's musl loader and runs it either as an ordinary process (the native backend, the default) or inside one PRoot namespace. Bash sequences lifecycle commands, and a C helper handles parsing, integrity, owned filesystem state and execution. The helper is compiled on the target device. Vendor payloads are fetched separately with the URLs and digests in `compatibility.json`. The [fresh 0.3.2 report](../compatibility/galaxy-s26-ultra-0.3.2-20260924.md) records private source lifecycle and authenticated Sonnet tool acceptance; 0.2.0 command/manual and older 0.1.0 model observations remain historical evidence.
 
 ## Why installation needs a manager
 
@@ -22,7 +22,40 @@ A channel moves an installation forward only. When it names a release older than
 
 Source archives stay in the cache for the project pin and for every retained release, so those rebuild offline. `update` and `cleanup` remove archives that nothing retained refers to.
 
-### Launch
+### Launch: two backends
+
+Anthropic's executable is built for Linux with musl. It asks the kernel for its loader at `/lib/ld-musl-aarch64.so.1` and reads nameservers from `/etc/resolv.conf`. Android has neither path, and an application can create neither. A release answers that in one of two ways, recorded in its receipt as `backend`; `install` and `update` take `--backend native|proot`, the project default is `backend` in `compatibility.json`, and `termux-muscle versions` shows which each release uses.
+
+| | Native (default) | PRoot |
+| --- | --- | --- |
+| How the paths are supplied | Once, at installation: the release is prepared to find its own loader and resolver file | On every system call: PRoot traces the process tree and answers for the missing paths |
+| Downloaded bytes | Executable: its ELF interpreter path is set to the release's loader; code and data are untouched. Loader: three constants replaced. Both verified against their pinned or signed digests first | Unchanged |
+| Processes Claude Code starts | Ordinary Termux processes, as fast as in any Termux shell | Traced; on the reference device process creation is about 3 times slower and file-heavy commands 3 to 5 times slower |
+| `/bin/sh`, used for hooks | Android's shell | Termux Bash, mapped |
+| `#!/usr/bin/env` and `#!/bin/sh` scripts | Run by termux-exec, as in any Termux shell | Mapped paths |
+| `/tmp` | Not writable, as in any Termux shell; `TMPDIR` is | A private directory, mapped |
+| Running inside another traced process | Works | Refused |
+
+#### Native
+
+Preparation happens after both downloads are verified byte for byte, and before the candidate's startup checks:
+
+1. **The executable's loader path.** `patchelf --set-interpreter` points the installed executable at `lib/ld-musl-aarch64.so.1` inside its own release directory, and the helper then reads the path back from the file and compares it. The new path is longer than the old one, so patchelf adds one 64 KiB page at the front of the file to hold it and the program headers, and updates the file's own tables for the contents that moved: the program headers, the section headers and the section index of eight symbol entries. Measured on Claude Code 2.1.296, with that one-page shift taken into account, 121 bytes differ, all of them in those tables. Anthropic's code and data are the same bytes, loaded at the same addresses.
+2. **The loader's configuration.** Three constants in the release's private copy of the Alpine loader are replaced by others of the same length, each required to occur exactly once: `/etc/resolv.conf` becomes `/proc/self/fd/99`, and `LD_PRELOAD` and `LD_LIBRARY_PATH` become `TM_PRELOAD` and `TM_LIBRARY_PATH`. The result must match `musl.native_loader_sha256` in `compatibility.json`, so the configured loader is pinned exactly like the original.
+3. **The resolver object.** `lib/tm-resolver.so` is ours (`src/native/tm-resolver.c`, about twenty lines). When a Claude Code process starts, it opens the resolver file named in `TM_RESOLV_CONF` on descriptor 99, close-on-exec. It defines nothing another module calls and replaces nothing. musl then finds its nameservers through `/proc/self/fd/99`.
+
+The two renamed variables are why the rest of the environment can be left alone. A Termux shell sets `LD_PRELOAD` to termux-exec, an Android library that musl cannot load; a musl program that read it would refuse to start. The private loader does not read it, so it stays in the environment for the Android programs Claude Code runs, where termux-exec does what it does in any Termux shell: it makes `#!/usr/bin/env` and `#!/bin/sh` scripts work. The launcher sets `TM_PRELOAD` to the resolver object, clears `TM_LIBRARY_PATH`, and, when the caller has no `LD_PRELOAD` at all (a service, for instance), supplies Termux's own termux-exec so tools behave as they do in a shell.
+
+The receipt records the SHA-256 of each installed file (`native.binary_sha256`, `native.loader_sha256`, `native.resolver_sha256`) beside the digests of the verified originals, and every launch checks the installed files against it. `repair` re-extracts from the verified cache and prepares the release again. A loader that does not configure to its pinned digest, a patchelf that is missing or fails, and an installation path containing a space or colon (the loader could not name the resolver object) each stop the installation with the active release untouched; `--backend proot` remains available.
+
+Differences from the PRoot backend that a user can meet:
+
+- Hooks run through `/bin/sh`, which is Android's shell and not Bash. A hook that needs Bash should start with `bash -c` or call a script.
+- A program Claude Code starts directly, without a shell, cannot be a script whose first line names `/usr/bin/env` or `/bin/sh`: the kernel reads that line and Android has no such path. This mainly concerns MCP servers configured as a bare script path. Name the interpreter as the command (`node`, `python3`), or give the script a Termux shebang (`termux-fix-shebang`).
+- `/tmp` is not writable. `TMPDIR` is honoured, and Claude Code's own scratch files follow `CLAUDE_CODE_TMPDIR`, which the launcher points at `TMPDIR` when unset.
+- The resolver file is opened when each Claude Code process starts. Editing it in place takes effect at once; replacing the file takes effect for processes started afterwards.
+
+#### PRoot
 
 The runtime keeps the executable and loader bytes unchanged. PRoot maps only the needed paths:
 
@@ -36,11 +69,17 @@ The runtime keeps the executable and loader bytes unchanged. PRoot maps only the
 | `/tmp` | Private runtime temporary directory |
 | Runtime namespace marker | The selected installation and release identity |
 
-The launcher selects Termux certificates and external ripgrep, clears incompatible loader variables and disables Claude's unmanaged self-updater. It preserves the caller's arguments, working directory and account configuration. It does not force a public DNS service or overlay all of `/bin`.
+The launcher clears `LD_PRELOAD` and `LD_LIBRARY_PATH` for the whole process tree, because the unmodified loader would read them.
 
-Nested execution recognizes a context bound inside the existing namespace and keeps that session's release pinned. A foreign tracer or conflicting installation context produces a diagnostic. Candidate validation belongs in a fresh native Termux shell when an existing session is pinned to a different release.
+Nested execution recognizes a context bound inside the existing namespace and keeps that session's release pinned. A foreign tracer or conflicting installation context produces a diagnostic. Candidate validation of a PRoot release belongs in a fresh native Termux shell when an existing session is pinned to a different release.
 
-PRoot is part of this design. The project does not claim zero overhead, root-level isolation, universal Android compatibility or equivalence to a supported desktop installation. Ordinary sessions and bounded test probes have different process-lifetime requirements; terminating a health probe must not imply killing legitimate background work in ordinary use.
+PRoot does not provide root-level isolation, and its tracing has a measured cost. Choose it when the downloaded bytes must run unchanged, or when a workflow depends on its mapped `/bin/sh`, `/usr/bin/env` or `/tmp`.
+
+#### Both
+
+The launcher selects Termux certificates and external ripgrep and disables Claude's unmanaged self-updater. It preserves the caller's arguments, working directory and account configuration. It does not force a public DNS service or overlay all of `/bin`.
+
+Neither backend claims universal Android compatibility or equivalence to a supported desktop installation. Ordinary sessions and bounded test probes have different process-lifetime requirements; terminating a health probe must not imply killing legitimate background work in ordinary use.
 
 ## Isolated startup gate
 
