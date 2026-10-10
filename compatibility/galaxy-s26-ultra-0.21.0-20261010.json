@@ -1,0 +1,191 @@
+{
+  "schema": 1,
+  "generated_at": "2026-10-10T22:09:39Z",
+  "project": {
+    "name": "Termux Muscle",
+    "version": "0.21.0"
+  },
+  "claude_code": {
+    "version": "2.1.296",
+    "musl_version": "1.2.6-r2",
+    "backend": "native"
+  },
+  "environment": {
+    "manufacturer": "samsung",
+    "model": "SM-S948U",
+    "android_version": "17",
+    "android_api": 37,
+    "abi": "arm64-v8a",
+    "device_name": "Samsung Galaxy S26 Ultra",
+    "kernel": "6.12.69-android16-6-pb4d3caf-abogkiS948USQS4BZIG-4k",
+    "page_size": 4096,
+    "termux_version": "0.118.3",
+    "termux_source": "GITHUB",
+    "packages": {
+      "bash": "5.3.20",
+      "coreutils": "9.11-1",
+      "curl": "8.22.0",
+      "ca-certificates": "1:2026.09.25",
+      "proot": "5.1.107.96",
+      "ripgrep": "15.2.0",
+      "clang": "21.1.8-3",
+      "make": "4.4.1-1",
+      "pkg-config": "0.29.2-3",
+      "json-c": "0.19",
+      "libarchive": "3.8.9",
+      "openssl": "1:3.6.5",
+      "zlib": "1.3.2",
+      "termux-tools": "1.46.0+really1.45.0-1",
+      "termux-exec": "1:2.5.0-1",
+      "diffutils": "3.12-2",
+      "tar": "1.35-3",
+      "gzip": "1.15",
+      "mandoc": "1.14.6-8",
+      "patchelf": "0.19.2",
+      "gpgv": "2.5.24"
+    }
+  },
+  "provenance": "maintainer",
+  "checks": [
+    {
+      "id": "dns_configuration",
+      "status": "PASS",
+      "detail_code": "nameserver_configured"
+    },
+    {
+      "id": "command_links",
+      "status": "PASS",
+      "detail_code": "managed_commands_owned"
+    },
+    {
+      "id": "runtime_integrity",
+      "status": "PASS",
+      "detail_code": "receipt_hashes_match"
+    },
+    {
+      "id": "startup_version",
+      "status": "PASS",
+      "detail_code": "isolated_version_passed"
+    },
+    {
+      "id": "startup_help",
+      "status": "PASS",
+      "detail_code": "isolated_help_passed"
+    },
+    {
+      "id": "startup_init",
+      "status": "PASS",
+      "detail_code": "isolated_initialization_passed"
+    },
+    {
+      "id": "namespace_shell",
+      "status": "PASS",
+      "detail_code": "local_probe_passed"
+    },
+    {
+      "id": "install",
+      "status": "PASS",
+      "detail_code": "private_source_bootstrap_no_link"
+    },
+    {
+      "id": "update",
+      "status": "PASS",
+      "detail_code": "offline_candidate_activated"
+    },
+    {
+      "id": "rollback",
+      "status": "PASS",
+      "detail_code": "previous_candidate_restored_offline"
+    },
+    {
+      "id": "uninstall",
+      "status": "PASS",
+      "detail_code": "private_owned_root_removed"
+    },
+    {
+      "id": "shell_tools",
+      "status": "PASS",
+      "detail_code": "authenticated_fixture_observed"
+    },
+    {
+      "id": "interactive",
+      "status": "SKIP",
+      "detail_code": "requires_manual_test"
+    },
+    {
+      "id": "background",
+      "status": "SKIP",
+      "detail_code": "requires_manual_test"
+    },
+    {
+      "id": "screen_off",
+      "status": "SKIP",
+      "detail_code": "requires_manual_test"
+    },
+    {
+      "id": "alternate_backend",
+      "status": "PASS",
+      "detail_code": "proot_startup_verified"
+    },
+    {
+      "id": "native_shell",
+      "status": "PASS",
+      "detail_code": "authenticated_fixture_observed"
+    },
+    {
+      "id": "portable_shebang",
+      "status": "PASS",
+      "detail_code": "authenticated_fixture_observed"
+    },
+    {
+      "id": "ripgrep",
+      "status": "PASS",
+      "detail_code": "authenticated_fixture_observed"
+    },
+    {
+      "id": "untraced_tools",
+      "status": "PASS",
+      "detail_code": "tool_process_not_traced"
+    }
+  ],
+  "models": [
+    {
+      "requested": "claude-opus-5-5",
+      "status": "PASS",
+      "detail_code": "exact_model_verified",
+      "observed": [
+        "claude-opus-5-5"
+      ]
+    }
+  ],
+  "source": {
+    "commit": "5026120b4fdd6906357e8c292d721e0d938e3c0b",
+    "uncommitted_changes": false
+  },
+  "evidence_notes": "galaxy-s26-ultra-0.21.0-20261010.md",
+  "lifecycle_acceptance": {
+    "scope": "isolated_native_source_bootstrap_no_link",
+    "backend": "native",
+    "alternate_backend": "proot",
+    "model_requests": false,
+    "live_host_links_changed": false,
+    "public_release_delivery": "not_exercised"
+  },
+  "authenticated_workflow": {
+    "generated_at": "2026-10-10T22:09:28Z",
+    "model_requests": true,
+    "live_host_links_changed": false,
+    "exact_fixture_tool_uses": 1,
+    "matching_successful_tool_results": 1,
+    "final_success": true,
+    "fixture_attestation_matches": true,
+    "total_cost_usd": 0.02821,
+    "capture": {
+      "exit_code": 0,
+      "timeout": false,
+      "elapsed_ms": 4846,
+      "bytes": 6206
+    },
+    "maximum_budget_usd": 0.50
+  }
+}

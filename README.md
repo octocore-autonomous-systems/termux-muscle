@@ -8,7 +8,7 @@
 
 An independent community project from [Octocore Autonomous Systems](https://github.com/octocore-autonomous-systems) (OAS). **Not affiliated with, endorsed by, sponsored by, or authorized by Anthropic.** Claude and Claude Code are Anthropic products; your use of them remains subject to Anthropic's terms and account access.
 
-> **0.21.0 prepares channel-following updates and the native backend** on Android **ARM64 / aarch64**, with Claude Code 2.1.296 as its tested pin. Fresh device and authenticated tool acceptance is pending; earlier release reports retain their original scope.
+> **0.21.0 follows Anthropic's release channel and runs Claude Code without PRoot.** Its tested pin is Claude Code 2.1.296 on Android **ARM64 / aarch64**. Private source installation, startup, update, rollback, removal and an authenticated **Opus 5.5** tool workflow passed on the native backend on **Samsung Galaxy S26 Ultra, Android 17, Termux 0.118.3 (GitHub)**, and the PRoot backend passed its startup checks. See the scoped [0.21.0 report](compatibility/galaxy-s26-ultra-0.21.0-20261010.md); other configurations need volunteer evidence.
 
 [Install](#install) · [Commands](#everyday-use) · [Device matrix](docs/device-compatibility.md) · [Troubleshooting](docs/troubleshooting.md) · [Contribute](CONTRIBUTING.md)
 
@@ -108,7 +108,7 @@ A release runs in one of two ways, shown by `termux-muscle versions`:
 | | Native (default) | PRoot (`--backend proot`) |
 | --- | --- | --- |
 | Claude Code and its tools | Ordinary Termux processes | Traced by PRoot on every system call |
-| Measured through the Bash tool, Galaxy S26 Ultra | 300 process starts 3.1 s, `git status` 26 ms, reading a source tree 39 ms | 10.0 s, 120 ms, 154 ms |
+| Measured through the Bash tool, Galaxy S26 Ultra, [two runs](compatibility/galaxy-s26-ultra-0.21.0-20261010.md#timings) | 300 process starts 1.9 to 3.1 s; `git status` 21 to 27 ms; reading a source tree 25 to 39 ms | 5.1 to 10.1 s; 61 to 121 ms; 129 to 164 ms |
 | Downloaded files | Loader path set in the executable; three constants set in the private musl loader | Unchanged |
 | Hooks (`/bin/sh`) | Android's shell | Termux Bash |
 | `/tmp` | Not writable, as in any Termux shell; use `TMPDIR` | Private and writable |
@@ -167,7 +167,7 @@ Model minimums describe client requirements. The Termux Muscle minimum is derive
 
 Model requirements were documented on **2026-09-29** against [Anthropic's model configuration documentation](https://code.claude.com/docs/en/model-config). Availability depends on your account, provider and organization policy; a newer client does not grant model access.
 
-Model acceptance for **0.21.0** is pending; the tables do not assert verification for this release.
+**Opus 5.5** passed authenticated tool acceptance with Termux Muscle **0.21.0** and Claude Code **2.1.296** on **2026-10-10** ([scoped report](compatibility/galaxy-s26-ultra-0.21.0-20261010.md)). Other listed models are not verified by that report.
 
 Earlier measurements, including mixed Fable observations, retain their dated scope in the [device compatibility reports](docs/device-compatibility.md).
 
