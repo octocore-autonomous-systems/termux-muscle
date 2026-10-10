@@ -68,14 +68,11 @@ jobs:
           bash tests/dev/check_format.sh
       - name: Build C helper
         run: make -j2 CFLAGS='-std=c11 -Wall -Wextra -Wpedantic -Werror -O2 -g'
-      - name: Test maintainer release tracking offline
-        if: matrix.compiler == 'gcc'
-        run: python3 -B -m unittest discover -s tests/dev -p 'test_track_upstream.py' -v
-      - name: Test maintainer release helpers offline
+      - name: Check generated CLI files and README tables
         if: matrix.compiler == 'gcc'
         run: |
+          python3 -B scripts/cli_schema.py --check
           python3 -B scripts/readme_compatibility.py --check
-          python3 -B -m unittest discover -s tests/dev -p 'test_release_helpers.py' -v
           python3 -B -m unittest discover -s tests/dev -p 'test_readme_compatibility.py' -v
       - name: Run offline unit and regression tests
         run: make check

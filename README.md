@@ -115,17 +115,6 @@ A release runs in one of two ways, shown by `termux-muscle versions`:
 
 The backend is chosen per release, so `rollback` crosses between them and a running session keeps the one it started with. To move the active Claude Code version to the other backend, name it: `termux-muscle update --claude-version X.Y.Z --backend proot`. On the native backend, write hooks that need Bash as `bash -c '...'` or as a script, and configure an MCP server by its interpreter (`node`, `python3`) when its script starts with `#!/usr/bin/env`. [Architecture →](docs/architecture.md#launch-two-backends)
 
-## Upstream release tracking
-
-The repository's scheduled tracker checks Anthropic's ARM64 musl package every
-six hours and opens a deduplicated compatibility-testing issue when it observes
-a version newer than the project pin. Discovery does not approve compatibility
-or update installations, and installations do not wait for it: `termux-muscle
-update` installs a signed release directly. The issue reminds maintainers to
-refresh the device-tested pin.
-See [release tracking](docs/release-tracking.md) for activation, manual checks,
-failure visibility and scheduling limits.
-
 ## Device compatibility
 
 See the [device compatibility matrix](docs/device-compatibility.md) for tested device, Android/API and Termux configurations, per-check results, evidence reports and limitations. **PASS** means the named check passed; **FAIL** means it failed; **SKIP** means untested.

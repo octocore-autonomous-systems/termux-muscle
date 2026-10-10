@@ -63,8 +63,7 @@ while IFS= read -r file; do
         .githooks/*) fail "unexpected contributor hook: $file";;
     esac
     case "$file" in
-        scripts/track_upstream.py|scripts/cli_schema.py|tests/dev/test_track_upstream.py) ;; # Maintainer-only source; never run by bootstrap.
-        scripts/release_prepare.py|scripts/release_register.py|scripts/readme_compatibility.py|tests/dev/test_release_helpers.py|tests/dev/test_readme_compatibility.py) ;; # Maintainer release helpers; never run by bootstrap.
+        scripts/cli_schema.py|scripts/readme_compatibility.py|tests/dev/test_readme_compatibility.py) ;; # Maintainer-only generators and their test; never run by bootstrap.
         *.c|*.h|*.sh|*.md|*.yml|*.yaml|*.json|Makefile|VERSION|LICENSE|.gitignore|.clang-format|.githooks/pre-commit|docs/man/termux-muscle.1|docs/images/termux-muscle-hero.png|bin/termux-muscle) ;;
         *) fail "unexpected source file type (vendor/build artifacts are excluded): $file";;
     esac

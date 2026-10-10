@@ -337,6 +337,10 @@ with_patchelf "$TM_CORE" acquire-extract "$valid/native-plan.json" "$valid/npm.t
 [[ $("$TM_CORE" json-get "$native/payload.json" claude.binary_sha256) == "$("$TM_CORE" sha256 "$valid/original-claude")" ]]
 [[ $("$TM_CORE" json-get "$native/payload.json" musl.loader_sha256) == "$("$TM_CORE" sha256 "$valid/original-loader")" ]]
 cmp -- "$native/lib/ld-musl-aarch64.so.1" "$valid/configured-loader"
+# The maintainer command names the digest to pin without changing the loader.
+[[ $("$TM_CORE" native-loader-sha256 "$valid/original-loader") == "$("$TM_CORE" sha256 "$valid/configured-loader")" ]]
+[[ $("$TM_CORE" sha256 "$valid/original-loader") == "$("$TM_CORE" json-get "$valid/compatibility.json" musl.loader_sha256)" ]]
+must_fail native_unsupported "$TM_CORE" native-loader-sha256 "$valid/configured-loader"
 cmp -- "$native/lib/tm-resolver.so" "$test_root/build/tm-resolver.so"
 [[ $(stat -c %s "$native/lib/ld-musl-aarch64.so.1") == "$(stat -c %s "$valid/original-loader")" ]]
 # Exactly the three constants differ: 15 + 2 + 2 bytes.
