@@ -67,4 +67,5 @@ int tm_report_main(int argc, char **argv);
 int tm_migration_main(int argc, char **argv);
 int tm_release_main(int argc, char **argv);
 int tm_tooling_main(int argc, char **argv);
+int tm_native_main(int argc, char **argv);
 #endif

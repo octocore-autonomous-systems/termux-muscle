@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: MPL-2.0
-# Maintainer release helper: verify the published release P from a NATIVE shell.
+# Maintainer release helper: verify the published release P.
 #
 #   bash scripts/release_public_verify.sh P LOCAL_SHA256SUMS OUT_DIR
 #
 # Downloads the five public assets, checks them against SHA256SUMS and against the local
 # build's SHA256SUMS, then runs the real public installer in a disposable root with HOME and
-# XDG_DATA_HOME redirected, and proves the live installation was not touched. Writes
+# XDG_DATA_HOME redirected, and proves the live installation was not touched. The installer
+# runs as a new user would run it, so it installs the release Anthropic's channel names and
+# checks Anthropic's signature on it. Run it from an untraced shell: a native Termux shell or a
+# Claude Code session on the native backend. Writes
 # asset-verification.txt, public-install.log and live-fingerprint-{before,after}-public-install.txt
 # into OUT_DIR. Exits non-zero on the first failure.
 set -euo pipefail

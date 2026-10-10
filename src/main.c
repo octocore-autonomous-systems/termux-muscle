@@ -170,6 +170,8 @@ int main(int argc, char **argv) {
         return tm_migration_main(argc, argv);
     if (!strcmp(argv[0], "tooling"))
         return tm_tooling_main(argc, argv);
+    if (!strcmp(argv[0], "native-loader-sha256"))
+        return tm_native_main(argc, argv);
     if (!strcmp(argv[0], "report") || !strcmp(argv[0], "doctor") ||
         !strcmp(argv[0], "startup-check"))
         return tm_report_main(argc, argv);

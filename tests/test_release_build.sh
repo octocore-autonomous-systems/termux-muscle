@@ -10,13 +10,9 @@ fixture_version=$(cat "$project/VERSION")
 mkdir -p "$source/src" "$source/bin" "$source/lib" "$source/tests" "$source/scripts" "$source/docs"
 mkdir -p "$source/.githooks" "$source/docs/man" "$source/docs/images"
 mkdir -p "$source/tests/dev"
-printf '# maintainer tracker fixture\n' > "$source/scripts/track_upstream.py"
-printf '# maintainer tracker test fixture\n' > "$source/tests/dev/test_track_upstream.py"
 printf '# maintainer CLI schema generator fixture\n' > "$source/scripts/cli_schema.py"
 printf '# maintainer README generator fixture\n' > "$source/scripts/readme_compatibility.py"
-printf '# maintainer release preparation fixture\n' > "$source/scripts/release_prepare.py"
-printf '# maintainer release registration fixture\n' > "$source/scripts/release_register.py"
-printf '# maintainer release helper test fixture\n' > "$source/tests/dev/test_release_helpers.py"
+printf '# maintainer README generator test fixture\n' > "$source/tests/dev/test_readme_compatibility.py"
 # A tiny fixed PNG tests byte preservation, without decoding or editing artwork.
 printf '%s' 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a1XkAAAAASUVORK5CYII=' | base64 --decode > "$source/docs/images/termux-muscle-hero.png"
 printf '.TH TERMUX-MUSCLE 1\n.SH NAME\ntermux-muscle \- fixture manual\n' > "$source/docs/man/termux-muscle.1"
@@ -73,8 +69,7 @@ grep -q '/.githooks/pre-commit$' "$work/names" || fail 'contributor hook omitted
 tar -tvzf "$work/dist/$asset" > "$work/modes"
 grep -Eq '^-rwxr-xr-x .*[/]\.githooks/pre-commit$' "$work/modes" || fail 'contributor hook is not executable'
 if grep -Eq '/build/|\.pyz$|\.pyc$|tm-core$' "$work/names"; then fail 'archive included compiler output or bytecode'; fi
-for approved in scripts/track_upstream.py scripts/cli_schema.py scripts/readme_compatibility.py tests/dev/test_track_upstream.py \
-    scripts/release_prepare.py scripts/release_register.py tests/dev/test_release_helpers.py; do
+for approved in scripts/cli_schema.py scripts/readme_compatibility.py tests/dev/test_readme_compatibility.py; do
     tar -xOzf "$work/dist/$asset" "termux-muscle-$fixture_version/$approved" > "$work/python-source"
     cmp "$work/python-source" "$source/$approved" || fail 'maintainer Python source omitted or changed'
 done
@@ -132,7 +127,7 @@ run_build
 rm "$source/src/vendor.so"
 passed
 
-for unexpected in "$source/scripts/foreign.py" "$source/tests/dev/foreign.py" "$source/scripts/track_upstream.pyc"; do
+for unexpected in "$source/scripts/foreign.py" "$source/tests/dev/foreign.py" "$source/scripts/cli_schema.pyc"; do
     printf 'unexpected source or bytecode\n' > "$unexpected"
     run_build
     [[ $status != 0 ]] || fail 'non-allowlisted Python source or bytecode accepted'

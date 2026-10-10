@@ -26,6 +26,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <openssl/evp.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -58,7 +59,8 @@ static const struct {
     {"LD_LIBRARY_PATH", "TM_LIBRARY_PATH"},
 };
 
-static void configure_loader(const char *path, const char *expected) {
+/* The loader's bytes with every setting applied; the file is not changed. */
+static char *configured_loader(const char *path, size_t *total) {
     size_t size;
     char *bytes = tm_read_file(path, MAX_LOADER, &size);
     for (size_t i = 0; i < sizeof settings / sizeof *settings; i++) {
@@ -79,12 +81,39 @@ static void configure_loader(const char *path, const char *expected) {
                 "This musl loader cannot be configured for native execution; use --backend proot.");
         memcpy(match, settings[i].to, length);
     }
+    *total = size;
+    return bytes;
+}
+
+static void configure_loader(const char *path, const char *expected) {
+    size_t size;
+    char *bytes = configured_loader(path, &size);
     tm_atomic_write(path, bytes, size, 0700);
     free(bytes);
     char actual[65];
     tm_sha256(path, actual);
     if (strcmp(actual, expected))
         tm_die("integrity_failed", "The configured musl loader differs from its recorded SHA-256.");
+}
+
+/* native-loader-sha256 LOADER: the digest to pin as musl.native_loader_sha256
+ * for a verified, unconfigured loader. Maintainers run it when the loader pin
+ * changes; installation only ever compares against the pinned value. */
+int tm_native_main(int argc, char **argv) {
+    if (argc != 2 || strcmp(argv[0], "native-loader-sha256"))
+        tm_die("usage", "Usage: native-loader-sha256 LOADER");
+    tm_regular(argv[1]);
+    size_t size;
+    char *bytes = configured_loader(argv[1], &size);
+    unsigned char digest[EVP_MAX_MD_SIZE];
+    unsigned int length = 0;
+    if (EVP_Digest(bytes, size, digest, &length, EVP_sha256(), NULL) != 1 || length != 32)
+        tm_die("integrity_failed", "Cannot hash the configured loader.");
+    for (unsigned int i = 0; i < length; i++)
+        printf("%02x", digest[i]);
+    putchar('\n');
+    free(bytes);
+    return 0;
 }
 
 /* tm-resolver.so is built with the helper and installed beside it. */
