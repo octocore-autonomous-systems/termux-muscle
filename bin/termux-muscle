@@ -23,8 +23,9 @@ tm_help() { tm_schema_help "${1:-}"; }
 tm_preflight() {
     local dependency
     [[ -x $TM_CORE ]] || tm_error helper_missing 'Build this checkout with make, or rerun the source installer.'
-    [[ -d $TM_PREFIX && -x $TM_PREFIX/bin/proot && -x $TM_PREFIX/bin/bash ]] ||
-        tm_error prerequisites 'Use native Termux with proot and bash installed; check --prefix.'
+    # Each backend reports its own missing tool (patchelf or proot) when used.
+    [[ -d $TM_PREFIX && -x $TM_PREFIX/bin/bash ]] ||
+        tm_error prerequisites 'Use native Termux with bash installed; check --prefix.'
     [[ $(uname -m) == aarch64 ]] || tm_error unsupported_platform 'This release supports the official ARM64 musl Claude Code backend.'
     for dependency in timeout sha256sum; do command -v "$dependency" >/dev/null || tm_error prerequisites "Missing command: $dependency"; done
 }
@@ -69,11 +70,16 @@ tm_install_release() (
     set -euo pipefail
     local operation=$1; shift
     local selector='' policy=signed offline=false no_link=false arg manifest=$TM_SOURCE/compatibility.json
-    local channel='' active='' newest
+    local channel='' active='' newest backend=''
     while (($#)); do
         arg=$1; shift
         case $arg in
             --claude-version) (($#)) || tm_error usage '--claude-version needs a value.'; selector=$1; shift ;;
+            --backend)
+                (($#)) || tm_error usage '--backend needs native or proot.'
+                [[ $operation != repair ]] || tm_error usage 'repair keeps the backend of the release it rebuilds.'
+                case $1 in native|proot) backend=$1 ;; *) tm_error usage '--backend needs native or proot.' ;; esac
+                shift ;;
             --allow-unverified) policy=allow-unverified ;;
             --offline) offline=true ;;
             --no-link) [[ $operation == install ]] || tm_error usage '--no-link applies to install only.'; no_link=true ;;
@@ -121,6 +127,10 @@ tm_install_release() (
     work=$(mktemp -d "$TM_ROOT/cache/.lifecycle.XXXXXXXX")
     trap 'rm -rf -- "$work"' EXIT
     tm_acquire_plan "$manifest" "$selector" "$policy" "$offline" "$work/plan.json"
+    if [[ -n $backend ]]; then
+        "$TM_CORE" acquire-backend "$work/plan.json" "$backend" > "$work/chosen.json"
+        mv -f -- "$work/chosen.json" "$work/plan.json"
+    fi
     version=$("$TM_CORE" acquire-field "$work/plan.json" version)
     id=$("$TM_CORE" state "$TM_ROOT" candidate "$version")
     printf 'Preparing Claude Code %s...\n' "$version" >&2

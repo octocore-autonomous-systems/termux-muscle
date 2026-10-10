@@ -12,6 +12,8 @@ The initial implementation does **not copy source code** from these projects. Ou
 | [gtbuchanan/claude-code-termux](https://github.com/gtbuchanan/claude-code-termux) | `47dd8fe` | Embedded binary dispatch, child execution paths, live Termux DNS and careful management of loader variables. |
 | [Khronos31: running recent Claude Code on Termux](https://zenn.dev/khronos31/articles/termux-claude-code-latest) | Article reviewed 2026-09-14 | Official ARM64 musl payload, Alpine loader and PRoot resolver technique. Musl support and staged replacement are prior art, not inventions of this project. |
 | [Anthropic issue #50270](https://github.com/anthropics/claude-code/issues/50270) | Discussion reviewed 2026-09-14 | Evidence of Android installation and native-runtime failures across client versions and devices. |
+| [Aarstad/claude-code-termux-musl](https://github.com/Aarstad/claude-code-termux-musl) | README reviewed 2026-10-10 | Running the official musl build without PRoot by setting its loader path, and keeping termux-exec away from the musl process. Our native backend resolves DNS differently, through the loader and a file descriptor, where that project uses a local proxy. |
+| [Thr45hx/claude-code-termux-native](https://github.com/Thr45hx/claude-code-termux-native) | README reviewed 2026-10-10 | A second PRoot-free design, on the glibc build, and its promote-after-smoke-test update. |
 
 ## Software downloaded separately
 

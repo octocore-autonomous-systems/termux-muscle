@@ -49,9 +49,9 @@ tm_bootstrap() (
                 (($# > 1)) || tm_error usage "$1 needs a directory."
                 if [[ $1 == --source-dir ]]; then source_dir=$2; else build_dir=$2; fi
                 shift 2 ;;
-            --claude-version)
-                (($# > 1)) || tm_error usage '--claude-version needs a value.'
-                selection=(--claude-version "$2"); shift 2 ;;
+            --claude-version|--backend)
+                (($# > 1)) || tm_error usage "$1 needs a value."
+                selection+=("$1" "$2"); shift 2 ;;
             --no-install) no_install=true; shift ;;
             --link) link_claude=true; shift ;;
             --no-link) link_claude=false; shift ;;

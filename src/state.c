@@ -361,30 +361,46 @@ char *tm_store_release(const char *root, const char *id) {
     json_object_put(j);
     return release;
 }
+/* The digests the installed executable and loader must have. The PRoot
+ * backend runs the downloaded bytes; the native backend runs the files it
+ * prepared at installation and recorded under "native". */
+void tm_store_installed(json_object *receipt, const char **binary, const char **loader) {
+    if (tm_backend_native(tm_json_string(receipt, "backend"))) {
+        json_object *native = tm_json_field(receipt, "native", json_type_object);
+        *binary = tm_json_string(native, "binary_sha256");
+        *loader = tm_json_string(native, "loader_sha256");
+    } else {
+        *binary =
+            tm_json_string(tm_json_field(receipt, "claude", json_type_object), "binary_sha256");
+        *loader = tm_json_string(tm_json_field(receipt, "musl", json_type_object), "loader_sha256");
+    }
+}
 void tm_store_verify(const char *release) {
     char *p = tm_path(release, "payload.json");
     json_object *j = tm_json_read(p);
     free(p);
     if (json_object_get_int(tm_json_field(j, "schema", json_type_int)) != 1 ||
-        strcmp(tm_json_string(j, "backend"), "unmodified-musl-proot") ||
         !tm_version_valid(tm_json_string(j, "version")))
         tm_die("invalid_payload", "Release receipt is invalid.");
-    const char *fields[] = {"claude", "musl"}, *keys[] = {"binary_sha256", "loader_sha256"};
-    const char *paths[] = {"claude", "lib/ld-musl-aarch64.so.1"};
+    bool native = tm_backend_native(tm_json_string(j, "backend"));
+    const char *expected[3] = {NULL, NULL, NULL};
+    const char *paths[] = {"claude", "lib/ld-musl-aarch64.so.1", "lib/tm-resolver.so"};
+    tm_store_installed(j, &expected[0], &expected[1]);
+    if (native)
+        expected[2] =
+            tm_json_string(tm_json_field(j, "native", json_type_object), "resolver_sha256");
     p = tm_path(release, "lib");
     tm_directory(p, false);
     free(p);
-    for (int i = 0; i < 2; i++) {
-        json_object *source = tm_json_field(j, fields[i], json_type_object);
-        const char *expected = tm_json_string(source, keys[i]);
+    for (int i = 0; i < (native ? 3 : 2); i++) {
         char actual[65];
-        if (!tm_hex_valid(expected, 64))
+        if (!tm_hex_valid(expected[i], 64))
             tm_die("invalid_payload", "Release digest is invalid.");
         p = tm_path(release, paths[i]);
         tm_regular(p);
         tm_sha256(p, actual);
         free(p);
-        if (strcmp(expected, actual))
+        if (strcmp(expected[i], actual))
             tm_die("integrity_failed", "Release integrity check failed; run repair or rollback.");
     }
     json_object_put(j);
@@ -716,7 +732,7 @@ int tm_state_main(int argc, char **argv) {
                     *history = tm_json_field(j, "history", json_type_array);
         const char *current = tm_json_optional_string(j, "current"),
                    *previous = tm_json_optional_string(j, "previous");
-        printf("%-10s %-14s %s\n", "Role", "Claude Code", "Source policy");
+        printf("%-10s %-14s %-15s %s\n", "Role", "Claude Code", "Source policy", "Backend");
         for (size_t i = 0; i < json_object_array_length(history); i++) {
             const char *id = json_object_get_string(json_object_array_get_idx(history, i));
             const char *role = current && !strcmp(id, current)     ? "Current"
@@ -724,9 +740,14 @@ int tm_state_main(int argc, char **argv) {
                                                                    : "Retained";
             char *release = tm_store_release(root, id), *p = tm_path(release, "payload.json");
             json_object *receipt = tm_json_read(p);
-            const char *policy = tm_json_optional_string(receipt, "compatibility_status");
-            printf("%-10s %-14.*s %s\n", role, (int)(strchr(id, '-') - id), id,
-                   policy ? policy : "unknown");
+            const char *policy = tm_json_optional_string(receipt, "compatibility_status"),
+                       *backend = tm_json_optional_string(receipt, "backend");
+            printf("%-10s %-14.*s %-15s %s\n", role, (int)(strchr(id, '-') - id), id,
+                   policy ? policy : "unknown",
+                   !backend                              ? "unknown"
+                   : !strcmp(backend, TM_BACKEND_NATIVE) ? "native"
+                   : !strcmp(backend, TM_BACKEND_PROOT)  ? "proot"
+                                                         : "unknown");
             json_object_put(receipt);
             free(p);
             free(release);

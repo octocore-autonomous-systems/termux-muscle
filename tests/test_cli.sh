@@ -144,6 +144,9 @@ case $1 in
         ;;
     context) : ;;
     acquire-prune) printf '%s\0' "$@" > "$TM_FIXTURE_TRACE/prune.argv"; printf '%s\n' '{}' ;;
+    acquire-backend)
+        printf '%s\0' "${@:3}" > "$TM_FIXTURE_TRACE/backend.argv"
+        printf '%s\n' '{"status":"ready","version":"2.1.270"}' ;;
     links) printf '%s\0' "$@" > "$TM_FIXTURE_TRACE/links.argv" ;;
     *) printf 'Unexpected fixture helper operation: %s\n' "$1" >&2; exit 84 ;;
 esac
@@ -362,6 +365,28 @@ expect_argv "$trace/plan.argv" 2.1.300 allow-unverified false
 TM_FIXTURE_CHANNEL=2.1.300 update_cli --claude-version latest --allow-unverified > /dev/null
 expect_argv "$trace/plan.argv" 2.1.300 allow-unverified false
 pass 'offline and pinned updates stay with the project pin; --allow-unverified is the only signature bypass'
+
+# The backend is chosen per release; without the option the plan keeps the
+# project default, and repair keeps the backend of the release it rebuilds.
+for backend in native proot; do
+    reset_trace
+    update_cli --claude-version pinned --backend "$backend" > /dev/null
+    expect_argv "$trace/backend.argv" "$backend"
+    has_event state-activate || fail "a $backend release was not installed"
+done
+reset_trace
+update_cli --claude-version pinned > /dev/null
+[[ ! -e $trace/backend.argv ]] || fail 'a backend was chosen without being asked for'
+reset_trace
+for bad in chroot ''; do
+    if update_cli --claude-version pinned --backend "$bad" > /dev/null 2> "$trace/backend.err"; then fail 'an unknown backend was accepted'; fi
+    grep -Fq -- '--backend needs native or proot' "$trace/backend.err" || fail 'unknown backend was not explained'
+done
+if PATH="$guards:$PATH" "$host_bash" "$cli" --root "$root" --prefix "$prefix" repair --backend native > /dev/null 2> "$trace/backend.err"; then fail 'repair accepted a backend change'; fi
+if has_event acquisition-plan; then fail 'a rejected backend request reached acquisition'; fi
+PATH="$guards:$PATH" "$host_bash" "$cli" --root "$root" --prefix "$prefix" install --no-link --backend native > /dev/null
+expect_argv "$trace/backend.argv" native
+pass 'install and update choose a backend per release; repair keeps the one it rebuilds'
 
 # Reset inherited ignored SIGINT before starting the async test controller.
 "${CC:-cc}" -x c -o "$scratch/reset-signals" - <<'C'

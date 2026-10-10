@@ -128,6 +128,8 @@ def parser() -> tuple[argparse.ArgumentParser, dict[str, argparse.ArgumentParser
                    help="choose the Claude Code release (default: latest)")
     p.add_argument("--allow-unverified", action="store_true",
                    help="skip Anthropic's signature check for this release")
+    p.add_argument("--backend", metavar="native|proot",
+                   help="run without PRoot (native) or inside it (proot)")
     p.add_argument("--offline", action="store_true", help="use verified cached archives")
     p.add_argument("--no-link", action="store_true", help="preserve existing Claude command entries")
     p = command("run")
@@ -138,6 +140,8 @@ def parser() -> tuple[argparse.ArgumentParser, dict[str, argparse.ArgumentParser
                    help="choose the Claude Code release (default: latest)")
     p.add_argument("--allow-unverified", action="store_true",
                    help="skip Anthropic's signature check for this release")
+    p.add_argument("--backend", metavar="native|proot",
+                   help="run without PRoot (native) or inside it (proot)")
     p.add_argument("--offline", action="store_true", help="use verified cached archives")
     command("rollback")
     p = command("repair")
@@ -211,7 +215,7 @@ def generate_completion(root: argparse.ArgumentParser, commands: dict[str, argpa
         for action in p._actions:
             if action.option_strings and action.nargs != 0:
                 pattern = "|".join(f"{name}/{flag}" for flag in action.option_strings)
-                kind = "directory" if action.dest in ("root", "prefix") else "file" if action.dest in ("output", "path") else "selector" if action.dest == "claude_version" else "none"
+                kind = "directory" if action.dest in ("root", "prefix") else "file" if action.dest in ("output", "path") else "selector" if action.dest == "claude_version" else "backend" if action.dest == "backend" else "none"
                 value_cases.append(f"        {pattern}) kind={kind} ;;")
     return f'''#!/usr/bin/env bash
 # SPDX-License-Identifier: MPL-2.0
@@ -259,6 +263,7 @@ _termux_muscle_complete() {{
         directory) mapfile -t COMPREPLY < <(compgen -d -- "$current"); return 0 ;;
         file) mapfile -t COMPREPLY < <(compgen -f -- "$current"); return 0 ;;
         selector) mapfile -t COMPREPLY < <(compgen -W 'latest stable pinned' -- "$current"); return 0 ;;
+        backend) mapfile -t COMPREPLY < <(compgen -W 'native proot' -- "$current"); return 0 ;;
         none) return 0 ;;
     esac
     if [[ -z $command ]]; then

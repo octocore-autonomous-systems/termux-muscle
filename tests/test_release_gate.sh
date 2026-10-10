@@ -135,6 +135,19 @@ check; [[ $status != 0 ]] || fail 'symlink report accepted'; rm "$report"; reset
 set_json "$manifest" claude.package '"@someone/claude-code"'; reject 'unofficial package accepted'
 set_json "$manifest" claude.integrity '"sha512-invalid"'; reject 'malformed package integrity accepted'
 set_json "$manifest" musl.url '"https://attacker.example/musl.apk"'; reject 'unofficial loader accepted'
+# Either backend can be a release's default. The native one runs a configured
+# copy of the pinned loader, and that copy's digest has to be pinned as well.
+for backend in unmodified-musl-proot musl-native; do
+    set_json "$manifest" backend "\"$backend\""
+    check; [[ $status == 0 ]] || fail "default backend $backend rejected"; ((count+=1)); reset
+done
+set_json "$manifest" backend '"chroot"'; reject 'unknown backend accepted'
+set_json "$manifest" backend '"musl-native"'
+"$work/verifier" fixture-delete "$manifest" musl.native_loader_sha256; reject 'native default accepted without its configured loader digest'
+set_json "$manifest" musl.native_loader_sha256 '"not-a-digest"'; reject 'malformed configured loader digest accepted'
+set_json "$manifest" backend '"unmodified-musl-proot"'
+"$work/verifier" fixture-delete "$manifest" musl.native_loader_sha256
+check; [[ $status == 0 ]] || fail 'a PRoot default was required to pin a native loader digest'; ((count+=1)); reset
 set_json "$manifest" models.source '"https://code.claude.com.attacker.example/docs"'; reject 'lookalike model source accepted'
 "$work/verifier" fixture-duplicate "$manifest" models.documented; reject 'duplicate documented models accepted'
 set_json "$manifest" models.documented '[]'; reject 'absent documented models accepted'

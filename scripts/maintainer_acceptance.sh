@@ -7,14 +7,20 @@
 #
 #   install (source bootstrap, --no-link) -> isolated startup checks
 #   -> offline update -> optional authenticated shell-tool check
-#   -> offline rollback -> uninstall
+#   -> offline rollback -> the other backend's startup checks -> uninstall
+#
+# The lifecycle runs on the project's default backend (compatibility.json
+# "backend"). The other backend is then installed from the same verified
+# cache and must pass the isolated startup checks, so the fallback a user
+# can select with --backend is known to start on this device.
 #
 # The live installation is never used. Its commands, manual, completion and
 # state are fingerprinted before and after; any difference fails the run.
 #
-# Run from a fresh native Termux shell, NOT from inside Claude Code: a managed
-# Claude session runs inside PRoot, and the runtime deliberately refuses to
-# start a second managed release from there (runtime_nested_conflict).
+# Run from a native Termux shell. A Claude Code session on the PRoot backend
+# is not one: it is traced, and PRoot refuses to start a second managed
+# release from inside it (runtime_nested_conflict). A session on the native
+# backend is an ordinary process, so this script runs there too.
 #
 # Usage: scripts/maintainer_acceptance.sh [--model MODEL_ID] [--output FILE]
 #                                         [--keep-work] [--preflight]
@@ -87,6 +93,11 @@ done
 version=$(<"$SRC/VERSION")
 pin=$(jq -r '.claude.version' "$SRC/compatibility.json")
 musl=$(jq -r '.musl.version' "$SRC/compatibility.json")
+case $(jq -r '.backend' "$SRC/compatibility.json") in
+    musl-native) backend=native other_backend=proot ;;
+    unmodified-musl-proot) backend=proot other_backend=native ;;
+    *) die 'compatibility.json names an unknown backend.' ;;
+esac
 [[ $(jq -r '.project_version' "$SRC/compatibility.json") == "$version" ]] ||
     die 'VERSION and compatibility.json project_version disagree.'
 # Evidence must describe a commit. `make stage` copies whole bin/, lib/ and
@@ -110,6 +121,7 @@ cat >&2 <<PLAN
 Termux Muscle $version acceptance
   source      $SRC (${commit:0:7}$($dirty && printf ', %s uncommitted or untracked file(s)' "$changes"))
   pinned      Claude Code $pin, musl $musl
+  backend     $backend (then $other_backend startup checks)
   live root   $LIVE_ROOT (fingerprinted, never modified)
   model check ${model:-none; shell_tools will be SKIP}${model:+ (one real request: plan usage on a subscription, billed up to \$$BUDGET_USD on an API key)}
   report      $output
@@ -173,11 +185,13 @@ installed=''
 if lifecycle bootstrap --source-dir "$SRC" --build-dir "$SRC/build" --no-link --claude-version pinned; then
     installed=$(state_field current)
     receipt=$root/releases/$installed/payload.json
-    if [[ -n $installed && $(jq -r .version "$receipt") == "$pin" &&
-          $(jq -r .compatibility_status "$receipt") == pinned ]]; then
-        record install PASS private_source_bootstrap_no_link
-    else
+    if [[ -z $installed || $(jq -r .version "$receipt") != "$pin" ||
+          $(jq -r .compatibility_status "$receipt") != pinned ]]; then
         record install FAIL activated_release_not_the_pin
+    elif [[ $(jq -r .backend "$receipt") != "$(jq -r .backend "$SRC/compatibility.json")" ]]; then
+        record install FAIL activated_release_not_the_default_backend
+    else
+        record install PASS private_source_bootstrap_no_link
     fi
 else
     record install FAIL bootstrap_failed
@@ -227,13 +241,16 @@ else
     nonce=$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')
     fixture=$work/fixture/tm-fixture
     printf '%s\n' "$nonce" > "$work/fixture/needle.txt"
-    # The portable shebang exercises the namespace's /usr/bin/env mapping and
-    # rg exercises native tools. Any failure stops before the marker is printed.
+    # The portable shebang exercises /usr/bin/env, which PRoot maps and which
+    # termux-exec provides to a native release's tools; rg exercises native
+    # tools. The script also records whether the tool process is traced. Any
+    # failure stops before the marker is printed.
     cat > "$fixture" <<FIXTURE
 #!/usr/bin/env sh
 set -eu
 dir=\$(dirname -- "\$0")
 rg --fixed-strings --quiet -- '$nonce' "\$dir/needle.txt"
+sed -n 's/^TracerPid:[[:space:]]*//p' /proc/self/status > "\$dir/tracer"
 printf '%s\n' '$nonce' > "\$dir/attestation"
 printf 'TM_FIXTURE_OK %s\n' '$nonce'
 FIXTURE
@@ -278,6 +295,11 @@ Then reply with only the line it printed." \
         record native_shell PASS authenticated_fixture_observed
         record portable_shebang PASS authenticated_fixture_observed
         record ripgrep PASS authenticated_fixture_observed
+        # A native release's tools are ordinary processes; PRoot traces by design.
+        tracer=$(cat "$work/fixture/tracer" 2>/dev/null || :)
+        if [[ $backend != native ]]; then record untraced_tools SKIP proot_backend_traces_by_design
+        elif [[ $tracer == 0 ]]; then record untraced_tools PASS tool_process_not_traced
+        else record untraced_tools FAIL "tool_process_traced"; fi
     elif [[ $tool_exit == 124 || $tool_exit == 137 ]]; then
         record shell_tools FAIL timeout
     elif [[ $(jq length <<< "$uses") == 0 ]]; then
@@ -319,6 +341,25 @@ else
     record rollback SKIP prerequisite_failed
 fi
 
+# -------------------------------------------------------- the other backend
+say "alternate backend: $other_backend startup checks from the verified cache"
+alternate=$work/alternate.json
+if [[ -n $installed ]] && lifecycle update --offline --backend "$other_backend"; then
+    lifecycle test --output "$alternate" || :
+    if [[ -s $alternate ]] && jq -e --arg b "$other_backend" '.claude_code.backend == $b and
+        ([.checks[] | select(.id == "runtime_integrity" or .id == "startup_version" or .id == "startup_help"
+            or .id == "startup_init" or .id == "namespace_shell") | .status] | length == 5 and all(. == "PASS"))' \
+        "$alternate" > /dev/null; then
+        record alternate_backend PASS "${other_backend}_startup_verified"
+    else
+        record alternate_backend FAIL "${other_backend}_startup_checks_failed"
+    fi
+elif [[ -n $installed ]]; then
+    record alternate_backend FAIL "${other_backend}_install_failed"
+else
+    record alternate_backend SKIP prerequisite_failed
+fi
+
 # --------------------------------------------------------------- uninstall
 say 'uninstall: remove the disposable installation'
 if [[ -n $installed ]] && lifecycle uninstall; then
@@ -356,7 +397,7 @@ done | jq -sc .)
 mkdir -p -- "$(dirname -- "$output")"
 jq --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --argjson over "$overrides" --argjson models "$models" \
     --argjson workflow "$workflow" --argjson live "$live_unchanged" --arg notes "$(basename -- "${output%.json}").md" \
-    --arg commit "$commit" --argjson dirty "$dirty" '
+    --arg commit "$commit" --argjson dirty "$dirty" --arg backend "$backend" --arg other "$other_backend" '
     # Observed results replace the diagnostic placeholders by ID; checks the
     # diagnostic report does not know about are appended in ID order.
     ([.checks[].id]) as $ids
@@ -369,6 +410,7 @@ jq --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --argjson over "$overrides" --argjs
     | .models = $models
     | .evidence_notes = $notes
     | .lifecycle_acceptance = {scope: "isolated_native_source_bootstrap_no_link",
+        backend: $backend, alternate_backend: $other,
         model_requests: false, live_host_links_changed: ($live | not),
         public_release_delivery: "not_exercised"}
     | if $workflow == null then . else .authenticated_workflow = $workflow end' \

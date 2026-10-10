@@ -28,9 +28,11 @@ _termux_muscle_complete() {
                 install/--root) ((i++)); continue ;;
                 install/--prefix) ((i++)); continue ;;
                 install/--claude-version) ((i++)); continue ;;
+                install/--backend) ((i++)); continue ;;
                 update/--root) ((i++)); continue ;;
                 update/--prefix) ((i++)); continue ;;
                 update/--claude-version) ((i++)); continue ;;
+                update/--backend) ((i++)); continue ;;
                 rollback/--root) ((i++)); continue ;;
                 rollback/--prefix) ((i++)); continue ;;
                 repair/--root) ((i++)); continue ;;
@@ -76,9 +78,11 @@ _termux_muscle_complete() {
         install/--root) kind=directory ;;
         install/--prefix) kind=directory ;;
         install/--claude-version) kind=selector ;;
+        install/--backend) kind=backend ;;
         update/--root) kind=directory ;;
         update/--prefix) kind=directory ;;
         update/--claude-version) kind=selector ;;
+        update/--backend) kind=backend ;;
         rollback/--root) kind=directory ;;
         rollback/--prefix) kind=directory ;;
         repair/--root) kind=directory ;;
@@ -110,6 +114,7 @@ _termux_muscle_complete() {
         directory) mapfile -t COMPREPLY < <(compgen -d -- "$current"); return 0 ;;
         file) mapfile -t COMPREPLY < <(compgen -f -- "$current"); return 0 ;;
         selector) mapfile -t COMPREPLY < <(compgen -W 'latest stable pinned' -- "$current"); return 0 ;;
+        backend) mapfile -t COMPREPLY < <(compgen -W 'native proot' -- "$current"); return 0 ;;
         none) return 0 ;;
     esac
     if [[ -z $command ]]; then
@@ -117,9 +122,9 @@ _termux_muscle_complete() {
     elif [[ $current == -* ]]; then
         case $command in
         help) options='-h --help --root --prefix' ;;
-        install) options='-h --help --root --prefix --claude-version --allow-unverified --offline --no-link' ;;
+        install) options='-h --help --root --prefix --claude-version --allow-unverified --backend --offline --no-link' ;;
         run) options='' ;;
-        update) options='-h --help --root --prefix --claude-version --allow-unverified --offline' ;;
+        update) options='-h --help --root --prefix --claude-version --allow-unverified --backend --offline' ;;
         rollback) options='-h --help --root --prefix' ;;
         repair) options='-h --help --root --prefix --offline' ;;
         versions) options='-h --help --root --prefix --available --all --json' ;;

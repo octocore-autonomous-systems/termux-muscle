@@ -243,6 +243,11 @@ bool tm_hex_valid(const char *s, size_t length) {
             return false;
     return true;
 }
+bool tm_backend_native(const char *backend) {
+    if (!backend || (strcmp(backend, TM_BACKEND_NATIVE) && strcmp(backend, TM_BACKEND_PROOT)))
+        tm_die("invalid_backend", "Unknown runtime backend; choose native or proot.");
+    return !strcmp(backend, TM_BACKEND_NATIVE);
+}
 bool tm_release_valid(const char *s) {
     if (!s || strlen(s) > 61)
         return false;

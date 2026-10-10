@@ -17,7 +17,7 @@ override DESTDIR := $(value DESTDIR)
 export DESTDIR
 
 .PHONY: all check check-deps check-format check-format-tooling stage clean dist release
-all: build/tm-core
+all: build/tm-core build/tm-resolver.so
 
 check-deps:
 	@command -v $(CC) >/dev/null || { echo 'A C11 compiler is required (Termux package: clang).' >&2; exit 1; }
@@ -30,6 +30,15 @@ build/%.o: src/%.c src/tm.h VERSION | check-deps
 build/tm-core: $(OBJECTS) | check-deps
 	@mkdir -p build
 	$(CC) $(CFLAGS) $(LDFLAGS) $(OBJECTS) $(LDLIBS) -o $@
+
+# The native backend's resolver object is loaded by musl inside Claude Code. It
+# is linked without startup objects or this build's library flags, and names
+# the C library only as "libc", a name every C library's loader, musl's
+# included, takes to mean itself.
+build/tm-resolver.so: src/native/tm-resolver.c | check-deps
+	@mkdir -p build
+	$(CC) -std=c11 -Wall -Wextra -Wpedantic -O2 -fPIC -fno-stack-protector -U_FORTIFY_SOURCE \
+		-shared -nostdlib $< -lc -o $@
 
 build/tests/%: tests/%.c $(LIB_OBJECTS) src/tm.h VERSION | check-deps
 	@mkdir -p build/tests
@@ -47,7 +56,7 @@ check-format-tooling:
 
 # Only stage into a fresh explicit destination; the CLI owns installation.
 stage: all
-	@bash -eu -c 'test -n "$${DESTDIR:-}" || { echo "DESTDIR must name a private staging directory" >&2; exit 1; }; case "$$DESTDIR" in /|.|..) exit 1;; esac; test ! -L "$$DESTDIR"; if test -d "$$DESTDIR"; then shopt -s nullglob dotglob; entries=("$$DESTDIR"/*); test "$${#entries[@]}" -eq 0 || { echo "DESTDIR must be empty" >&2; exit 1; }; fi; mkdir -p "$$DESTDIR/libexec"; cp -R bin lib docs "$$DESTDIR/"; cp build/tm-core "$$DESTDIR/libexec/tm-core"; cp VERSION compatibility.json README.md CONTRIBUTING.md LICENSE CREDITS.md "$$DESTDIR/"; chmod 755 "$$DESTDIR/bin/termux-muscle" "$$DESTDIR/libexec/tm-core"'
+	@bash -eu -c 'test -n "$${DESTDIR:-}" || { echo "DESTDIR must name a private staging directory" >&2; exit 1; }; case "$$DESTDIR" in /|.|..) exit 1;; esac; test ! -L "$$DESTDIR"; if test -d "$$DESTDIR"; then shopt -s nullglob dotglob; entries=("$$DESTDIR"/*); test "$${#entries[@]}" -eq 0 || { echo "DESTDIR must be empty" >&2; exit 1; }; fi; mkdir -p "$$DESTDIR/libexec"; cp -R bin lib docs "$$DESTDIR/"; cp build/tm-core "$$DESTDIR/libexec/tm-core"; cp build/tm-resolver.so "$$DESTDIR/libexec/tm-resolver.so"; cp VERSION compatibility.json README.md CONTRIBUTING.md LICENSE CREDITS.md "$$DESTDIR/"; chmod 755 "$$DESTDIR/bin/termux-muscle" "$$DESTDIR/libexec/tm-core" "$$DESTDIR/libexec/tm-resolver.so"'
 
 dist: all
 	@bash scripts/build_release.sh --output dist

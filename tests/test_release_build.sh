@@ -179,6 +179,8 @@ for file in VERSION compatibility.json LICENSE CREDITS.md README.md; do cp "$sou
 printf 'fixture contribution guide\n' > "$make_source/CONTRIBUTING.md"
 printf '/* empty fixture header */\n' > "$make_source/src/tm.h"
 printf 'int main(void) { return 0; }\n' > "$make_source/src/main.c"
+mkdir -p "$make_source/src/native"
+cp "$project/src/native/tm-resolver.c" "$make_source/src/native/tm-resolver.c"
 cp "$source/bin/termux-muscle" "$make_source/bin/termux-muscle"
 cp "$source/lib/fixture.sh" "$make_source/lib/fixture.sh"
 mkdir -p "$make_source/docs/man"
@@ -186,6 +188,7 @@ cp "$source/docs/man/termux-muscle.1" "$make_source/docs/man/termux-muscle.1"
 destination="$work/stage ' literal \$(unexecuted)"
 make -C "$make_source" stage "DESTDIR=$destination" > "$work/output" 2> "$work/error" || fail 'make staging failed with literal path'
 [[ -x "$destination/libexec/tm-core" && -f "$destination/bin/termux-muscle" ]] || fail 'make expanded literal destination characters'
+[[ -x "$destination/libexec/tm-resolver.so" ]] || fail 'make staging omitted the native resolver object'
 cmp "$destination/docs/man/termux-muscle.1" "$source/docs/man/termux-muscle.1" || fail 'make staging omitted or changed manual'
 set +e
 make -C "$make_source" stage "DESTDIR=$destination" > "$work/output" 2> "$work/error"

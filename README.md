@@ -18,7 +18,8 @@ A Claude Code update can leave Termux with a launcher and no usable binary. Term
 
 - Follows Anthropic's release channel: `termux-muscle update` installs a new Claude Code release as soon as Anthropic's signature on it verifies, without waiting for a Termux Muscle release.
 - Downloads Anthropic's official ARM64 musl package and verifies its bytes before use.
-- Supplies a small PRoot environment with the musl loader, Termux shell, live DNS and certificates.
+- Runs Claude Code as an ordinary Termux process. Nothing traces it, so the commands Claude runs are as fast as in any Termux shell, and `#!/usr/bin/env` scripts work as they do there. A PRoot backend that runs the downloaded bytes unchanged remains one option away.
+- Supplies the musl loader, live DNS and certificates the Linux build expects.
 - Checks a candidate before making it current; keeps a previous release for rollback.
 - Separates runtime updates, account authentication and management-tool updates.
 - Sets up the normal `claude` command after runtime validation, backing up replaced commands for eligible restoration.
@@ -34,9 +35,9 @@ Run this in a **native Termux shell on an ARM64 Android device**:
 curl -fsSL https://github.com/octocore-autonomous-systems/termux-muscle/releases/download/v0.20.0/install.sh | sh
 ```
 
-The installer adds missing Termux prerequisites with `pkg`, verifies the release's source archive, builds the C helper locally and runs its offline tests before installation. Bash manages the lifecycle; the helper uses json-c, libarchive and OpenSSL. Build and test tools are Clang, make, pkg-config and diffutils; tar and gzip unpack the source. Runtime tools are Bash, PRoot, coreutils, ripgrep, curl, gpgv and CA certificates. Termux's `mandoc` package provides the manual viewer. The installed project requires no Python, npm or Ubuntu installation. Contributors can regenerate the checked-in CLI help and completion files from the standard-library `argparse` definition with `python3 scripts/cli_schema.py`; add `--check` to verify they are current.
+The installer adds missing Termux prerequisites with `pkg`, verifies the release's source archive, builds the C helper locally and runs its offline tests before installation. Bash manages the lifecycle; the helper uses json-c, libarchive and OpenSSL. Build and test tools are Clang, make, pkg-config and diffutils; tar and gzip unpack the source. Runtime tools are Bash, patchelf, PRoot, coreutils, ripgrep, curl, gpgv and CA certificates. Termux's `mandoc` package provides the manual viewer. The installed project requires no Python, npm or Ubuntu installation. Contributors can regenerate the checked-in CLI help and completion files from the standard-library `argparse` definition with `python3 scripts/cli_schema.py`; add `--check` to verify they are current.
 
-Local compilation requires downloading a C toolchain when one is not already installed. It builds our helper against your Termux environment; Anthropic's proprietary Claude Code executable is downloaded separately and remains unmodified.
+Local compilation requires downloading a C toolchain when one is not already installed. It builds our helper against your Termux environment. Anthropic's proprietary Claude Code executable is downloaded separately and verified against its pinned or signed SHA-256. The default native backend then sets the loader path in its installed copy and leaves its code and data unchanged; `--backend proot` runs the downloaded bytes as they are. [What each backend changes →](docs/architecture.md#launch-two-backends)
 
 After the runtime passes validation, the installer sets up `claude` in the Termux prefix, `~/.local/bin`, and at the first existing executable `claude` found elsewhere on PATH. Replaced regular files and symlinks are backed up. Start Claude Code and use its normal authentication flow:
 
@@ -81,6 +82,7 @@ normal launches still do. See [startup acceptance](docs/testing.md#isolated-star
 | Check installation health | `termux-muscle doctor` |
 | Move to the newest Claude Code release | `termux-muscle update` (or `claude update`) |
 | Use the Claude Code release this project version was tested with | `termux-muscle update --claude-version pinned` |
+| Run the next release inside PRoot instead, or natively again | `termux-muscle update --backend proot` (or `native`) |
 | Restore the previous local release | `termux-muscle rollback` |
 | Rebuild from verified cached downloads | `termux-muscle repair --offline` |
 | Update this management tool | `termux-muscle self-update` (`--force` to reinstall a compatible version) |
@@ -98,6 +100,20 @@ Source archives are kept for the project pin and for each retained release, so t
 Use `-V` or `--verbose` to stream the full installer, build, and test transcript. With `--json`, either verbose flag has no effect: JSON contains the complete captured transcript. The `transcript.stages` array separates verification, build, test, and installation output for installers that emit stage boundaries; older published installers appear as one `installer` stage. Each stage has base64 `output_base64` bytes.
 
 Ordinary self-update output shows release verification, local build, tests and installation as they start. During tests, one dot means one top level C or shell test program has passed, and the stage ends with passed, skipped and failed program totals. On a terminal, a spinner with elapsed seconds runs during the build, and after the dots a live status shows the running program, its position such as `3/15`, and its elapsed seconds; each is erased when its step ends. Logs and `--json` transcripts receive only the dots, which wrap after 60, and the totals. Set `TM_SELF_UPDATE_PROGRESS_LIVE=0` to turn the live status off. Compiler commands and individual PASS lines stay in a private full log. On failure, the command names the stage and retains that log at the printed path.
+
+## Native and PRoot backends
+
+A release runs in one of two ways, shown by `termux-muscle versions`:
+
+| | Native (default) | PRoot (`--backend proot`) |
+| --- | --- | --- |
+| Claude Code and its tools | Ordinary Termux processes | Traced by PRoot on every system call |
+| Measured through the Bash tool, Galaxy S26 Ultra | 300 process starts 3.1 s, `git status` 26 ms, reading a source tree 39 ms | 10.0 s, 120 ms, 154 ms |
+| Downloaded files | Loader path set in the executable; three constants set in the private musl loader | Unchanged |
+| Hooks (`/bin/sh`) | Android's shell | Termux Bash |
+| `/tmp` | Not writable, as in any Termux shell; use `TMPDIR` | Private and writable |
+
+The backend is chosen per release, so `rollback` crosses between them and a running session keeps the one it started with. To move the active Claude Code version to the other backend, name it: `termux-muscle update --claude-version X.Y.Z --backend proot`. On the native backend, write hooks that need Bash as `bash -c '...'` or as a script, and configure an MCP server by its interpreter (`node`, `python3`) when its script starts with `#!/usr/bin/env`. [Architecture →](docs/architecture.md#launch-two-backends)
 
 ## Upstream release tracking
 

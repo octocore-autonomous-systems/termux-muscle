@@ -313,6 +313,90 @@ tm_acquire_plan "$signed/compatibility.json" pinned signed false "$signed/pin-pl
 [[ ! -s $TM_TEST_CURL_LOG && $("$TM_CORE" json-get "$signed/pin-plan.json" compatibility_status) == pinned ]]
 pass 'channel lookup and signed plans download only the registry record, manifest and signature'
 
+# Native backend: the release is prepared once, at installation, to run without
+# PRoot. The fixtures are synthetic, so a stand-in performs patchelf's one edit;
+# real patchelf meets the real executable in device acceptance.
+mkdir -- "$test_work/tool-bin" "$test_work/no-tools"
+"${CC:-cc}" -std=c11 -Wall -Wextra -Werror "$test_root/tests/fake_patchelf.c" -o "$test_work/tool-bin/patchelf"
+with_patchelf() { PATH="$test_work/tool-bin:$PATH" "$@"; }
+[[ $("$TM_CORE" json-get "$valid/plan.json" backend) == unmodified-musl-proot ]]
+"$TM_CORE" acquire-backend "$valid/plan.json" native > "$valid/native-plan.json"
+[[ $("$TM_CORE" json-get "$valid/native-plan.json" backend) == musl-native ]]
+"$TM_CORE" acquire-backend "$valid/native-plan.json" proot > "$valid/back-plan.json"
+cmp -- "$valid/plan.json" "$valid/back-plan.json"
+must_fail invalid_backend "$TM_CORE" acquire-backend "$valid/plan.json" chroot
+native=$valid/native-release
+mkdir -- "$native"
+with_patchelf "$TM_CORE" acquire-extract "$valid/native-plan.json" "$valid/npm.tgz" "$valid/musl.apk" "$native" > "$valid/native-result.json"
+[[ $("$TM_CORE" json-get "$native/payload.json" backend) == musl-native ]]
+[[ $("$TM_CORE" json-get "$native/payload.json" native.interpreter) == "$native/lib/ld-musl-aarch64.so.1" ]]
+[[ $("$TM_CORE" json-get "$native/payload.json" native.binary_sha256) == "$("$TM_CORE" sha256 "$native/claude")" ]]
+[[ $("$TM_CORE" json-get "$native/payload.json" native.loader_sha256) == "$("$TM_CORE" sha256 "$native/lib/ld-musl-aarch64.so.1")" ]]
+[[ $("$TM_CORE" json-get "$native/payload.json" native.resolver_sha256) == "$("$TM_CORE" sha256 "$native/lib/tm-resolver.so")" ]]
+# The receipt still records the digests of the verified originals.
+[[ $("$TM_CORE" json-get "$native/payload.json" claude.binary_sha256) == "$("$TM_CORE" sha256 "$valid/original-claude")" ]]
+[[ $("$TM_CORE" json-get "$native/payload.json" musl.loader_sha256) == "$("$TM_CORE" sha256 "$valid/original-loader")" ]]
+cmp -- "$native/lib/ld-musl-aarch64.so.1" "$valid/configured-loader"
+cmp -- "$native/lib/tm-resolver.so" "$test_root/build/tm-resolver.so"
+[[ $(stat -c %s "$native/lib/ld-musl-aarch64.so.1") == "$(stat -c %s "$valid/original-loader")" ]]
+# Exactly the three constants differ: 15 + 2 + 2 bytes.
+[[ $(cmp -l "$valid/original-loader" "$native/lib/ld-musl-aarch64.so.1" | wc -l) == 19 ]]
+grep -aq '/proc/self/fd/99' "$native/lib/ld-musl-aarch64.so.1" && grep -aq 'TM_PRELOAD' "$native/lib/ld-musl-aarch64.so.1" && grep -aq 'TM_LIBRARY_PATH' "$native/lib/ld-musl-aarch64.so.1"
+! grep -aq -e '/etc/resolv.conf' -e 'LD_PRELOAD' -e 'LD_LIBRARY_PATH' "$native/lib/ld-musl-aarch64.so.1" || fail 'a loader constant was left in place'
+# In the executable only the program header that names the loader changed
+# (three 8-byte fields), and the new loader path was added.
+original_size=$(stat -c %s "$valid/original-claude")
+changed=$(cmp -l -n "$original_size" "$valid/original-claude" "$native/claude" | wc -l) || :
+((changed > 0 && changed <= 24)) || fail "the executable changed in $changed bytes besides its loader path"
+grep -aq -- "$native/lib/ld-musl-aarch64.so.1" "$native/claude"
+pass 'native release: loader configured to its pinned digest, resolver object installed, loader path set and recorded'
+
+"$TM_CORE" acquire-plan "$native/payload.json" pinned pinned > "$valid/native-repair-plan.json"
+[[ $("$TM_CORE" json-get "$valid/native-repair-plan.json" backend) == musl-native ]]
+if "$TM_CORE" json-get "$valid/native-repair-plan.json" native > /dev/null 2>&1; then fail 'a plan carried installed digests from an old receipt'; fi
+mkdir -- "$valid/native-rebuilt"
+with_patchelf "$TM_CORE" acquire-extract "$valid/native-repair-plan.json" "$valid/npm.tgz" "$valid/musl.apk" "$valid/native-rebuilt" > /dev/null
+[[ $("$TM_CORE" json-get "$valid/native-rebuilt/payload.json" native.loader_sha256) == "$("$TM_CORE" json-get "$native/payload.json" native.loader_sha256)" ]]
+[[ $("$TM_CORE" json-get "$valid/native-rebuilt/payload.json" native.interpreter) == "$valid/native-rebuilt/lib/ld-musl-aarch64.so.1" ]]
+pass 'a native receipt rebuilds as native, with fresh installed digests'
+
+for mode in native-wrong-loader-hash native-missing-setting native-duplicate-setting native-unpinned; do
+    fixture "$mode"
+    "$TM_CORE" acquire-plan "$test_work/$mode/compatibility.json" pinned pinned > "$test_work/$mode/plan.json"
+    expected=native_unsupported; [[ $mode != native-wrong-loader-hash ]] || expected=integrity_failed
+    if [[ $mode == native-unpinned ]]; then
+        must_fail native_unsupported "$TM_CORE" acquire-backend "$test_work/$mode/plan.json" native
+        continue
+    fi
+    "$TM_CORE" acquire-backend "$test_work/$mode/plan.json" native > "$test_work/$mode/native-plan.json"
+    mkdir -- "$test_work/$mode/release"
+    must_fail "$expected" with_patchelf "$TM_CORE" acquire-extract "$test_work/$mode/native-plan.json" "$test_work/$mode/npm.tgz" "$test_work/$mode/musl.apk" "$test_work/$mode/release"
+    [[ ! -e "$test_work/$mode/release/payload.json" ]]
+    # The same sources still install under PRoot, byte for byte.
+    mkdir -- "$test_work/$mode/proot-release"
+    "$TM_CORE" acquire-extract "$test_work/$mode/plan.json" "$test_work/$mode/npm.tgz" "$test_work/$mode/musl.apk" "$test_work/$mode/proot-release" > /dev/null
+    cmp -- "$test_work/$mode/original-loader" "$test_work/$mode/proot-release/lib/ld-musl-aarch64.so.1"
+done
+pass 'a loader that does not configure to its pinned digest never becomes a native release'
+
+# patchelf missing, failing, or reporting success without doing the edit.
+for case in missing failing idle; do
+    mkdir -- "$valid/patchelf-$case"
+    tools=$test_work/no-tools expected=native_failed
+    case $case in
+        missing) expected=prerequisites ;;
+        failing) tools=$test_work/patchelf-failing; mkdir -- "$tools"; printf '#!%s\nexit 1\n' "$(command -v bash)" > "$tools/patchelf" ;;
+        idle) tools=$test_work/patchelf-idle; mkdir -- "$tools"; printf '#!%s\nexit 0\n' "$(command -v bash)" > "$tools/patchelf" ;;
+    esac
+    [[ $case == missing ]] || chmod 700 "$tools/patchelf"
+    must_fail "$expected" env PATH="$tools" "$TM_CORE" acquire-extract "$valid/native-plan.json" "$valid/npm.tgz" "$valid/musl.apk" "$valid/patchelf-$case"
+    [[ ! -e "$valid/patchelf-$case/payload.json" ]]
+done
+mkdir -- "$valid/spaced native"
+must_fail native_unsupported with_patchelf "$TM_CORE" acquire-extract "$valid/native-plan.json" "$valid/npm.tgz" "$valid/musl.apk" "$valid/spaced native"
+[[ ! -e "$valid/spaced native/payload.json" ]]
+pass 'native preparation needs patchelf, checks the result itself and refuses a path its loader could not name'
+
 # Cache cleanup: the pin and every retained release keep their source archives;
 # archives that nothing retained refers to are removed.
 store=$test_work/prune-root

@@ -123,12 +123,10 @@ static char *context_validate(json_object *context, const char *root, const char
         tm_die("runtime_context_invalid", "Runtime namespace identity is invalid; run repair.");
     char *payload_path = tm_path(release, "payload.json");
     json_object *payload = tm_json_read(payload_path);
-    json_object *claude = tm_json_field(payload, "claude", json_type_object);
-    json_object *musl = tm_json_field(payload, "musl", json_type_object);
-    if (strcmp(tm_json_string(context, "binary_sha256"), tm_json_string(claude, "binary_sha256")) !=
-            0 ||
-        strcmp(tm_json_string(context, "loader_sha256"), tm_json_string(musl, "loader_sha256")) !=
-            0)
+    const char *binary_hash, *loader_hash;
+    tm_store_installed(payload, &binary_hash, &loader_hash);
+    if (strcmp(tm_json_string(context, "binary_sha256"), binary_hash) != 0 ||
+        strcmp(tm_json_string(context, "loader_sha256"), loader_hash) != 0)
         tm_die("runtime_context_invalid",
                "Namespace source hashes disagree with the release receipt; run repair.");
     free(payload_path);
@@ -170,6 +168,7 @@ static long tracer_pid(void) {
     return tracer;
 }
 
+/* The release whose PRoot namespace this process runs in, or NULL outside one. */
 static char *nested_release(const char *root, const char *prefix) {
     struct stat info;
     if (lstat(TM_NAMESPACE_PATH, &info) == 0) {
@@ -181,10 +180,6 @@ static char *nested_release(const char *root, const char *prefix) {
     if (errno != ENOENT)
         tm_die("runtime_context_invalid",
                "Cannot inspect the runtime namespace; start a fresh Termux shell.");
-    if (tracer_pid() != 0)
-        tm_die(
-            "runtime_foreign_tracer",
-            "This process is already traced outside the managed runtime; use a fresh Termux shell.");
     return NULL;
 }
 
@@ -205,6 +200,53 @@ static char *bind_argument(const char *source, const char *destination) {
     snprintf(value, size, "%s:%s!", source, destination);
     return value;
 }
+
+/* Constant shell source for the diagnostic probe, with host paths supplied as
+ * positional arguments. It exercises the shell environment a release gives
+ * Claude Code without executing vendor code, reading account data or claiming
+ * authenticated tool coverage. Normal exits and signals remove scratch;
+ * SIGKILL residue stays beneath the leased release's private runtime-tmp.
+ *
+ * Under PRoot the probe checks the mapped /bin/sh and /usr/bin/env. The native
+ * backend maps nothing: it checks that Termux's own env, shell and ripgrep run
+ * and that a script can be written and run from scratch storage. Portable
+ * shebangs are termux-exec's job, in the caller's environment. */
+static char proot_probe[] =
+    "set -euo pipefail\n"
+    "umask 077\n"
+    "prefix=$1\n"
+    "ripgrep=$2\n"
+    "work=$(\"$prefix/bin/mktemp\" -d \"$TMPDIR/.namespace-probe.XXXXXXXX\")\n"
+    "trap '\"$prefix/bin/rm\" -rf -- \"$work\"' EXIT\n"
+    "trap 'exit 129' HUP\n"
+    "trap 'exit 130' INT\n"
+    "trap 'exit 143' TERM\n"
+    "[[ $(/bin/sh -c 'test -n \"${BASH_VERSION:-}\" && printf namespace-sh-ok') == namespace-sh-ok ]]\n"
+    "printf '%s\\n' '#!/usr/bin/env bash' 'set -euo pipefail' "
+    "'[[ -n ${BASH_VERSION:-} ]]' 'printf namespace-env-ok' > \"$work/portable hook\"\n"
+    "\"$prefix/bin/chmod\" 700 \"$work/portable hook\"\n"
+    "[[ $(\"$work/portable hook\") == namespace-env-ok ]]\n"
+    "printf '%s\\n' namespace-rg-ok > \"$work/rg input\"\n"
+    "[[ $(\"$ripgrep\" -F -x namespace-rg-ok \"$work/rg input\") == namespace-rg-ok ]]\n"
+    "printf '%s\\n' namespace_shell:PASS\n";
+static char native_probe[] =
+    "set -euo pipefail\n"
+    "umask 077\n"
+    "prefix=$1\n"
+    "ripgrep=$2\n"
+    "work=$(\"$prefix/bin/mktemp\" -d \"$TMPDIR/.native-probe.XXXXXXXX\")\n"
+    "trap '\"$prefix/bin/rm\" -rf -- \"$work\"' EXIT\n"
+    "trap 'exit 129' HUP\n"
+    "trap 'exit 130' INT\n"
+    "trap 'exit 143' TERM\n"
+    "[[ $(\"$prefix/bin/env\" bash -c 'test -n \"${BASH_VERSION:-}\" && printf native-env-ok') == native-env-ok ]]\n"
+    "printf '%s\\n' 'set -euo pipefail' '[[ -n ${BASH_VERSION:-} ]]' 'printf native-script-ok' "
+    "> \"$work/termux hook\"\n"
+    "\"$prefix/bin/chmod\" 700 \"$work/termux hook\"\n"
+    "[[ $(\"$prefix/bin/bash\" \"$work/termux hook\") == native-script-ok ]]\n"
+    "printf '%s\\n' native-rg-ok > \"$work/rg input\"\n"
+    "[[ $(\"$ripgrep\" -F -x native-rg-ok \"$work/rg input\") == native-rg-ok ]]\n"
+    "printf '%s\\n' namespace_shell:PASS\n";
 
 static int run_runtime(int argc, char **argv, const char *root, const char *prefix) {
     bool shell_probe = strcmp(argv[0], "shell-probe") == 0;
@@ -232,14 +274,26 @@ static int run_runtime(int argc, char **argv, const char *root, const char *pref
             tm_die("invalid_release", "The selected runtime identifier is invalid.");
         selected = tm_strdup(argv[3]);
     }
-    if (pinned && strcmp(pinned, selected) != 0)
-        tm_die(
-            "runtime_nested_conflict",
-            "This session pins another release; run candidate checks from a fresh Termux shell.");
 
     int lease = tm_store_lease(root, selected, false, false);
     char *release = tm_store_release(root, selected);
     bind_path_check(release);
+    char *receipt_path = tm_path(release, "payload.json");
+    json_object *receipt = tm_json_read(receipt_path);
+    bool native = tm_backend_native(tm_json_string(receipt, "backend"));
+    json_object_put(receipt);
+    free(receipt_path);
+    /* PRoot cannot start inside another tracer, and a PRoot session can only
+     * run the release its namespace was built for. A native release is an
+     * ordinary program and has neither limit. */
+    if (!native && pinned && strcmp(pinned, selected) != 0)
+        tm_die(
+            "runtime_nested_conflict",
+            "This session pins another release; run candidate checks from a fresh Termux shell.");
+    if (!native && !pinned && tracer_pid() != 0)
+        tm_die(
+            "runtime_foreign_tracer",
+            "This process is already traced outside the managed runtime; use a fresh Termux shell.");
     tm_store_verify(release);
     char *context_path = tm_path(release, TM_CONTEXT_NAME);
     json_object *context = read_context(context_path);
@@ -257,7 +311,6 @@ static int run_runtime(int argc, char **argv, const char *root, const char *pref
     char *loader = tm_path(release, "lib/ld-musl-aarch64.so.1");
     executable(binary);
     executable(loader);
-    char *proot = prefix_executable(prefix, "bin/proot");
     char *shell = prefix_executable(prefix, "bin/bash");
     char *env_command = prefix_executable(prefix, "bin/env");
     char *ripgrep = prefix_executable(prefix, "bin/rg");
@@ -274,8 +327,6 @@ static int run_runtime(int argc, char **argv, const char *root, const char *pref
                    "Cannot isolate the shell diagnostic from startup hooks.");
     }
 
-    if (unsetenv("LD_PRELOAD") != 0 || unsetenv("LD_LIBRARY_PATH") != 0)
-        tm_die("runtime_environment_failed", "Cannot clear incompatible loader settings.");
     set_environment("DISABLE_AUTOUPDATER", "1");
     set_environment("USE_BUILTIN_RIPGREP", "0");
     if (!getenv("SHELL"))
@@ -297,8 +348,6 @@ static int run_runtime(int argc, char **argv, const char *root, const char *pref
     tm_directory(temporary, false);
     if (access(temporary, W_OK | X_OK) != 0)
         tm_die("runtime_path_invalid", "Runtime temporary storage is not writable; run repair.");
-    set_environment("TMPDIR", temporary);
-    set_environment("BUN_TMPDIR", temporary);
     set_environment("SSL_CERT_FILE", certificate);
     char descriptor_text[32];
     snprintf(descriptor_text, sizeof(descriptor_text), "%d", lease);
@@ -306,53 +355,78 @@ static int run_runtime(int argc, char **argv, const char *root, const char *pref
 
     char **command = tm_alloc(((size_t)argc + 32) * sizeof(char *));
     size_t n = 0;
-    if (!pinned) {
-        command[n++] = proot;
-        if (probe)
-            command[n++] = "--kill-on-exit";
-        const char *sources[] = {loader,      loader,    resolver,    shell,
-                                 env_command, temporary, context_path};
-        const char *destinations[] = {"/lib/ld-musl-aarch64.so.1",
-                                      "/lib/libc.musl-aarch64.so.1",
-                                      "/etc/resolv.conf",
-                                      "/bin/sh",
-                                      "/usr/bin/env",
-                                      "/tmp",
-                                      TM_NAMESPACE_PATH};
-        for (size_t i = 0; i < sizeof(sources) / sizeof(sources[0]); ++i) {
-            command[n++] = "-b";
-            command[n++] = bind_argument(sources[i], destinations[i]);
+    if (native) {
+        /* The private loader reads TM_PRELOAD and TM_LIBRARY_PATH in place of
+         * the LD_ names, so the caller's LD_PRELOAD (normally termux-exec)
+         * stays in the environment for the Android programs Claude Code runs.
+         * tm-resolver.so opens the resolver file named here in each Claude
+         * Code process; musl reads it through descriptor 99. */
+        char *resolver_object = tm_path(release, "lib/tm-resolver.so");
+        executable(resolver_object);
+        set_environment("TM_PRELOAD", resolver_object);
+        set_environment("TM_RESOLV_CONF", resolver);
+        if (unsetenv("TM_LIBRARY_PATH") != 0)
+            tm_die("runtime_environment_failed", "Cannot prepare the runtime environment.");
+        /* A Termux shell preloads termux-exec, which is what makes
+         * #!/usr/bin/env and /bin/sh scripts run on Android. A service or
+         * another program may start Claude Code without it; supply Termux's
+         * own default then, so tools behave as they do in a Termux shell. A
+         * caller that sets LD_PRELOAD, even to nothing, keeps its choice. */
+        if (!getenv("LD_PRELOAD")) {
+            const char *names[] = {"lib/libtermux-exec-ld-preload.so", "lib/libtermux-exec.so"};
+            for (size_t i = 0; i < sizeof names / sizeof *names; i++) {
+                char *library = tm_path(prefix, names[i]);
+                /* LD_PRELOAD separates entries with spaces and colons. */
+                bool present = !strpbrk(library, " :\t\n") && access(library, R_OK) == 0;
+                if (present)
+                    set_environment("LD_PRELOAD", library);
+                free(library);
+                if (present)
+                    break;
+            }
+        }
+        /* Android's /tmp is not writable. Claude Code's own scratch files
+         * default to it, so point them at the caller's temporary directory. */
+        if (shell_probe)
+            set_environment("TMPDIR", temporary);
+        else if (!getenv("TMPDIR")) {
+            char *fallback = tm_path(prefix, "tmp");
+            set_environment("TMPDIR", fallback);
+            free(fallback);
+        }
+        if (!getenv("CLAUDE_CODE_TMPDIR"))
+            set_environment("CLAUDE_CODE_TMPDIR", getenv("TMPDIR"));
+    } else {
+        char *proot = prefix_executable(prefix, "bin/proot");
+        if (unsetenv("LD_PRELOAD") != 0 || unsetenv("LD_LIBRARY_PATH") != 0)
+            tm_die("runtime_environment_failed", "Cannot clear incompatible loader settings.");
+        set_environment("TMPDIR", temporary);
+        set_environment("BUN_TMPDIR", temporary);
+        if (!pinned) {
+            command[n++] = proot;
+            if (probe)
+                command[n++] = "--kill-on-exit";
+            const char *sources[] = {loader,      loader,    resolver,    shell,
+                                     env_command, temporary, context_path};
+            const char *destinations[] = {"/lib/ld-musl-aarch64.so.1",
+                                          "/lib/libc.musl-aarch64.so.1",
+                                          "/etc/resolv.conf",
+                                          "/bin/sh",
+                                          "/usr/bin/env",
+                                          "/tmp",
+                                          TM_NAMESPACE_PATH};
+            for (size_t i = 0; i < sizeof(sources) / sizeof(sources[0]); ++i) {
+                command[n++] = "-b";
+                command[n++] = bind_argument(sources[i], destinations[i]);
+            }
         }
     }
     if (shell_probe) {
-        /* Constant shell source, with all host paths supplied as positional
-         * arguments. This exercises our namespace without executing vendor
-         * code, reading account data, or claiming authenticated tool coverage.
-         * Normal exits/signals remove scratch; SIGKILL residue stays beneath
-         * the leased release's private runtime-tmp for later release cleanup. */
-        static char script[] =
-            "set -euo pipefail\n"
-            "umask 077\n"
-            "prefix=$1\n"
-            "ripgrep=$2\n"
-            "work=$(\"$prefix/bin/mktemp\" -d \"$TMPDIR/.namespace-probe.XXXXXXXX\")\n"
-            "trap '\"$prefix/bin/rm\" -rf -- \"$work\"' EXIT\n"
-            "trap 'exit 129' HUP\n"
-            "trap 'exit 130' INT\n"
-            "trap 'exit 143' TERM\n"
-            "[[ $(/bin/sh -c 'test -n \"${BASH_VERSION:-}\" && printf namespace-sh-ok') == namespace-sh-ok ]]\n"
-            "printf '%s\\n' '#!/usr/bin/env bash' 'set -euo pipefail' "
-            "'[[ -n ${BASH_VERSION:-} ]]' 'printf namespace-env-ok' > \"$work/portable hook\"\n"
-            "\"$prefix/bin/chmod\" 700 \"$work/portable hook\"\n"
-            "[[ $(\"$work/portable hook\") == namespace-env-ok ]]\n"
-            "printf '%s\\n' namespace-rg-ok > \"$work/rg input\"\n"
-            "[[ $(\"$ripgrep\" -F -x namespace-rg-ok \"$work/rg input\") == namespace-rg-ok ]]\n"
-            "printf '%s\\n' namespace_shell:PASS\n";
         command[n++] = shell;
         command[n++] = "--noprofile";
         command[n++] = "--norc";
         command[n++] = "-c";
-        command[n++] = script;
+        command[n++] = native ? native_probe : proot_probe;
         command[n++] = "termux-muscle-namespace-probe";
         command[n++] = (char *)prefix;
         command[n++] = ripgrep;

@@ -389,7 +389,8 @@ static json_object *environment(const char *prefix) {
     const char *names[] = {"bash",       "coreutils", "curl", "ca-certificates", "proot",
                            "ripgrep",    "clang",     "make", "pkg-config",      "json-c",
                            "libarchive", "openssl",   "zlib", "termux-tools",    "termux-exec",
-                           "diffutils",  "tar",       "gzip", "mandoc"};
+                           "diffutils",  "tar",       "gzip", "mandoc",          "patchelf",
+                           "gpgv"};
     char *dpkg = tm_path(prefix, "bin/dpkg-query");
     for (size_t i = 0; i < sizeof names / sizeof *names; i++) {
         char *args[] = {dpkg, "-W", "-f=${Version}", "--", (char *)names[i], NULL};
@@ -580,6 +581,8 @@ static void metadata_probe(void *data) {
     addstr(value, "id", id);
     addstr(value, "version", version);
     addstr(value, "musl_version", musl);
+    addstr(value, "backend",
+           tm_backend_native(tm_json_string(receipt, "backend")) ? "native" : "proot");
     tm_json_print(value);
     json_object_put(value);
     json_object_put(receipt);
@@ -769,6 +772,7 @@ static json_object *collect_report(const char *root, const char *prefix, const c
     json_object_object_add(report, "project", project);
     addstr(client, "version", NULL);
     addstr(client, "musl_version", NULL);
+    addstr(client, "backend", NULL);
     json_object_object_add(report, "claude_code", client);
     json_object_object_add(report, "environment", environment(prefix));
     addstr(report, "provenance", "community");
@@ -793,6 +797,7 @@ static json_object *collect_report(const char *root, const char *prefix, const c
     if (valid) {
         addstr(client, "version", version);
         addstr(client, "musl_version", musl);
+        addstr(client, "backend", string_value(receipt, "backend"));
         if (temporary_ready) {
             json_object *startup =
                 startup_acceptance(self, root, prefix, id, version, temporary, &model_flags_ready);

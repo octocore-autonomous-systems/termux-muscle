@@ -276,8 +276,15 @@ static void verify_pins(json_object *manifest) {
     if (strncmp(url, origin, strlen(origin)) || a < b || strcmp(url + a - b, expected) ||
         strstr(url, "..") || strpbrk(url, "?#\\<>"))
         invalid("Loader URL must pin the matching Alpine aarch64 package.");
-    if (strcmp(text_field(manifest, "backend"), "unmodified-musl-proot"))
+    const char *backend = text_field(manifest, "backend");
+    if (strcmp(backend, TM_BACKEND_PROOT) && strcmp(backend, TM_BACKEND_NATIVE))
         invalid("Compatibility backend is not implemented.");
+    /* The native backend runs a configured copy of the pinned loader; its
+     * digest is pinned too, so the configuration cannot drift unnoticed. */
+    const char *configured = tm_json_optional_string(musl, "native_loader_sha256");
+    if ((configured && !tm_hex_valid(configured, 64)) ||
+        (!configured && !strcmp(backend, TM_BACKEND_NATIVE)))
+        invalid("The native backend needs the SHA-256 of its configured musl loader.");
 }
 /* Formerly pinned Claude Code versions stay distinguishable from versions that
  * were never accepted. Each history entry names the project releases that pinned
@@ -629,8 +636,14 @@ static void render_notes(json_object *manifest, json_object *models) {
         fputs("**Development evidence is incomplete. No device acceptance is asserted.**\n\n",
               stdout);
     fputs(
-        "The Bash manager and C helper are built from verified source on the target Termux installation. Anthropic's executable is downloaded separately and remains unmodified.\n\n## Documented model compatibility\n\nDocumentation checked ",
+        "The Bash manager and C helper are built from verified source on the target Termux installation. Anthropic's executable is downloaded separately and verified against its pinned or signed SHA-256. ",
         stdout);
+    fputs(
+        !strcmp(text_field(manifest, "backend"), TM_BACKEND_NATIVE)
+            ? "The default native backend then sets the ELF interpreter path of its installed copy to the release's own musl loader, leaving its code and data unchanged, and runs it as an ordinary process; the PRoot backend (`--backend proot`) runs the downloaded bytes unmodified."
+            : "The default PRoot backend runs it unmodified.",
+        stdout);
+    fputs("\n\n## Documented model compatibility\n\nDocumentation checked ", stdout);
     markdown(text_field(models, "checked_documentation_on"));
     fputs(". Source: ", stdout);
     source_link(text_field(models, "source"));
