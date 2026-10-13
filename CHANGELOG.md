@@ -5,7 +5,9 @@
 - **The test suite passes inside a Claude Code session.** On the native backend a session hands its commands `TM_RESOLV_CONF`, `SSL_CERT_FILE` and `CLAUDE_CODE_TMPDIR`. The launcher honours the first two as overrides and keeps the third, so `make check` run from such a session failed `tests/test_runtime.sh` with "missing precise bind": its fixture launches used the session's resolver and certificate paths. The test runner now clears the three variables before any test program runs, and a regression test covers it. The installer runs the same suite, so `install.sh` and `termux-muscle self-update` started from inside a session were refused at "local tests failed"; they now proceed. A plain Termux shell, CI and the device's scheduled update never set these variables and were unaffected.
 - No runtime change: `tm-core run` still honours `TM_RESOLV_CONF` and `SSL_CERT_FILE`. The pin stays at Claude Code **2.1.296** (`claude.pinned_since` **0.20.0**) and musl at **1.2.6-r2**.
 
-Fresh device and authenticated tool acceptance for this release is pending.
+- Verify **Opus 5.5** on the pin, on the native backend, with an exact authenticated Bash-tool fixture whose tool process is untraced; start the PRoot backend from the same verified cache.
+
+[Galaxy S26 Ultra evidence from 2026-10-13 UTC](compatibility/galaxy-s26-ultra-0.21.1-20261013.md) covers all 15 test programs and fresh maintainer acceptance from clean commit `618677f`, both run from inside a Claude Code session on the native backend, where the suite failed at 0.21.0. Install, isolated startup, authenticated tools, offline update/rollback and removal passed on the native backend and the PRoot backend passed its startup checks. The live installation was unchanged. Optional runtime host probes and the unavailable cross-UID fixture were skipped in the deterministic suite.
 
 ## 0.21.0
 
