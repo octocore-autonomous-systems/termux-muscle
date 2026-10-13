@@ -1,0 +1,19 @@
+# Galaxy S26 Ultra acceptance: Termux Muscle 0.21.1
+
+Verified 2026-10-13 UTC on Samsung Galaxy S26 Ultra (SM-S948U), Android 17 / API 37, Termux 0.118.3 from GitHub. The [JSON report](galaxy-s26-ultra-0.21.1-20261013.json) records the exact kernel, page size, package versions, check results and sanitized workflow metadata. The tested pin is Claude Code **2.1.296** with musl **1.2.6-r2**, on the **native** backend. The report was generated at **2026-10-13T19:32:17Z** by `scripts/maintainer_acceptance.sh` from a clean checkout of source commit **`618677f24cea3fd9c08fd509974e3e9f28e4692c`** (`source.uncommitted_changes: false`). Only the report's relative `evidence_notes` filename was adjusted when registering it; measured results are unchanged.
+
+## Run from inside a Claude Code session
+
+This release fixes the test suite failing inside a Claude Code session on the native backend, so both steps below were run there on purpose: in the Bash tool of a session started by the installed Termux Muscle 0.21.0 with Claude Code 2.1.296, untraced (`TracerPid: 0`), with `TM_RESOLV_CONF`, `SSL_CERT_FILE` and `CLAUDE_CODE_TMPDIR` all set by that session. Earlier reports ran in a plain Termux shell.
+
+Immediately before acceptance, `make check` ran from the same checkout in that session. All **15 C and shell test programs passed**. The same command at 0.21.0 (commit `f67a064`) in the same kind of session stopped at `FAIL runtime: missing precise bind` in `tests/test_runtime.sh`, and passed with the three variables removed or in a plain shell. The suite also passed in a plain Termux shell on the device, without those variables, from the tree that registers this report. The regression test in `tests/test_run.sh` fails with the change to `tests/run.sh` reverted. The optional runtime host-probe group was skipped without `TM_RUNTIME_HOST_PROBES=1`. The cross-UID executable tooling fixture was skipped because no readable Bash executable owned by another UID was available.
+
+A private source bootstrap with `--no-link --claude-version pinned` prepared and activated pinned 2.1.296 on the native backend and passed isolated version, help and initialization checks. An offline update activated a fresh candidate from the verified cache, rollback restored the previous candidate offline, and uninstall removed the owned root. Local diagnostics passed runtime integrity, DNS configuration, command link and shell environment checks. The live installation's commands, manual, completion and state records were fingerprinted before and after and were unchanged.
+
+The authenticated workflow recorded at **2026-10-13T19:32:06Z** used the private runtime with only the Bash tool available. **Opus 5.5** (`claude-opus-5-5`) made exactly one Bash call on a nonce fixture using a portable shebang and `rg`. The script matched the successful tool result, fixture attestation and final response, and recorded `TracerPid: 0` for the tool process (`untraced_tools`: PASS). Every assistant message came from exactly `claude-opus-5-5`. Capture exited 0 in **4989 ms**, without timeout, under a **$0.50 API budget cap**. Raw events and session identifiers were not retained in the public report.
+
+After the lifecycle, the PRoot backend was installed from the same verified cache with `update --offline --backend proot` and passed runtime integrity, isolated version, help and initialization, and its shell namespace check (`alternate_backend`: PASS).
+
+## Not covered
+
+Ordinary command takeover, indexed manual discovery, public HTTPS installer delivery, sustained interactive use, background and screen-off operation, MCP tool calls and other models were not exercised by this acceptance run. The release channel and signature trial and the backend timings of the [0.21.0 report](galaxy-s26-ultra-0.21.0-20261010.md) were not repeated; no code they exercise changed. Earlier reports retain their dated scope. Public delivery can be tested only after publication.
