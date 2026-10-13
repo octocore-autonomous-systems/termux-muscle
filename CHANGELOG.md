@@ -1,5 +1,12 @@
 # Changes
 
+## 0.21.1
+
+- **The test suite passes inside a Claude Code session.** On the native backend a session hands its commands `TM_RESOLV_CONF`, `SSL_CERT_FILE` and `CLAUDE_CODE_TMPDIR`. The launcher honours the first two as overrides and keeps the third, so `make check` run from such a session failed `tests/test_runtime.sh` with "missing precise bind": its fixture launches used the session's resolver and certificate paths. The test runner now clears the three variables before any test program runs, and a regression test covers it. The installer runs the same suite, so `install.sh` and `termux-muscle self-update` started from inside a session were refused at "local tests failed"; they now proceed. A plain Termux shell, CI and the device's scheduled update never set these variables and were unaffected.
+- No runtime change: `tm-core run` still honours `TM_RESOLV_CONF` and `SSL_CERT_FILE`. The pin stays at Claude Code **2.1.296** (`claude.pinned_since` **0.20.0**) and musl at **1.2.6-r2**.
+
+Fresh device and authenticated tool acceptance for this release is pending.
+
 ## 0.21.0
 
 - **Updates follow Anthropic's release channel.** `termux-muscle update` (and `claude update`) installs the version Anthropic's `latest` channel names; `--claude-version stable`, `pinned` or `X.Y.Z` chooses otherwise. A release other than the pin is admitted only when Anthropic's detached signature on its `manifest.json` verifies against the release key built into the manager and the executable has the SHA-256 that manifest signs; `--allow-unverified` is the only way past that. A channel never replaces the active release with an older one. A new Claude Code version no longer needs a Termux Muscle release.
