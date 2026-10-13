@@ -6,6 +6,11 @@ export LC_ALL=C
 # A running older manager exports TM_CORE while invoking the downloaded
 # installer. Always exercise this checkout's freshly built helper.
 export TM_CORE="$PWD/build/tm-core"
+# A Claude Code session on the native backend hands its commands the resolver
+# file, certificate bundle and scratch directory it was launched with. The
+# launcher honours the first two as overrides and keeps the third, so a
+# fixture launch must not inherit them from the session running this suite.
+unset TM_RESOLV_CONF SSL_CERT_FILE CLAUDE_CODE_TMPDIR
 # A self-update runs this suite with its stage-event and progress variables
 # set and progress on FD 3. Only this runner reports progress: some tests run
 # nested installers, which must not see the caller's variables or files.
