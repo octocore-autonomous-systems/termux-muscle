@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: MPL-2.0
 # The test runner reports self-update progress itself, keeps the caller's
-# self-update state away from test programs, and never leaves its live status
-# running after a program or the runner ends.
+# self-update state and a Claude Code session's launch environment away from
+# test programs, and never leaves its live status running after a program or
+# the runner ends.
 set -euo pipefail
 project=$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 work=$(mktemp -d "${TMPDIR:-/tmp}/muscle-run-test.XXXXXXXX")
@@ -13,7 +14,8 @@ pass() { ((count += 1)); }
 mkdir -p "$work/tree/tests" "$work/tree/build"
 cp -- "$project/tests/run.sh" "$work/tree/tests/run.sh"
 cat > "$work/tree/tests/test_a_probe.sh" <<'PROBE'
-env | grep '^TM_SELF_UPDATE_' > "$PROBE_OUT" || :
+env | grep -E '^(TM_SELF_UPDATE_|TM_RESOLV_CONF=|SSL_CERT_FILE=|CLAUDE_CODE_TMPDIR=)' > "$PROBE_OUT" || :
+[[ $TM_CORE == "$PWD/build/tm-core" ]] || printf 'TM_CORE=%s\n' "$TM_CORE" >> "$PROBE_OUT"
 if { printf '' >&3; } 2>/dev/null; then printf 'fd3-open\n' >> "$PROBE_OUT"; fi
 sleep "${PROBE_SLEEP:-0}"
 exit "${PROBE_EXIT:-0}"
@@ -25,6 +27,8 @@ runner() {
     set +e
     env TM_SELF_UPDATE_PROGRESS_MODE=concise TM_SELF_UPDATE_EVENTS="$work/events" \
         TM_SELF_UPDATE_TRANSCRIPT_FILE="$work/transcript" TM_SELF_UPDATE_TARGET_FILE="$work/target" \
+        TM_CORE="$work/installed/tm-core" TM_RESOLV_CONF="$work/session resolv.conf" \
+        SSL_CERT_FILE="$work/session cert.pem" CLAUDE_CODE_TMPDIR="$work/session tmp" \
         PROBE_OUT="$work/probe" COLUMNS=80 "$@" > "$work/stdout" 3> "$work/progress"
     status=$?
     set -e
@@ -40,7 +44,7 @@ settled() {
 runner bash "$work/tree/tests/run.sh"
 ((status == 0)) || fail 'runner failed'
 [[ -f $work/probe ]] || fail 'probe did not run'
-[[ ! -s $work/probe ]] || fail "test program inherited self-update state: $(tr '\n' ' ' < "$work/probe")"
+[[ ! -s $work/probe ]] || fail "test program inherited self-update or session state: $(tr '\n' ' ' < "$work/probe")"
 [[ $(< "$work/progress") == $'..\nTests: 2 passed, 0 skipped, 0 failed.' ]] ||
     fail "non-terminal progress changed: $(< "$work/progress")"
 [[ ! -s $work/events && ! -e $work/target ]] || fail 'test program wrote self-update records'
