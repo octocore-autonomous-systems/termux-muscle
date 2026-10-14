@@ -22,6 +22,9 @@ TM=${XDG_DATA_HOME:-$HOME/.local/share}/termux-muscle
 
 rc=0; termux-muscle self-update > "$OUT/self-update.log" 2>&1 || rc=$?
 [ "$rc" = 0 ] || [ "$rc" = 2 ] || { echo "self-update failed (exit $rc)" >&2; exit 1; }
+# An upgrade can remove the command path this shell cached (0.22.0 removed
+# ~/.local/bin/termux-muscle); Bash would then fail every later call with 127.
+hash -r
 rc=0; termux-muscle self-update > "$OUT/self-update-after-publication.log" 2>&1 || rc=$?
 [ "$rc" = 2 ] && grep -q already_current "$OUT/self-update-after-publication.log" || { echo "second self-update did not report already_current (exit $rc)" >&2; exit 1; }
 [ "$(termux-muscle --version | head -n 1)" = "Termux Muscle $P" ] || { echo "the manager is not $P" >&2; exit 1; }
