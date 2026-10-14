@@ -4,8 +4,9 @@
 
 - **The manager has one PATH entry.** Installation linked `termux-muscle` into both `$PREFIX/bin` and `~/.local/bin`. Both are on PATH, so `type -a termux-muscle` found it twice and `compgen -c termux-`, the list behind Bash command-name completion, printed it twice. The manager is now linked only into `$PREFIX/bin`, which Termux always has on PATH; `~/.local/bin/termux-muscle` is used only when an unrelated command already holds the prefix entry. Upgrading restores (removes) the owned `~/.local/bin` entry earlier releases created, through its ownership journal; a link there that Termux Muscle does not own is left alone. Claude command entries are unchanged. A shell that cached the old path needs `hash -r` or a new shell.
 - **The tested pin moves to Claude Code 2.1.299** (`claude.pinned_since` **0.22.0**), the release Anthropic's `latest` channel names; the executable's SHA-256 is the `linux-arm64-musl` checksum in Anthropic's signed manifest for 2.1.299. 2.1.296 joins `pin_history` with its 0.21.1 report. Musl stays at **1.2.6-r2**.
+- Verify **Opus 5.5** on the new pin, on the native backend, with an exact authenticated Bash-tool fixture whose tool process is untraced; start the PRoot backend from the same verified cache.
 
-Fresh device and authenticated tool acceptance for this release is pending.
+[Galaxy S26 Ultra evidence from 2026-10-14 UTC](compatibility/galaxy-s26-ultra-0.22.0-20261014.md) covers all 15 test programs and fresh maintainer acceptance from clean commit `6fdb9a3`, run from inside a native-backend Claude Code session. Install, isolated startup, authenticated tools, offline update/rollback and removal passed on the native backend on Claude Code 2.1.299, and the PRoot backend passed its startup checks. The live installation was unchanged. Optional runtime host probes and the unavailable cross-UID fixture were skipped in the deterministic suite.
 
 ## 0.21.1
 

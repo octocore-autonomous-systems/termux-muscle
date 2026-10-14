@@ -8,7 +8,7 @@
 
 An independent community project from [Octocore Autonomous Systems](https://github.com/octocore-autonomous-systems) (OAS). **Not affiliated with, endorsed by, sponsored by, or authorized by Anthropic.** Claude and Claude Code are Anthropic products; your use of them remains subject to Anthropic's terms and account access.
 
-> **0.22.0 prepares a single PATH entry for the `termux-muscle` command and moves the tested pin to Claude Code 2.1.299** on Android **ARM64 / aarch64**. Fresh device and authenticated tool acceptance is pending; earlier release reports retain their original scope.
+> **0.22.0 gives the `termux-muscle` command one PATH entry and moves the tested pin to Claude Code 2.1.299** on Android **ARM64 / aarch64**. Private source installation, startup, update, rollback, removal and an authenticated **Opus 5.5** tool workflow passed on the native backend on **Samsung Galaxy S26 Ultra, Android 17, Termux 0.118.3 (GitHub)**, and the PRoot backend passed its startup checks. See the scoped [0.22.0 report](compatibility/galaxy-s26-ultra-0.22.0-20261014.md); other configurations need volunteer evidence.
 
 [Install](#install) · [Commands](#everyday-use) · [Device matrix](docs/device-compatibility.md) · [Troubleshooting](docs/troubleshooting.md) · [Contribute](CONTRIBUTING.md)
 
@@ -169,7 +169,7 @@ Model minimums describe client requirements. The Termux Muscle minimum is derive
 
 Model requirements were documented on **2026-09-29** against [Anthropic's model configuration documentation](https://code.claude.com/docs/en/model-config). Availability depends on your account, provider and organization policy; a newer client does not grant model access.
 
-Model acceptance for **0.22.0** is pending; the tables do not assert verification for this release.
+**Opus 5.5** passed authenticated tool acceptance with Termux Muscle **0.22.0** and Claude Code **2.1.299** on **2026-10-14** ([scoped report](compatibility/galaxy-s26-ultra-0.22.0-20261014.md)). Other listed models are not verified by that report.
 
 Earlier measurements, including mixed Fable observations, retain their dated scope in the [device compatibility reports](docs/device-compatibility.md).
 
