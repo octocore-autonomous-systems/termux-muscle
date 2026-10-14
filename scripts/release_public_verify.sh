@@ -22,7 +22,7 @@ rm -rf "$W"; mkdir -p "$W/assets" "$W/home" "$OUT"
 
 fingerprint() {
   cd "$REAL_HOME"
-  for l in .local/bin/termux-muscle .local/bin/claude; do printf '%s -> %s\n' "$l" "$(readlink "$l")"; done
+  for l in "$PREFIX/bin/termux-muscle" .local/bin/termux-muscle .local/bin/claude; do printf '%s -> %s\n' "$l" "$(readlink "$l")"; done
   sha256sum .local/share/termux-muscle/bin/* .local/share/termux-muscle/installation.json \
     .local/share/termux-muscle/links.json .local/share/termux-muscle/state.json \
     .local/share/termux-muscle/tooling.json "$PREFIX/share/man/man1/termux-muscle.1" \

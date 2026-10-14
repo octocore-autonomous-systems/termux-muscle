@@ -376,7 +376,8 @@ rmdir "$hook_home/.local/bin/claude"
 mv "$scratch/home-original" "$hook_home/.local/bin/claude"
 HOME=$hook_home PATH=$hook_path env -u TMPDIR "$core" with-lock "$root" existing -- bash "$scratch/hook.sh" \
     bootstrap --source-dir "$TM_SOURCE" --build-dir "$TM_SOURCE/build" > "$scratch/hook-output"
-[[ $(readlink "$hook_home/.local/bin/termux-muscle") == "$root/bin/termux-muscle" &&
+[[ ! -e $hook_home/.local/bin/termux-muscle && ! -L $hook_home/.local/bin/termux-muscle &&
+   $(readlink "$prefix/bin/termux-muscle") == "$root/bin/termux-muscle" &&
    $(readlink "$prefix/bin/claude") == "$root/bin/claude" && $(readlink "$shadow/claude") == "$root/bin/claude" &&
    $(readlink "$hook_home/.local/bin/claude") == "$root/bin/claude" && -s $scratch/remote/runtime ]] || fail 'shell bootstrap ownership/install/default links'
 grep -q 'Command ownership record:' "$scratch/hook-output" || fail 'default takeover record not explained'
@@ -386,6 +387,36 @@ unset TM_TEST_STALE_CLAUDE
 pass 'default takeover clears a stale child-shell command hash before selecting the executable PATH winner'
 prefix_scratch=("$prefix/tmp/"*)
 [[ ${#prefix_scratch[@]} == 0 ]] || fail 'bootstrap fallback temporary directory not cleaned'
+
+home_manager=$hook_home/.local/bin/termux-muscle
+manager_bootstrap() {
+    HOME=$hook_home PATH=$hook_path "$core" with-lock "$root" existing -- bash "$scratch/hook.sh" bootstrap \
+        --source-dir "$TM_SOURCE" --build-dir "$TM_SOURCE/build" --no-install > "$scratch/hook-output" 2> "$scratch/error"
+}
+manager_journaled() { "$core" links "$root" status | grep -qF "\"$1\""; }
+# Releases before 0.22.0 also linked the manager into ~/.local/bin, so PATH
+# and `compgen -c` listed it twice. An upgrade restores that owned entry.
+"$core" with-lock "$root" existing -- "$core" links "$root" install "$home_manager" "$root/bin/termux-muscle" > /dev/null
+[[ $(readlink "$home_manager") == "$root/bin/termux-muscle" ]] || fail 'legacy home manager fixture'
+manager_bootstrap
+[[ ! -e $home_manager && ! -L $home_manager && $(readlink "$prefix/bin/termux-muscle") == "$root/bin/termux-muscle" ]] ||
+    fail 'upgrade kept a second owned manager entry'
+! manager_journaled "$home_manager" || fail 'restored home manager entry remained in the journal'
+ln -s -- "$root/bin/termux-muscle" "$home_manager"
+manager_bootstrap
+[[ $(readlink "$home_manager") == "$root/bin/termux-muscle" ]] || fail 'unjournaled home manager link was removed'
+rm -- "$home_manager"
+"$core" with-lock "$root" existing -- "$core" links "$root" restore "$prefix/bin/termux-muscle" > /dev/null
+printf 'foreign prefix manager\n' > "$prefix/bin/termux-muscle"
+manager_bootstrap
+[[ $(cat "$prefix/bin/termux-muscle") == 'foreign prefix manager' && $(readlink "$home_manager") == "$root/bin/termux-muscle" ]] ||
+    fail 'foreign prefix manager did not fall back to ~/.local/bin'
+grep -q "Existing command preserved: $prefix/bin/termux-muscle" "$scratch/error" || fail 'foreign prefix manager lacked guidance'
+rm -- "$prefix/bin/termux-muscle"
+manager_bootstrap
+[[ ! -e $home_manager && ! -L $home_manager && $(readlink "$prefix/bin/termux-muscle") == "$root/bin/termux-muscle" ]] ||
+    fail 'freed prefix entry did not replace the ~/.local/bin fallback'
+pass 'the manager has one PATH entry: prefix first, ~/.local/bin only behind a foreign prefix command, legacy owned duplicate restored'
 
 printf '.SH UPDATED\nNew manual revision.\n' >> "$TM_TEST_STAGE/docs/man/termux-muscle.1"
 HOME=$hook_home PATH=$hook_path "$core" with-lock "$root" existing -- bash "$scratch/hook.sh" bootstrap \
