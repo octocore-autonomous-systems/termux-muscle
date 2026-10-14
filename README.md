@@ -46,7 +46,7 @@ claude auth login
 claude
 ```
 
-The manager is made available in `$PREFIX/bin` and `~/.local/bin` without changing shell startup files. The installer also installs one manual page:
+The manager is made available as `$PREFIX/bin/termux-muscle` without changing shell startup files; `~/.local/bin/termux-muscle` is used instead only when an unrelated command already holds the prefix entry. Upgrading from a release before 0.22.0 removes the second, owned `~/.local/bin` entry those releases also created, so PATH lookups and `compgen -c` list the manager once. The installer also installs one manual page:
 
 ```sh
 termux-muscle --version

@@ -65,7 +65,7 @@ tm_bootstrap() (
         tm_error source_mismatch 'Bootstrap must run the freshly built source checkout and its build directory.'
     [[ $("$build_dir/tm-core" --version) == "Termux Muscle $TM_PROJECT_VERSION" ]] ||
         tm_error source_mismatch 'The source version and locally built helper disagree.'
-    local work id manager_path
+    local work id manager_path manager=$TM_ROOT/bin/termux-muscle manager_placed=false
     # Keep the new stage outside the installation: interrupted uninstall recovery
     # may remove the old root cache before this stage is published.
     work=$(mktemp -d "${TMPDIR:-$TM_PREFIX/tmp}/termux-muscle-stage.XXXXXXXX")
@@ -73,15 +73,24 @@ tm_bootstrap() (
     timeout --kill-after=5 120 make -C "$source_dir" stage "DESTDIR=$work/stage" >&2
     id=$("$TM_CORE" tooling "$TM_ROOT" publish "$work/stage" "$TM_PROJECT_VERSION" "$TM_PREFIX")
     mkdir -p -- "$HOME/.local/bin"
-    # Expected foreign commands are preserved; errors in existing ownership
-    # metadata are still fatal when the links helper attempts a managed repair.
+    # The manager gets one PATH entry, so PATH lookups and `compgen -c` list it
+    # once. The prefix is always on Termux's PATH; ~/.local/bin is used only
+    # when a foreign command holds the prefix entry. Releases before 0.22.0
+    # linked both, so an owned ~/.local/bin entry is restored (removed) through
+    # its journal. Expected foreign commands are preserved; errors in existing
+    # ownership metadata are still fatal when the links helper repairs an entry.
     for manager_path in "$TM_PREFIX/bin/termux-muscle" "$HOME/.local/bin/termux-muscle"; do
-        if [[ ${manager_path%/*} -ef $TM_ROOT/bin ]]; then continue; fi
-        if [[ ( -e $manager_path || -L $manager_path ) &&
-              ( ! -L $manager_path || $(readlink -- "$manager_path") != "$TM_ROOT/bin/termux-muscle" ) ]]; then
-            printf 'Existing command preserved: %s\nUse the owned command: %s\n' "$manager_path" "$TM_ROOT/bin/termux-muscle" >&2
+        if [[ ${manager_path%/*} -ef $TM_ROOT/bin ]]; then manager_placed=true; continue; fi
+        if [[ $manager_placed == true ]]; then
+            if [[ -L $manager_path && $(readlink -- "$manager_path") == "$manager" ]]; then
+                "$TM_CORE" links "$TM_ROOT" restore "$manager_path" >/dev/null
+            fi
+        elif [[ ( -e $manager_path || -L $manager_path ) &&
+                ( ! -L $manager_path || $(readlink -- "$manager_path") != "$manager" ) ]]; then
+            printf 'Existing command preserved: %s\nUse the owned command: %s\n' "$manager_path" "$manager" >&2
         else
-            "$TM_CORE" links "$TM_ROOT" install "$manager_path" "$TM_ROOT/bin/termux-muscle" >/dev/null
+            "$TM_CORE" links "$TM_ROOT" install "$manager_path" "$manager" >/dev/null
+            manager_placed=true
         fi
     done
     local manual_path=$TM_PREFIX/share/man/man1/termux-muscle.1
