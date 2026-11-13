@@ -1,0 +1,19 @@
+# Galaxy S26 Ultra acceptance: Termux Muscle 0.23.0
+
+Verified 2026-11-13 UTC on Samsung Galaxy S26 Ultra (SM-S948U), Android 17 / API 37, Termux 0.118.3 from GitHub. The [JSON report](galaxy-s26-ultra-0.23.0-20261113.json) records the exact kernel, page size, package versions, check results and sanitized workflow metadata. The tested pin is Claude Code **2.1.323** with musl **1.2.6-r3**, on the **native** backend. The report was generated at **2026-11-13T12:27:56Z** by `scripts/maintainer_acceptance.sh` from a clean checkout of source commit **`5142f9ffc8c961a2411753f610d448013da44f05`** (`source.uncommitted_changes: false`). Only the report's relative `evidence_notes` filename was adjusted when registering it; measured results are unchanged.
+
+## Deterministic suite and lifecycle
+
+Both steps ran in the Bash tool of a native-backend Claude Code session, untraced (`TracerPid: 0`). Immediately before acceptance, `make check` ran from the same checkout: all **15 C and shell test programs passed**, including the new assertions for the version listings in `tests/test_acquire.sh` (exact listing text, no signed release called unverified, pin history only with `--all`, installed and active rows, the signature-bypass warning) and `tests/test_runtime.sh` (the `Verified by` column). The optional runtime host-probe group was skipped without `TM_RUNTIME_HOST_PROBES=1`. The cross-UID executable tooling fixture was skipped because no readable Bash executable owned by another UID was available.
+
+A first acceptance attempt from the preceding preparation commit, which still pinned musl 1.2.6-r2, failed at the private install with `download_failed`: Alpine 3.24 no longer serves `musl-1.2.6-r2.apk` (HTTP 404). The musl pin was moved to 1.2.6-r3 after verifying the archive's Alpine signature, and the run recorded here started from an empty cache, so it downloaded and verified the new archive.
+
+A private source bootstrap with `--no-link --claude-version pinned` prepared and activated pinned 2.1.323 on the native backend and passed isolated version, help and initialization checks. An offline update activated a fresh candidate from the verified cache, rollback restored the previous candidate offline, and uninstall removed the owned root. Local diagnostics passed runtime integrity, DNS configuration, command link and shell environment checks. The live installation's commands, manual, completion and state records were fingerprinted before and after and were unchanged.
+
+The authenticated workflow recorded at **2026-11-13T12:27:48Z** used the private runtime with only the Bash tool available. **Opus 5.5** (`claude-opus-5-5`) made exactly one Bash call on a nonce fixture using a portable shebang and `rg`. The script matched the successful tool result, fixture attestation and final response, and recorded an untraced tool process (`untraced_tools`: PASS). Every assistant message came from exactly `claude-opus-5-5`. Capture exited 0 in **7732 ms**, without timeout, under a **$0.50 API budget cap**. Raw events and session identifiers were not retained in the public report.
+
+After the lifecycle, the PRoot backend was installed from the same verified cache with `update --offline --backend proot` and passed runtime integrity, isolated version, help and initialization, and its shell namespace check (`alternate_backend`: PASS).
+
+## Not covered
+
+The new listings were checked by the regression tests and by reading them on this device, not by the acceptance script. Ordinary command takeover, indexed manual discovery, public HTTPS installer delivery, sustained interactive use, background and screen-off operation, MCP tool calls and other models were not exercised. The release channel and signature trial and the backend timings of the [0.21.0 report](galaxy-s26-ultra-0.21.0-20261010.md) were not repeated. Earlier reports retain their dated scope. Public delivery can be tested only after publication.

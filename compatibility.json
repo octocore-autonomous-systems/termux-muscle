@@ -1,20 +1,20 @@
 {
   "schema": 1,
-  "project_version": "0.22.0",
+  "project_version": "0.23.0",
   "claude": {
-    "version": "2.1.299",
-    "pinned_since": "0.22.0",
+    "version": "2.1.323",
+    "pinned_since": "0.23.0",
     "package": "@anthropic-ai/claude-code-linux-arm64-musl",
-    "tarball": "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-arm64-musl/-/claude-code-linux-arm64-musl-2.1.299.tgz",
-    "integrity": "sha512-b9mv2wUcpabFUA4wjpkGdlKG9Oo2Pt43SRaqOHJ06k+hCagmyieQtP+6XX3Il1FDJzYFbjI0rJl0BBLo1/VRbw==",
-    "binary_sha256": "3e90af8f81cf7db932bbda3ab2ba57facb1e2a19a43f911b70536bf627472757"
+    "tarball": "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-arm64-musl/-/claude-code-linux-arm64-musl-2.1.323.tgz",
+    "integrity": "sha512-0BEiR/+PbtnQVaIXlo7vNeYDqdA1dAEZDOM+tE5gBuq5PpXPyxziddtm+yhSebeV6WyjUzQc88c9bRTrYTtLOA==",
+    "binary_sha256": "62ab6e3383909ca8bd50c5b4422f1730d653052cc527ea62c000de867d0ceb24"
   },
   "musl": {
-    "version": "1.2.6-r2",
-    "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/aarch64/musl-1.2.6-r2.apk",
-    "sha256": "5e9674b7f41152fe2119093b5cb4c13eaaadb19c2d5422b2d7267913e663ee6e",
-    "loader_sha256": "32377e6d71725bb019e9ff6d5e9f16b4d5156d6f2c36504191c2d6a7c4d4a44d",
-    "native_loader_sha256": "3e80537b07eeb7509d4f45addd833d4770217a86b35c21064259de184622b1d3"
+    "version": "1.2.6-r3",
+    "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/aarch64/musl-1.2.6-r3.apk",
+    "sha256": "2e17864102278d9049c3a56f1bceed9e8cf287065617e579325123443daed8a5",
+    "loader_sha256": "53282acc2be8a08a9fdcf880334bf35bbfd0a13862b7f3616be3919fcda11793",
+    "native_loader_sha256": "1c831881bac74b51f3f6f1f39b20052badcca92431476fbf3f889d39b7b17727"
   },
   "pin_history": [
     {
@@ -142,6 +142,15 @@
       },
       "verified_on": "2026-10-13",
       "report": "compatibility/galaxy-s26-ultra-0.21.1-20261013.json"
+    },
+    {
+      "version": "2.1.299",
+      "project_versions": {
+        "first": "0.22.0",
+        "last": "0.22.0"
+      },
+      "verified_on": "2026-10-14",
+      "report": "compatibility/galaxy-s26-ultra-0.22.0-20261014.json"
     }
   ],
   "backend": "musl-native",
@@ -183,10 +192,10 @@
     "verified": [
       "claude-opus-5-5"
     ],
-    "availability_note": "Documented minimum client versions come from Anthropic's model configuration reference, reviewed on 2026-09-29. Sonnet 5.5 requires Claude Code 2.1.284 or later and Opus 5.5 requires 2.1.280 or later. Opus 5.5 passed an exact authenticated Bash-tool workflow on 2026-10-14 with 0.22.0 on the 2.1.299 pin, on the native backend, on the reported Galaxy S26 Ultra. Earlier 0.21.1 and 0.21.0 checks on 2.1.296 on the native backend, and 0.20.0 checks on 2.1.296, 0.19.0 checks on 2.1.295, 0.18.0 checks on 2.1.294, 0.17.0 checks on 2.1.293, 0.16.0 checks on 2.1.292, 0.15.0 checks on 2.1.291, 0.14.0 checks on 2.1.289, 0.13.0 checks on 2.1.288, 0.12.0 checks on 2.1.287, 0.11.0 checks on 2.1.286, 0.10.0 checks on 2.1.285, 0.8.0 and 0.9.0 checks on 2.1.284 and 0.4.0 through 0.7.0 checks on 2.1.283, all on the PRoot backend, remain dated evidence. Sonnet 5.5 and Fable 5.1 are documented, not verified. Historical Sonnet 5 and mixed Fable observations retain their original scope. Model availability depends on account, provider and organization policy."
+    "availability_note": "Documented minimum client versions come from Anthropic's model configuration reference, reviewed on 2026-09-29. Sonnet 5.5 requires Claude Code 2.1.284 or later and Opus 5.5 requires 2.1.280 or later. Opus 5.5 passed an exact authenticated Bash-tool workflow on 2026-11-13 with 0.23.0 on the 2.1.323 pin, on the native backend, on the reported Galaxy S26 Ultra. Earlier 0.22.0 checks on 2.1.299 and 0.21.1 and 0.21.0 checks on 2.1.296 on the native backend, and 0.20.0 checks on 2.1.296, 0.19.0 checks on 2.1.295, 0.18.0 checks on 2.1.294, 0.17.0 checks on 2.1.293, 0.16.0 checks on 2.1.292, 0.15.0 checks on 2.1.291, 0.14.0 checks on 2.1.289, 0.13.0 checks on 2.1.288, 0.12.0 checks on 2.1.287, 0.11.0 checks on 2.1.286, 0.10.0 checks on 2.1.285, 0.8.0 and 0.9.0 checks on 2.1.284 and 0.4.0 through 0.7.0 checks on 2.1.283, all on the PRoot backend, remain dated evidence. Sonnet 5.5 and Fable 5.1 are documented, not verified. Historical Sonnet 5 and mixed Fable observations retain their original scope. Model availability depends on account, provider and organization policy."
   },
   "reports": [
-    "compatibility/galaxy-s26-ultra-0.22.0-20261014.json"
+    "compatibility/galaxy-s26-ultra-0.23.0-20261113.json"
   ],
-  "verified_on": "2026-10-14"
+  "verified_on": "2026-11-13"
 }

@@ -65,7 +65,7 @@ def render_section(root):
     for version, pin in releases:
         lines.append(f"| [{version}](docs/releases/{version}.md) | {pin} |")
     lines.extend(["",
-                  f"The [compatibility manifest](compatibility.json) records the current pin and pin history; `termux-muscle versions --available --all` marks every client this project device-tested. The musl loader remains **{manifest['musl']['version']}**.",
+                  f"The [compatibility manifest](compatibility.json) records the current pin and pin history; `termux-muscle versions --available --all` marks every client this project device-tested. The musl loader is **{manifest['musl']['version']}**.",
                   "",
                   "Model minimums describe client requirements. The Termux Muscle minimum is derived from the earliest release whose pin meets that requirement; it does not establish the model's introduction date or device verification. **—** means no listed release meets the requirement.",
                   "",
