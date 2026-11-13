@@ -171,8 +171,11 @@ access.
 Offline repair requires the necessary verified cached archives.
 .TP
 .BR versions " [\-\-json]"
-Print current, previous and retained Claude Code versions with their source
-policy.
+Print the current, previous and retained Claude Code versions on this device,
+the backend each runs on and what verified it before installation:
+Anthropic's signature, this project's device-tested pin, or nothing for a
+release installed with
+.BR \-\-allow\-unverified .
 .B \-\-json
 prints the managed state record, including release identifiers.
 This is distinct from the allowlisted public diagnostic report and can contain
@@ -181,23 +184,32 @@ local lifecycle metadata.
 .BR "versions \-\-available" " [\-\-all] [\-\-json]"
 List Claude Code releases published for the official ARM64 musl package,
 newest first, with their release dates.
-Each row is labelled
-.B pinned
-(the version this Termux Muscle release was accepted with),
-.B formerly pinned
-(a version an earlier Termux Muscle release was accepted with; the label names
-the first and last such release, from the manifest's pin history) or
-.BR unverified
-(never accepted by this project), and also
+Anthropic publishes and signs every release listed, and
+.B update
+installs one only after that signature verifies and the release passes local
+startup checks.
+.B "ON THIS DEVICE"
+shows
 .B active
-or
-.B retained
-when it is installed, plus upstream tags such as
-.BR latest .
-The ten newest releases are shown, together with every pinned, formerly
-pinned, active or retained one;
+for the release in use and
+.B installed
+for one kept for rollback.
+.B NOTES
+names Anthropic's channels such as
+.BR latest " and " stable ,
+marks the
+.B pinned
+release (the one this Termux Muscle version was device-tested with, installed
+by
+.B "\-\-claude\-version pinned"
+and
+.BR \-\-offline )
+and warns about a release that was installed without the signature check.
+The ten newest releases are shown, together with the pinned and installed
+ones;
 .B \-\-all
-lists every release.
+lists every release and marks those earlier Termux Muscle versions were
+device-tested with.
 .B \-\-json
 prints a
 .B termux-muscle.available.v1

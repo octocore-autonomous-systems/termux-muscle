@@ -732,7 +732,7 @@ int tm_state_main(int argc, char **argv) {
                     *history = tm_json_field(j, "history", json_type_array);
         const char *current = tm_json_optional_string(j, "current"),
                    *previous = tm_json_optional_string(j, "previous");
-        printf("%-10s %-14s %-15s %s\n", "Role", "Claude Code", "Source policy", "Backend");
+        printf("%-10s %-14s %-9s %s\n", "Role", "Claude Code", "Backend", "Verified by");
         for (size_t i = 0; i < json_object_array_length(history); i++) {
             const char *id = json_object_get_string(json_object_array_get_idx(history, i));
             const char *role = current && !strcmp(id, current)     ? "Current"
@@ -742,12 +742,16 @@ int tm_state_main(int argc, char **argv) {
             json_object *receipt = tm_json_read(p);
             const char *policy = tm_json_optional_string(receipt, "compatibility_status"),
                        *backend = tm_json_optional_string(receipt, "backend");
-            printf("%-10s %-14.*s %-15s %s\n", role, (int)(strchr(id, '-') - id), id,
-                   policy ? policy : "unknown",
+            printf("%-10s %-14.*s %-9s %s\n", role, (int)(strchr(id, '-') - id), id,
                    !backend                              ? "unknown"
                    : !strcmp(backend, TM_BACKEND_NATIVE) ? "native"
                    : !strcmp(backend, TM_BACKEND_PROOT)  ? "proot"
-                                                         : "unknown");
+                                                         : "unknown",
+                   !policy                         ? "unknown"
+                   : !strcmp(policy, "signed")     ? "Anthropic's signature"
+                   : !strcmp(policy, "pinned")     ? "this project's device-tested pin"
+                   : !strcmp(policy, "unverified") ? "nothing (installed with --allow-unverified)"
+                                                   : "unknown");
             json_object_put(receipt);
             free(p);
             free(release);

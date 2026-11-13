@@ -154,7 +154,7 @@ Termux Muscle and Claude Code have independent version numbers. Each Termux Musc
 | [0.21.1](docs/releases/0.21.1.md) | 2.1.296 |
 | [0.22.0](docs/releases/0.22.0.md) | 2.1.299 |
 
-The [compatibility manifest](compatibility.json) records the current pin and pin history; `termux-muscle versions --available` identifies formerly pinned clients. The musl loader remains **1.2.6-r2**.
+The [compatibility manifest](compatibility.json) records the current pin and pin history; `termux-muscle versions --available --all` marks every client this project device-tested. The musl loader remains **1.2.6-r2**.
 
 Model minimums describe client requirements. The Termux Muscle minimum is derived from the earliest release whose pin meets that requirement; it does not establish the model's introduction date or device verification. **—** means no listed release meets the requirement.
 
