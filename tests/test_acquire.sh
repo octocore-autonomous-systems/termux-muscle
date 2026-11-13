@@ -471,25 +471,29 @@ fresh=$listing/fresh-root
 diff -u - "$listing/all.txt" <<'TEXT' || fail 'available listing text changed'
 Claude Code releases for Termux (linux-arm64-musl), newest first:
 
-VERSION    RELEASED    STATUS
-2.1.11     -           unverified, deprecated, latest
-2.1.10     2026-01-10  pinned
-2.1.9      2026-01-09  formerly pinned (0.1.0 to 0.2.0), stable
-2.1.8      2026-01-08  unverified
-0.0.0      -           unverified
+VERSION    RELEASED    ON THIS DEVICE  NOTES
+2.1.11     -                           latest, deprecated by Anthropic
+2.1.10     2026-01-10                  pinned: device-tested with this Termux Muscle
+2.1.9      2026-01-09                  stable, device-tested with Termux Muscle 0.1.0 to 0.2.0
+2.1.8      2026-01-08
+0.0.0      -
 
-The pinned release passed acceptance with this Termux Muscle version; a formerly
-pinned release passed with the Termux Muscle releases shown. Every other version
-is unverified by this project and is installed only when Anthropic's release
-signature verifies:
+Anthropic publishes and signs every release listed. Termux Muscle installs one
+only after that signature verifies and the release passes startup checks on
+this device:
   termux-muscle update                          newest release (latest channel)
   termux-muscle update --claude-version X.Y.Z   one exact release
+
+latest and stable are Anthropic's release channels. A device-tested release
+also went through this project's own test run on a phone; the pinned one is
+what --claude-version pinned and --offline install.
 TEXT
 "$TM_CORE" acquire-available "$listing/compatibility.json" "$listing/registry.json" "$fresh" 1 text > "$listing/one.txt"
 grep -Fq '2.1.11 ' "$listing/one.txt" && grep -Fq '2.1.10 ' "$listing/one.txt" || fail 'limit hid the pinned release'
-grep -Fq '2.1.9      2026-01-09  formerly pinned (0.1.0 to 0.2.0), stable' "$listing/one.txt" || fail 'limit hid the formerly pinned release'
+! grep -Fq '2.1.9 ' "$listing/one.txt" || fail 'the short listing still carries pin history'
+! grep -Fqi 'unverified' "$listing/all.txt" || fail 'a signed release is still called unverified'
 ! grep -Fq '2.1.8 ' "$listing/one.txt" || fail 'limit ignored'
-grep -Fq 'Showing 3 of 5 releases; add --all' "$listing/one.txt" || fail 'limit summary missing'
+grep -Fq 'Showing 2 of 5 releases; add --all' "$listing/one.txt" || fail 'limit summary missing'
 root=$listing/root
 "$TM_CORE" with-lock "$root" create -- true
 old=$("$TM_CORE" with-lock "$root" existing -- bash "$test_root/tests/test_state.sh" --candidate "$TM_CORE" "$root" 2.1.8 activate)
@@ -503,14 +507,28 @@ old=$("$TM_CORE" with-lock "$root" existing -- bash "$test_root/tests/test_state
 [[ $("$TM_CORE" json-get "$listing/local.json" pin_history) == '[{"version":"2.1.9","project_versions":{"first":"0.1.0","last":"0.2.0"},"verified_on":"2026-01-09","report":"compatibility/fixture.json"}]' ]] || fail 'pin history missing from the JSON listing'
 # A manifest without pin_history (older project releases) still lists.
 printf '%s\n' '{"schema":1,"claude":{"version":"2.1.10","package":"@anthropic-ai/claude-code-linux-arm64-musl"}}' > "$listing/legacy.json"
-"$TM_CORE" acquire-available "$listing/legacy.json" "$listing/registry.json" "$fresh" all text | grep -Fq '2.1.9      2026-01-09  unverified, stable' || fail 'legacy manifest listing changed'
+"$TM_CORE" acquire-available "$listing/legacy.json" "$listing/registry.json" "$fresh" all text | grep -Fxq '2.1.9      2026-01-09                  stable' || fail 'legacy manifest listing changed'
 # A history entry naming the current pin never demotes the pin label.
 printf '%s\n' '{"schema":1,"claude":{"version":"2.1.10","package":"@anthropic-ai/claude-code-linux-arm64-musl"},"pin_history":[{"version":"2.1.10","project_versions":{"first":"0.1.0","last":"0.2.0"}}]}' > "$listing/conflict.json"
-"$TM_CORE" acquire-available "$listing/conflict.json" "$listing/registry.json" "$fresh" all text | grep -Fq '2.1.10     2026-01-10  pinned' || fail 'conflicting history demoted the pin'
+"$TM_CORE" acquire-available "$listing/conflict.json" "$listing/registry.json" "$fresh" all text | grep -Fq '2.1.10     2026-01-10                  pinned: device-tested with this Termux Muscle' || fail 'conflicting history demoted the pin'
+
+# Installed releases: what the device runs, and the one real warning.
+"$TM_CORE" acquire-available "$listing/compatibility.json" "$listing/registry.json" "$root" all text > "$listing/local.txt"
+grep -Fxq '2.1.8      2026-01-08  installed' "$listing/local.txt" || fail 'installed release not marked'
+grep -Fxq '2.1.7      -           active          no longer published' "$listing/local.txt" || fail 'active release not marked'
+! grep -Fq 'signature check' "$listing/local.txt" || fail 'a release with no bypass receipt was flagged'
+printf '%s\n' '{"version":"2.1.8","compatibility_status":"unverified"}' > "$root/releases/$old/payload.json"
+"$TM_CORE" acquire-available "$listing/compatibility.json" "$listing/registry.json" "$root" all text |
+    grep -Fxq '2.1.8      2026-01-08  installed       installed without the signature check' || fail 'signature bypass not flagged'
+printf '%s\n' '{"version":"2.1.8","compatibility_status":"signed"}' > "$root/releases/$old/payload.json"
+"$TM_CORE" acquire-available "$listing/compatibility.json" "$listing/registry.json" "$root" all text |
+    grep -Fxq '2.1.8      2026-01-08  installed' || fail 'signed installed release flagged'
+printf '%s\n' '{"schema":1,"claude":{"version":"2.1.10","package":"@anthropic-ai/claude-code-linux-arm64-musl"},"pin_history":[{"version":"2.1.9","project_versions":{"first":"0.2.0","last":"0.2.0"}}]}' > "$listing/single.json"
+"$TM_CORE" acquire-available "$listing/single.json" "$listing/registry.json" "$fresh" all text | grep -Fxq '2.1.9      2026-01-09                  stable, device-tested with Termux Muscle 0.2.0' || fail 'single-release history label'
 
 printf '%s\n' '{"name":"@evil/claude-code-linux-arm64-musl","versions":{}}' > "$listing/other.json"
 must_fail invalid_metadata "$TM_CORE" acquire-available "$listing/compatibility.json" "$listing/other.json" "$fresh" all text
 must_fail invalid_arguments "$TM_CORE" acquire-available "$listing/compatibility.json" "$listing/registry.json" "$fresh" 0 text
 must_fail invalid_arguments "$TM_CORE" acquire-available "$listing/compatibility.json" "$listing/registry.json" "$fresh" all yaml
-pass 'available versions: numeric order, pin/formerly-pinned/active/retained labels, limits and safe tags'
+pass 'available versions: numeric order, device and device-tested labels, signature-bypass warning, limits and safe tags'
 printf 'Acquisition regression groups passed: %s\n' "$test_count"

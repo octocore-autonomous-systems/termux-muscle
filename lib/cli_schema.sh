@@ -176,11 +176,13 @@ options:
   --all         with --available, list every release
   --json        print machine readable output
 
---available reads the official npm registry and never installs anything. The
-pinned release passed device acceptance with this Termux Muscle version and a
-formerly pinned release passed with the Termux Muscle releases shown; every
-other version is unverified by this project. update --claude-version X.Y.Z
-installs any of them once Anthropic's release signature verifies.
+Without options, lists the releases installed on this device and how each was
+verified. --available reads the official npm registry and never installs
+anything: Anthropic publishes and signs every release it lists, and update
+installs one only after that signature verifies and the release passes local
+startup checks. Notes name Anthropic's channels (latest, stable) and the
+releases this project also device-tested; --all adds every release and the
+full device-test history.
 TM_SCHEMA_HELP_VERSIONS
             ;;
         doctor) cat <<'TM_SCHEMA_HELP_DOCTOR'

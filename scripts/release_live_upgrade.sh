@@ -35,7 +35,7 @@ case $(sed -n 's/.*"backend": *"\([^"]*\)".*/\1/p' "$TM/tools/current/compatibil
     unmodified-musl-proot) default=proot ;;
     *) echo "cannot read the default backend of the installed manager" >&2; exit 1 ;;
 esac
-current() { termux-muscle versions | awk '$1 == "Current" { print $2, $4 }'; }
+current() { termux-muscle versions | awk '$1 == "Current" { print $2, $3 }'; }
 read -r X backend <<< "$(current)"
 if [ "$backend" != "$default" ]; then
     termux-muscle update --claude-version "$X" > "$OUT/live-backend.log" 2>&1

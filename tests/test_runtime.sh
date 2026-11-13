@@ -235,8 +235,17 @@ env -u LD_PRELOAD "$core" run "$native_root" "$native_prefix" current normal -- 
 contains "$scratch/native-environment" "$(line LD_PRELOAD "$native_prefix/lib/libtermux-exec-ld-preload.so")" 'the current termux-exec library name was not preferred'
 LD_PRELOAD="$scratch/preload.so" native > "$scratch/native-environment"
 contains "$scratch/native-environment" "$(line LD_PRELOAD "$scratch/preload.so")" 'a caller preload was replaced by the default'
-[[ $("$core" state "$native_root" versions | tail -n 1) =~ ^Current\ +2\.1\.270\ +unknown\ +native$ ]] || fail 'versions did not show the native backend'
-[[ $("$core" state "$root" versions | tail -n 1) =~ ^Current\ +2\.1\.270\ +unknown\ +proot$ ]] || fail 'versions did not show the PRoot backend'
+[[ $("$core" state "$native_root" versions | tail -n 1) =~ ^Current\ +2\.1\.270\ +native\ +unknown$ ]] || fail 'versions did not show the native backend'
+[[ $("$core" state "$root" versions | tail -n 1) =~ ^Current\ +2\.1\.270\ +proot\ +unknown$ ]] || fail 'versions did not show the PRoot backend'
+# The installed view says what verified each release, in words.
+cp -- "$native_release/payload.json" "$scratch/receipt-before-policy"
+for policy_case in "signed|Anthropic's signature" "pinned|this project's device-tested pin" 'unverified|nothing (installed with --allow-unverified)'; do
+    sed "s/^{/{\"compatibility_status\":\"${policy_case%%|*}\",/" "$scratch/receipt-before-policy" > "$native_release/payload.json"
+    "$core" state "$native_root" versions > "$scratch/versions-view"
+    [[ $(head -n 1 "$scratch/versions-view") =~ ^Role\ +Claude\ Code\ +Backend\ +Verified\ by$ ]] || fail 'versions header changed'
+    [[ $(tail -n 1 "$scratch/versions-view") == *" native    ${policy_case#*|}" ]] || fail "versions did not explain the ${policy_case%%|*} policy"
+done
+cp -- "$scratch/receipt-before-policy" "$native_release/payload.json"
 printf 'nameserver 203.0.113.1\n' > "$scratch/native resolver"
 TM_RESOLV_CONF="$scratch/native resolver" SSL_CERT_FILE="$scratch/custom CA" native > "$scratch/native-environment"
 contains "$scratch/native-environment" "$(line TM_RESOLV_CONF "$scratch/native resolver")" 'native resolver override lost'

@@ -911,7 +911,8 @@ struct available {
     json_object *tags;
     /* The pin_history entry for a formerly pinned version, or NULL. */
     json_object *formerly;
-    bool pinned, active, retained, deprecated, in_registry;
+    /* An installed copy that was admitted with --allow-unverified. */
+    bool pinned, active, retained, deprecated, in_registry, unchecked;
 };
 static int compare_versions(const char *left, const char *right) {
     for (int part = 0; part < 3; part++) {
@@ -1065,6 +1066,16 @@ static void list_available(const char *manifest_path, const char *metadata_path,
                 active = entry->version;
             }
             entry->retained = true;
+            /* Only a release installed past the signature check earns a warning. */
+            char *release = tm_store_release(root, id), *receipt = tm_path(release, "payload.json");
+            if (!access(receipt, F_OK)) {
+                json_object *payload = tm_json_read(receipt);
+                const char *policy = tm_json_optional_string(payload, "compatibility_status");
+                entry->unchecked |= policy && !strcmp(policy, "unverified");
+                json_object_put(payload);
+            }
+            free(receipt);
+            free(release);
         }
         /* Another copy of the active version is not a separate retained release. */
         for (size_t i = 0; i < count; i++)
@@ -1085,12 +1096,13 @@ static void list_available(const char *manifest_path, const char *metadata_path,
     json_object *releases = json_object_new_array();
     if (!json) {
         puts("Claude Code releases for Termux (linux-arm64-musl), newest first:\n");
-        printf("%-10s %-11s %s\n", "VERSION", "RELEASED", "STATUS");
+        printf("%-10s %-11s %-15s %s\n", "VERSION", "RELEASED", "ON THIS DEVICE", "NOTES");
     }
     for (size_t i = 0, rank = 0; i < count; i++) {
         struct available *entry = &list[i];
-        /* Pinned, formerly pinned, active and retained releases are always listed. */
-        bool local = entry->pinned || entry->formerly || entry->active || entry->retained;
+        /* The pin and installed releases are always listed. The text view leaves
+         * pin history to --all; JSON keeps it, as its consumers expect. */
+        bool local = entry->pinned || entry->active || entry->retained || (json && entry->formerly);
         bool recent = entry->in_registry && ++rank <= limit;
         if (!recent && !local)
             continue;
@@ -1114,11 +1126,13 @@ static void list_available(const char *manifest_path, const char *metadata_path,
             json_object_array_add(releases, item);
             continue;
         }
-        char status[512] = "", formerly[160] = "";
+        char notes[512] = "", tested[160] = "";
         size_t used = 0;
         const char *parts[8];
         size_t n = 0;
-        if (entry->formerly && !entry->pinned) {
+        if (entry->pinned)
+            snprintf(tested, sizeof tested, "pinned: device-tested with this Termux Muscle");
+        else if (entry->formerly) {
             json_object *range = NULL;
             const char *first = NULL, *last = NULL;
             if (json_object_object_get_ex(entry->formerly, "project_versions", &range) &&
@@ -1126,29 +1140,37 @@ static void list_available(const char *manifest_path, const char *metadata_path,
                 first = tm_json_optional_string(range, "first");
                 last = tm_json_optional_string(range, "last");
             }
-            if (first && last && tm_version_valid(first) && tm_version_valid(last))
-                snprintf(formerly, sizeof formerly, "formerly pinned (%s to %s)", first, last);
+            if (first && last && tm_version_valid(first) && tm_version_valid(last) &&
+                strcmp(first, last))
+                snprintf(tested, sizeof tested, "device-tested with Termux Muscle %s to %s", first,
+                         last);
+            else if (first && last && tm_version_valid(first) && tm_version_valid(last))
+                snprintf(tested, sizeof tested, "device-tested with Termux Muscle %s", first);
             else
-                snprintf(formerly, sizeof formerly, "formerly pinned");
+                snprintf(tested, sizeof tested, "device-tested with an earlier Termux Muscle");
         }
-        parts[n++] = entry->pinned ? "pinned" : formerly[0] ? formerly : "unverified";
-        if (entry->active)
-            parts[n++] = "active";
-        if (entry->retained)
-            parts[n++] = "retained";
+        for (size_t k = 0; k < json_object_array_length(entry->tags) && n < 4; k++)
+            parts[n++] = json_object_get_string(json_object_array_get_idx(entry->tags, k));
+        if (tested[0])
+            parts[n++] = tested;
+        if (entry->unchecked)
+            parts[n++] = "installed without the signature check";
         if (entry->deprecated)
-            parts[n++] = "deprecated";
+            parts[n++] = "deprecated by Anthropic";
         if (!entry->in_registry)
-            parts[n++] = "not in registry";
-        for (size_t k = 0; k < n; k++)
-            used += (size_t)snprintf(status + used, sizeof status - used, "%s%s", k ? ", " : "",
+            parts[n++] = "no longer published";
+        for (size_t k = 0; k < n && used < sizeof notes; k++)
+            used += (size_t)snprintf(notes + used, sizeof notes - used, "%s%s", k ? ", " : "",
                                      parts[k]);
-        for (size_t k = 0; k < json_object_array_length(entry->tags) && used < sizeof status; k++)
-            used +=
-                (size_t)snprintf(status + used, sizeof status - used, ", %s",
-                                 json_object_get_string(json_object_array_get_idx(entry->tags, k)));
-        printf("%-10s %-11s %s\n", entry->version, entry->released[0] ? entry->released : "-",
-               status);
+        const char *device = entry->active ? "active" : entry->retained ? "installed" : "";
+        if (notes[0])
+            printf("%-10s %-11s %-15s %s\n", entry->version,
+                   entry->released[0] ? entry->released : "-", device, notes);
+        else if (device[0])
+            printf("%-10s %-11s %s\n", entry->version, entry->released[0] ? entry->released : "-",
+                   device);
+        else
+            printf("%-10s %s\n", entry->version, entry->released[0] ? entry->released : "-");
     }
     if (json) {
         json_object *result = json_object_new_object();
@@ -1169,12 +1191,15 @@ static void list_available(const char *manifest_path, const char *metadata_path,
         if (shown < registry_count)
             printf("\nShowing %zu of %zu releases; add --all to list every one.\n", shown,
                    registry_count);
-        puts("\nThe pinned release passed acceptance with this Termux Muscle version; a formerly\n"
-             "pinned release passed with the Termux Muscle releases shown. Every other version\n"
-             "is unverified by this project and is installed only when Anthropic's release\n"
-             "signature verifies:\n"
+        puts("\nAnthropic publishes and signs every release listed. Termux Muscle installs one\n"
+             "only after that signature verifies and the release passes startup checks on\n"
+             "this device:\n"
              "  termux-muscle update                          newest release (latest channel)\n"
-             "  termux-muscle update --claude-version X.Y.Z   one exact release");
+             "  termux-muscle update --claude-version X.Y.Z   one exact release\n"
+             "\n"
+             "latest and stable are Anthropic's release channels. A device-tested release\n"
+             "also went through this project's own test run on a phone; the pinned one is\n"
+             "what --claude-version pinned and --offline install.");
     }
     for (size_t i = 0; i < count; i++)
         json_object_put(list[i].tags);
