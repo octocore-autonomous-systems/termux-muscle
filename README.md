@@ -8,7 +8,7 @@
 
 An independent community project from [Octocore Autonomous Systems](https://github.com/octocore-autonomous-systems) (OAS). **Not affiliated with, endorsed by, sponsored by, or authorized by Anthropic.** Claude and Claude Code are Anthropic products; your use of them remains subject to Anthropic's terms and account access.
 
-> **0.22.0 gives the `termux-muscle` command one PATH entry and moves the tested pin to Claude Code 2.1.299** on Android **ARM64 / aarch64**. Private source installation, startup, update, rollback, removal and an authenticated **Opus 5.5** tool workflow passed on the native backend on **Samsung Galaxy S26 Ultra, Android 17, Termux 0.118.3 (GitHub)**, and the PRoot backend passed its startup checks. See the scoped [0.22.0 report](compatibility/galaxy-s26-ultra-0.22.0-20261014.md); other configurations need volunteer evidence.
+> **0.23.0 prepares version listings that say what is installed and how each release was verified, moves the tested pin to Claude Code 2.1.323 and the musl pin to 1.2.6-r3** (Alpine no longer serves 1.2.6-r2, which broke new installations) on Android **ARM64 / aarch64**. Fresh device and authenticated tool acceptance is pending; earlier release reports retain their original scope.
 
 [Install](#install) · [Commands](#everyday-use) · [Device matrix](docs/device-compatibility.md) · [Troubleshooting](docs/troubleshooting.md) · [Contribute](CONTRIBUTING.md)
 
@@ -32,7 +32,7 @@ This is a **Claude Code lifecycle manager**, not a general agent runtime. It doe
 Run this in a **native Termux shell on an ARM64 Android device**:
 
 ```sh
-curl -fsSL https://github.com/octocore-autonomous-systems/termux-muscle/releases/download/v0.22.0/install.sh | sh
+curl -fsSL https://github.com/octocore-autonomous-systems/termux-muscle/releases/download/v0.23.0/install.sh | sh
 ```
 
 The installer adds missing Termux prerequisites with `pkg`, verifies the release's source archive, builds the C helper locally and runs its offline tests before installation. Bash manages the lifecycle; the helper uses json-c, libarchive and OpenSSL. Build and test tools are Clang, make, pkg-config and diffutils; tar and gzip unpack the source. Runtime tools are Bash, patchelf, PRoot, coreutils, ripgrep, curl, gpgv and CA certificates. Termux's `mandoc` package provides the manual viewer. The installed project requires no Python, npm or Ubuntu installation. Contributors can regenerate the checked-in CLI help and completion files from the standard-library `argparse` definition with `python3 scripts/cli_schema.py`; add `--check` to verify they are current.
@@ -153,8 +153,9 @@ Termux Muscle and Claude Code have independent version numbers. Each Termux Musc
 | [0.21.0](docs/releases/0.21.0.md) | 2.1.296 |
 | [0.21.1](docs/releases/0.21.1.md) | 2.1.296 |
 | [0.22.0](docs/releases/0.22.0.md) | 2.1.299 |
+| [0.23.0](docs/releases/0.23.0.md) | 2.1.323 |
 
-The [compatibility manifest](compatibility.json) records the current pin and pin history; `termux-muscle versions --available --all` marks every client this project device-tested. The musl loader remains **1.2.6-r2**.
+The [compatibility manifest](compatibility.json) records the current pin and pin history; `termux-muscle versions --available --all` marks every client this project device-tested. The musl loader is **1.2.6-r3**.
 
 Model minimums describe client requirements. The Termux Muscle minimum is derived from the earliest release whose pin meets that requirement; it does not establish the model's introduction date or device verification. **—** means no listed release meets the requirement.
 
@@ -169,7 +170,7 @@ Model minimums describe client requirements. The Termux Muscle minimum is derive
 
 Model requirements were documented on **2026-09-29** against [Anthropic's model configuration documentation](https://code.claude.com/docs/en/model-config). Availability depends on your account, provider and organization policy; a newer client does not grant model access.
 
-**Opus 5.5** passed authenticated tool acceptance with Termux Muscle **0.22.0** and Claude Code **2.1.299** on **2026-10-14** ([scoped report](compatibility/galaxy-s26-ultra-0.22.0-20261014.md)). Other listed models are not verified by that report.
+Model acceptance for **0.23.0** is pending; the tables do not assert verification for this release.
 
 Earlier measurements, including mixed Fable observations, retain their dated scope in the [device compatibility reports](docs/device-compatibility.md).
 
