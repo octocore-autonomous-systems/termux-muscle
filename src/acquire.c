@@ -23,7 +23,6 @@
 
 #define PACKAGE "@anthropic-ai/claude-code-linux-arm64-musl"
 #define REGISTRY "https://registry.npmjs.org/"
-#define ALPINE "https://dl-cdn.alpinelinux.org/alpine/"
 #define RELEASES "https://downloads.claude.ai/claude-code-releases/"
 #define PLATFORM "linux-arm64-musl"
 #define MAX_SIGNATURE_STATUS 16384U
@@ -112,6 +111,12 @@ static json_object *claude_source(json_object *source, bool require_binary) {
     }
     return out;
 }
+/* A loader pin names one of Alpine's two official addresses for musl (see
+ * tm_musl_source). Releases pin the archive of a numbered Alpine release, which
+ * stays available. The package address is still read here: receipts written by
+ * Termux Muscle 0.23.0 and earlier name it, and repair and rollback start from
+ * those receipts. Either way the archive and the loader inside it must match
+ * their recorded SHA-256. */
 static json_object *musl_source(json_object *source) {
     const char *version = tm_json_string(source, "version");
     const char *url = tm_json_string(source, "url");
@@ -121,20 +126,10 @@ static json_object *musl_source(json_object *source) {
     if (native_hash && !tm_hex_valid(native_hash, 64))
         tm_die("invalid_source", "The configured loader digest is not a SHA-256.");
     if (!matches(version, "^[0-9]+\\.[0-9]+\\.[0-9]+-r[0-9]+$") ||
-        strncmp(url, ALPINE "v", strlen(ALPINE) + 1))
+        strncmp(url, TM_ALPINE "v", strlen(TM_ALPINE) + 1))
         tm_die("invalid_source", "The loader needs an exact official Alpine musl source pin.");
-    const char *branch = url + strlen(ALPINE), *slash = strchr(branch, '/');
-    if (!slash || (size_t)(slash - branch) >= 32)
-        tm_die("invalid_source", "The Alpine distribution path is invalid.");
-    char distribution[32];
-    memcpy(distribution, branch, (size_t)(slash - branch));
-    distribution[slash - branch] = 0;
-    if (!matches(distribution, "^v[0-9]+\\.[0-9]+$"))
-        tm_die("invalid_source", "The Alpine distribution path is invalid.");
-    char expected[256];
-    snprintf(expected, sizeof expected, ALPINE "%s/main/aarch64/musl-%s.apk", distribution,
-             version);
-    if (strcmp(url, expected) || !tm_hex_valid(hash, 64) || !tm_hex_valid(loader_hash, 64))
+    if (tm_musl_source(url, version) == TM_MUSL_SOURCE_INVALID || !tm_hex_valid(hash, 64) ||
+        !tm_hex_valid(loader_hash, 64))
         tm_die("invalid_source",
                "The Alpine URL or its archive/loader hashes do not match a supported pin.");
     json_object *out = json_object_new_object();
@@ -800,9 +795,10 @@ static json_object *inspect_elf(const char *path, bool loader) {
     json_object_object_add(out, "needed", libraries);
     return out;
 }
-static void extract_payload(json_object *plan, const char *npm, const char *apk,
+static void extract_payload(json_object *plan, const char *npm, const char *loader_archive,
                             const char *release) {
-    int npm_fd = verify_archive(plan, "claude", npm), apk_fd = verify_archive(plan, "musl", apk);
+    int npm_fd = verify_archive(plan, "claude", npm),
+        loader_fd = verify_archive(plan, "musl", loader_archive);
     tm_directory(release, false);
     int root = open(release, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
     if (root < 0)
@@ -824,9 +820,11 @@ static void extract_payload(json_object *plan, const char *npm, const char *apk,
     exact_array(manifest, "libc", "musl");
     free(manifest_text);
     json_object_put(manifest);
-    free(extract_files(apk_fd, root, true, lib, licenses));
+    /* From the loader archive, an Alpine release's whole root file system or
+     * its musl package, only the loader itself is taken. */
+    free(extract_files(loader_fd, root, true, lib, licenses));
     close(npm_fd);
-    close(apk_fd);
+    close(loader_fd);
     char *binary = tm_path(release, "claude"),
          *loader = tm_path(release, "lib/ld-musl-aarch64.so.1"), hash[65];
     tm_sha256(binary, hash);

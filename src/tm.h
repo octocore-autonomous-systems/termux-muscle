@@ -16,6 +16,17 @@
  * an ordinary process prepared once at installation (see native.c). */
 #define TM_BACKEND_PROOT "unmodified-musl-proot"
 #define TM_BACKEND_NATIVE "musl-native"
+/* Alpine Linux's download host, the only origin a musl loader pin may name. */
+#define TM_ALPINE "https://dl-cdn.alpinelinux.org/alpine/"
+/* Where a musl loader pin points. Alpine publishes the root filesystem archive
+ * of a numbered release once and keeps it. The package file in a branch's
+ * rolling repository is replaced, and the old file removed, whenever Alpine
+ * rebuilds musl: a pin on it stops downloading from that day on. */
+enum tm_musl_source {
+    TM_MUSL_SOURCE_INVALID,
+    TM_MUSL_SOURCE_PACKAGE, /* vX.Y/main/aarch64/musl-VERSION.apk */
+    TM_MUSL_SOURCE_RELEASE  /* vX.Y/releases/aarch64/alpine-minirootfs-X.Y.Z-aarch64.tar.gz */
+};
 
 /* Fatal errors are intentional at command boundaries: no untrusted payload is
  * executed after a failed validation. The kernel closes locks on exit. */
@@ -38,6 +49,7 @@ bool tm_version_valid(const char *s);
 bool tm_release_valid(const char *s);
 bool tm_hex_valid(const char *s, size_t length);
 bool tm_backend_native(const char *backend);
+enum tm_musl_source tm_musl_source(const char *url, const char *version);
 json_object *tm_json_read(const char *path);
 json_object *tm_json_parse(const char *text, size_t size);
 void tm_json_write(const char *path, json_object *obj);
