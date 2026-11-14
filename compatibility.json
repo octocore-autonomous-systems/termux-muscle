@@ -11,8 +11,8 @@
   },
   "musl": {
     "version": "1.2.6-r3",
-    "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/aarch64/musl-1.2.6-r3.apk",
-    "sha256": "2e17864102278d9049c3a56f1bceed9e8cf287065617e579325123443daed8a5",
+    "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/releases/aarch64/alpine-minirootfs-3.24.4-aarch64.tar.gz",
+    "sha256": "4b14c18f7e90a063b61462ea1462a5732c154bf6adad594974fe6487cd98a8de",
     "loader_sha256": "53282acc2be8a08a9fdcf880334bf35bbfd0a13862b7f3616be3919fcda11793",
     "native_loader_sha256": "1c831881bac74b51f3f6f1f39b20052badcca92431476fbf3f889d39b7b17727"
   },

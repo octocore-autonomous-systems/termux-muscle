@@ -270,12 +270,16 @@ static void verify_pins(json_object *manifest) {
     const char *loader_version = text_field(musl, "version"), *url = text_field(musl, "url");
     if (!token(loader_version))
         invalid("Loader version is invalid.");
-    const char *origin = "https://dl-cdn.alpinelinux.org/alpine/";
-    snprintf(expected, sizeof expected, "/aarch64/musl-%s.apk", loader_version);
-    size_t a = strlen(url), b = strlen(expected);
-    if (strncmp(url, origin, strlen(origin)) || a < b || strcmp(url + a - b, expected) ||
-        strstr(url, "..") || strpbrk(url, "?#\\<>"))
-        invalid("Loader URL must pin the matching Alpine aarch64 package.");
+    /* A release pins the loader where Alpine keeps it. The package file is
+     * replaced whenever Alpine rebuilds musl, and a release that names it stops
+     * installing on new devices from that day on, as 0.22.0 did. */
+    enum tm_musl_source loader_source = tm_musl_source(url, loader_version);
+    if (loader_source == TM_MUSL_SOURCE_PACKAGE)
+        invalid(
+            "Loader URL names Alpine's musl package, which Alpine replaces at every rebuild; pin the archive of a numbered Alpine release.");
+    if (loader_source != TM_MUSL_SOURCE_RELEASE)
+        invalid(
+            "Loader URL must pin the aarch64 root filesystem archive of a numbered Alpine release.");
     const char *backend = text_field(manifest, "backend");
     if (strcmp(backend, TM_BACKEND_PROOT) && strcmp(backend, TM_BACKEND_NATIVE))
         invalid("Compatibility backend is not implemented.");
