@@ -7,7 +7,9 @@
 - `docs/troubleshooting.md` describes the `download_failed` of a first installation with 0.23.0 or earlier; `docs/architecture.md` and `docs/releasing.md` describe the new musl source and how to move its pin.
 - **The tested pin moves to Claude Code 2.1.329** (`claude.pinned_since` **0.24.0**), the release Anthropic's `latest` channel names; the executable's SHA-256 is the `linux-arm64-musl` checksum in Anthropic's signed manifest for 2.1.329. 2.1.323 joins `pin_history` with its 0.23.0 report.
 
-Fresh device and authenticated tool acceptance for this release is pending.
+- Verify **Opus 5.5** on the new pin and the musl release archive, on the native backend, with an exact authenticated Bash-tool fixture whose tool process is untraced; start the PRoot backend from the same verified cache.
+
+[Galaxy S26 Ultra evidence from 2026-11-20 UTC](compatibility/galaxy-s26-ultra-0.24.0-20261120.md) covers all 15 test programs and fresh maintainer acceptance from clean commit `9a0f67f`, run from inside a native-backend Claude Code session. Install from an empty cache, which downloads musl from the Alpine 3.24.4 release archive, isolated startup, authenticated tools, offline update/rollback and removal passed on the native backend on Claude Code 2.1.329 with musl 1.2.6-r3, and the PRoot backend passed its startup checks. The live installation was unchanged. Optional runtime host probes and the unavailable cross-UID fixture were skipped in the deterministic suite.
 
 ## 0.23.0
 
