@@ -20,7 +20,7 @@ The initial implementation does **not copy source code** from these projects. Ou
 Release archives contain this project's source and notices, not Claude Code or a bundled Linux distribution. Installation retrieves verified payloads from the sources recorded in [compatibility.json](compatibility.json).
 
 - **Claude Code:** supplied by Anthropic through its official npm registry package. It retains Anthropic's licenses, terms and access requirements. This project's MPL does not relicense Claude Code.
-- **musl:** a separately downloaded Alpine package supplies the loader. See [musl's copyright notice](https://git.musl-libc.org/cgit/musl/tree/COPYRIGHT) and the Alpine package metadata. This project does not alter the loader bytes.
+- **musl:** a separately downloaded Alpine Linux release archive supplies the loader; nothing else in the archive is installed. See [musl's copyright notice](https://git.musl-libc.org/cgit/musl/tree/COPYRIGHT) and the package metadata inside the archive. This project does not alter the loader bytes.
 - **Termux, PRoot and system utilities:** installed by Termux's package manager under their respective licenses. See [Termux packages](https://github.com/termux/termux-packages) and [PRoot](https://github.com/proot-me/proot).
 - **json-c, libarchive and OpenSSL:** provide JSON, archive and cryptographic routines through Termux packages. Their upstream licenses remain applicable; the project links the installed libraries rather than vendoring their source. See [json-c](https://github.com/json-c/json-c), [libarchive](https://github.com/libarchive/libarchive) and [OpenSSL](https://github.com/openssl/openssl).
 

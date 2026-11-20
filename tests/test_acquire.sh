@@ -115,6 +115,11 @@ while (( $# )); do
 done
 [[ $protocol == '=https' && $deadline == 180 && $maximum =~ ^[0-9]+$ ]]
 printf '%s\n' "$url" >> "$TM_TEST_CURL_LOG"
+# A file the server no longer has: curl --fail reports the 404 and exits 22.
+if [[ -n ${TM_TEST_GONE_URL:-} && $url == *"$TM_TEST_GONE_URL"* ]]; then
+    printf '%s\n' 'curl: (22) The requested URL returned error: 404' >&2
+    exit 22
+fi
 case $url in
     https://registry.npmjs.org/@anthropic-ai%2fclaude-code-linux-arm64-musl/latest) input=$TM_TEST_SOURCE/registry.json ;;
     https://registry.npmjs.org/@anthropic-ai%2fclaude-code-linux-arm64-musl/2.1.295) input=$TM_TEST_SOURCE/registry.json ;;
@@ -123,6 +128,7 @@ case $url in
     https://downloads.claude.ai/claude-code-releases/2.1.295/manifest.json.sig) input=$TM_TEST_SOURCE/manifest.json.sig ;;
     https://registry.npmjs.org/@anthropic-ai/claude-code-linux-arm64-musl/-/claude-code-linux-arm64-musl-*.tgz) input=$TM_TEST_SOURCE/npm.tgz ;;
     https://dl-cdn.alpinelinux.org/alpine/v3.24/main/aarch64/musl-1.2.6-r2.apk) input=$TM_TEST_SOURCE/musl.apk ;;
+    https://dl-cdn.alpinelinux.org/alpine/v3.24/releases/aarch64/alpine-minirootfs-3.24.2-aarch64.tar.gz) input=$TM_TEST_SOURCE/alpine-minirootfs.tar.gz ;;
     *) exit 42 ;;
 esac
 cp -- "$input" "$output"
@@ -169,6 +175,76 @@ export TM_TEST_HTTP=302
 must_fail download_failed tm_acquire "$test_work/redirect-release" "$test_work/redirect-cache" "$valid/compatibility.json" pinned pinned false
 unset TM_TEST_HTTP
 pass 'bad downloads and redirects never publish a payload or cache archive'
+
+# Alpine replaces the musl package file in a branch's rolling repository
+# whenever it rebuilds musl, and keeps the root filesystem archive of every
+# numbered release. A release that pinned the package file stopped installing
+# on new devices the day that happened (0.22.0); releases now pin the loader
+# in a release archive.
+fixture release-archive
+released=$test_work/release-archive
+alpine=https://dl-cdn.alpinelinux.org/alpine
+release_file=v3.24/releases/aarch64/alpine-minirootfs-3.24.2-aarch64.tar.gz
+"$TM_CORE" acquire-plan "$released/compatibility.json" pinned pinned > "$released/plan.json"
+[[ $("$TM_CORE" acquire-field "$released/plan.json" musl-url) == "$alpine/$release_file" ]]
+mkdir -- "$released/release"
+"$TM_CORE" acquire-extract "$released/plan.json" "$released/npm.tgz" "$released/alpine-minirootfs.tar.gz" "$released/release" > "$released/result.json"
+# The loader is the same file whichever archive supplied it, under the same digest.
+cmp -- "$valid/original-loader" "$released/release/lib/ld-musl-aarch64.so.1"
+[[ $("$TM_CORE" json-get "$released/release/payload.json" musl.loader_sha256) == "$("$TM_CORE" json-get "$valid/compatibility.json" musl.loader_sha256)" ]]
+[[ $("$TM_CORE" json-get "$released/release/payload.json" musl.url) == "$alpine/$release_file" ]]
+# Nothing else from Alpine's file system is installed.
+[[ $(ls -A -- "$released/release/lib") == ld-musl-aarch64.so.1 ]]
+for stray in bin etc usr tmp; do [[ ! -e "$released/release/$stray" ]] || fail "the release archive's $stray was installed"; done
+pass 'an Alpine release archive supplies the same loader bytes and nothing else from its file system'
+
+for other in v3.24/releases/aarch64/alpine-minirootfs-3.23.2-aarch64.tar.gz v3.24/releases/aarch64/alpine-minirootfs-3.24.0_rc1-aarch64.tar.gz \
+    v3.24/releases/x86_64/alpine-minirootfs-3.24.2-x86_64.tar.gz latest-stable/releases/aarch64/alpine-minirootfs-3.24.2-aarch64.tar.gz \
+    edge/releases/aarch64/alpine-minirootfs-20261101-aarch64.tar.gz v3.24/main/aarch64/musl-1.2.6-r3.apk; do
+    sed "s#$alpine/$release_file#$alpine/$other#" "$released/compatibility.json" > "$released/other.json"
+    grep -Fq -- "$alpine/$other" "$released/other.json"
+    must_fail invalid_source "$TM_CORE" acquire-plan "$released/other.json" pinned pinned
+done
+pass 'a loader pin names one numbered Alpine release for this architecture, or the package of the pinned build'
+
+for mode in release-merged-usr release-missing-loader; do
+    fixture "$mode"
+    "$TM_CORE" acquire-plan "$test_work/$mode/compatibility.json" pinned pinned > "$test_work/$mode/plan.json"
+    mkdir -- "$test_work/$mode/release"
+    expected=unsafe_archive; [[ $mode != release-missing-loader ]] || expected=invalid_archive
+    must_fail "$expected" "$TM_CORE" acquire-extract "$test_work/$mode/plan.json" "$test_work/$mode/npm.tgz" "$test_work/$mode/alpine-minirootfs.tar.gz" "$test_work/$mode/release"
+    [[ ! -e "$test_work/$mode/release/payload.json" ]]
+done
+pass 'a release archive without a plain lib/ld-musl-aarch64.so.1 is refused; a linked lib directory is not followed'
+
+# The stand-in server is now Alpine after a rebuild of musl: every package
+# file an earlier pin could name is gone, and the release archive is served.
+export TM_TEST_GONE_URL=/main/aarch64/musl-
+mkdir -- "$test_work/rebuilt" "$test_work/rebuilt-cache" "$test_work/lasting" "$test_work/lasting-cache" "$test_work/legacy-repair"
+# What broke: a first installation, with an empty cache, from a package pin.
+must_fail download_failed tm_acquire "$test_work/rebuilt" "$test_work/rebuilt-cache" "$valid/compatibility.json" pinned pinned false
+[[ ! -e "$test_work/rebuilt/payload.json" ]]
+# The same first installation with the loader pinned in a release archive.
+export TM_TEST_SOURCE="$released"
+: > "$TM_TEST_CURL_LOG"
+tm_acquire "$test_work/lasting" "$test_work/lasting-cache" "$released/compatibility.json" pinned pinned false > "$test_work/lasting-result.json"
+mapfile -t requests < "$TM_TEST_CURL_LOG"
+[[ ${#requests[@]} == 2 && ${requests[1]} == "$alpine/$release_file" ]]
+cmp -- "$valid/original-loader" "$test_work/lasting/lib/ld-musl-aarch64.so.1"
+[[ $("$TM_CORE" json-get "$test_work/lasting-result.json" verified) == true ]]
+pass 'a first installation still succeeds after Alpine rebuilds musl when the loader is pinned in a release archive'
+
+# A release installed from the package before the rebuild keeps its receipt
+# and its cached archive. It is rebuilt offline from them, byte for byte, and
+# its receipt goes on naming the source it was verified against.
+export TM_TEST_SOURCE="$valid"
+: > "$TM_TEST_CURL_LOG"
+tm_acquire "$test_work/legacy-repair" "$test_work/cache" "$test_work/online/payload.json" pinned pinned true > /dev/null
+[[ ! -s $TM_TEST_CURL_LOG ]]
+cmp -- "$test_work/online/payload.json" "$test_work/legacy-repair/payload.json"
+[[ $("$TM_CORE" json-get "$test_work/legacy-repair/payload.json" musl.url) == "$alpine/v3.24/main/aarch64/musl-1.2.6-r2.apk" ]]
+unset TM_TEST_GONE_URL
+pass 'a release installed from the package address still repairs offline from its receipt and cache'
 
 fixture unverified
 export TM_TEST_SOURCE="$test_work/unverified"
@@ -354,6 +430,16 @@ changed=$(cmp -l -n "$original_size" "$valid/original-claude" "$native/claude" |
 ((changed > 0 && changed <= 24)) || fail "the executable changed in $changed bytes besides its loader path"
 grep -aq -- "$native/lib/ld-musl-aarch64.so.1" "$native/claude"
 pass 'native release: loader configured to its pinned digest, resolver object installed, loader path set and recorded'
+
+# The loader from a release archive is the same file, so it configures to the
+# same pinned digest.
+"$TM_CORE" acquire-backend "$released/plan.json" native > "$released/native-plan.json"
+mkdir -- "$released/native-release"
+with_patchelf "$TM_CORE" acquire-extract "$released/native-plan.json" "$released/npm.tgz" "$released/alpine-minirootfs.tar.gz" "$released/native-release" > /dev/null
+cmp -- "$released/native-release/lib/ld-musl-aarch64.so.1" "$valid/configured-loader"
+[[ $("$TM_CORE" json-get "$released/native-release/payload.json" native.loader_sha256) == "$("$TM_CORE" json-get "$native/payload.json" native.loader_sha256)" ]]
+[[ $("$TM_CORE" json-get "$released/native-release/payload.json" musl.native_loader_sha256) == "$("$TM_CORE" json-get "$valid/compatibility.json" musl.native_loader_sha256)" ]]
+pass 'the native backend configures a loader from a release archive to the same pinned digest'
 
 "$TM_CORE" acquire-plan "$native/payload.json" pinned pinned > "$valid/native-repair-plan.json"
 [[ $("$TM_CORE" json-get "$valid/native-repair-plan.json" backend) == musl-native ]]

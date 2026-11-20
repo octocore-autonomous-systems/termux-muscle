@@ -133,9 +133,53 @@ static void member(struct archive *a, const char *name, const void *bytes, size_
         tm_die("fixture_failed", "Cannot write archive fixture member.");
     archive_entry_free(entry);
 }
+static void folder(struct archive *a, const char *name) {
+    struct archive_entry *entry = archive_entry_new();
+    archive_entry_set_pathname(entry, name);
+    archive_entry_set_filetype(entry, AE_IFDIR);
+    archive_entry_set_perm(entry, 0755);
+    archive_entry_set_mtime(entry, 1, 12345);
+    archive_entry_set_size(entry, 0);
+    if (archive_write_header(a, entry) != ARCHIVE_OK)
+        tm_die("fixture_failed", "Cannot write archive fixture folder.");
+    archive_entry_free(entry);
+}
 static void finish(struct archive *a) {
     if (archive_write_close(a) != ARCHIVE_OK || archive_write_free(a) != ARCHIVE_OK)
         tm_die("fixture_failed", "Cannot finish archive fixture.");
+}
+/* The root filesystem archive of a numbered Alpine release, as Alpine lays it
+ * out: one gzip stream, every name under "./", and the loader among the files
+ * of a whole small system. "release-merged-usr" is a layout Alpine does not
+ * ship in these archives today: /lib as a link into /usr. */
+static void release_archive(const char *path, const unsigned char *loader, size_t size,
+                            const char *mode) {
+    struct archive *a = writer(path);
+    folder(a, "./");
+    folder(a, "./bin/");
+    member(a, "./bin/busybox", "fixture busybox\n", 16, NULL);
+    member(a, "./bin/sh", NULL, 0, "/bin/busybox");
+    folder(a, "./etc/");
+    member(a, "./etc/alpine-release", "3.24.2\n", 7, NULL);
+    if (!strcmp(mode, "release-merged-usr")) {
+        member(a, "./lib", NULL, 0, "usr/lib");
+        folder(a, "./usr/");
+        folder(a, "./usr/lib/");
+        member(a, "./usr/lib/libc.musl-aarch64.so.1", NULL, 0, "ld-musl-aarch64.so.1");
+        member(a, "./usr/lib/ld-musl-aarch64.so.1", loader, size, NULL);
+    } else {
+        folder(a, "./lib/");
+        member(a, "./lib/libc.musl-aarch64.so.1", NULL, 0, "ld-musl-aarch64.so.1");
+        if (strcmp(mode, "release-missing-loader"))
+            member(a, "./lib/ld-musl-aarch64.so.1", loader, size, NULL);
+        folder(a, "./lib/apk/");
+        folder(a, "./lib/apk/db/");
+        member(a, "./lib/apk/db/installed", "P:musl\nV:1.2.6-r2\n\n", 19, NULL);
+        folder(a, "./usr/");
+        folder(a, "./usr/lib/");
+    }
+    folder(a, "./tmp/");
+    finish(a);
 }
 static void append_file(FILE *out, const char *path) {
     FILE *in = fopen(path, "rb");
@@ -180,7 +224,11 @@ int main(int argc, char **argv) {
          *loader_path = tm_path(directory, "original-loader");
     tm_atomic_write(binary_path, binary, sizeof binary, 0700);
     tm_atomic_write(loader_path, loader, sizeof loader, 0700);
-    char *npm_path = tm_path(directory, "npm.tgz"), *apk_path = tm_path(directory, "musl.apk");
+    /* Scenarios named "release-..." take the loader from the archive of an
+     * Alpine release, the others from Alpine's musl package. */
+    bool release = !strncmp(mode, "release-", 8);
+    char *npm_path = tm_path(directory, "npm.tgz"),
+         *apk_path = tm_path(directory, release ? "alpine-minirootfs.tar.gz" : "musl.apk");
     /* "signed" matches the version of the real signed manifest in tests/fixtures. */
     const char *version = !strcmp(mode, "unverified") ? "2.1.271"
                           : !strcmp(mode, "signed")   ? "2.1.295"
@@ -226,20 +274,24 @@ int main(int argc, char **argv) {
         member(a, "lib/ld-musl-aarch64.so.1", loader, sizeof loader, NULL);
     member(a, "lib/libc.musl-aarch64.so.1", NULL, 0, "ld-musl-aarch64.so.1");
     finish(a);
-    FILE *joined = fopen(apk_path, "wb");
-    if (!joined)
-        tm_die("fixture_failed", "Cannot create APK fixture.");
-    append_file(joined, signature);
-    append_file(joined, metadata);
-    append_file(joined, payload);
-    if (!strcmp(mode, "expansion-bomb")) {
-        char *padding = tm_path(directory, "padding.gz");
-        padding_archive(padding);
-        append_file(joined, padding);
-        free(padding);
+    if (release)
+        release_archive(apk_path, loader, sizeof loader, mode);
+    else {
+        FILE *joined = fopen(apk_path, "wb");
+        if (!joined)
+            tm_die("fixture_failed", "Cannot create APK fixture.");
+        append_file(joined, signature);
+        append_file(joined, metadata);
+        append_file(joined, payload);
+        if (!strcmp(mode, "expansion-bomb")) {
+            char *padding = tm_path(directory, "padding.gz");
+            padding_archive(padding);
+            append_file(joined, padding);
+            free(padding);
+        }
+        if (fclose(joined))
+            tm_die("fixture_failed", "Cannot finish APK fixture.");
     }
-    if (fclose(joined))
-        tm_die("fixture_failed", "Cannot finish APK fixture.");
     if (!strcmp(mode, "truncated")) {
         struct stat st;
         if (stat(npm_path, &st) || truncate(npm_path, st.st_size - 9))
@@ -288,7 +340,8 @@ int main(int argc, char **argv) {
               : binary_hash);
     value(musl, "version", "1.2.6-r2");
     value(musl, "url",
-          "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/aarch64/musl-1.2.6-r2.apk");
+          release ? TM_ALPINE "v3.24/releases/aarch64/alpine-minirootfs-3.24.2-aarch64.tar.gz"
+                  : TM_ALPINE "v3.24/main/aarch64/musl-1.2.6-r2.apk");
     value(musl, "sha256", apk_hash);
     value(musl, "loader_sha256",
           !strcmp(mode, "wrong-loader-hash")

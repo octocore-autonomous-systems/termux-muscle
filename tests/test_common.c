@@ -64,6 +64,61 @@ int main(void) {
     assert(!tm_release_valid("../../2.1.270-012345abcdef"));
     assert(!tm_release_valid("2.1.270-012345abcdeg"));
     puts("PASS C unit: versions and release identifiers cannot contain paths or shell syntax");
+    /* A musl loader pin is one of Alpine's two exact addresses: the archive of
+     * a numbered release, which Alpine keeps, or the package of one build,
+     * which Alpine replaces. */
+    const char *build = "1.2.6-r3";
+    assert(tm_musl_source(TM_ALPINE
+                          "v3.24/releases/aarch64/alpine-minirootfs-3.24.4-aarch64.tar.gz",
+                          build) == TM_MUSL_SOURCE_RELEASE);
+    assert(tm_musl_source(TM_ALPINE "v3.5/releases/aarch64/alpine-minirootfs-3.5.0-aarch64.tar.gz",
+                          build) == TM_MUSL_SOURCE_RELEASE);
+    assert(tm_musl_source(TM_ALPINE
+                          "v3.20/releases/aarch64/alpine-minirootfs-3.20.10-aarch64.tar.gz",
+                          build) == TM_MUSL_SOURCE_RELEASE);
+    assert(tm_musl_source(TM_ALPINE "v3.24/main/aarch64/musl-1.2.6-r3.apk", build) ==
+           TM_MUSL_SOURCE_PACKAGE);
+    const char *refused[] = {
+        "", TM_ALPINE,
+        /* The package of another build than the pin names. */
+        TM_ALPINE "v3.24/main/aarch64/musl-1.2.6-r2.apk",
+        TM_ALPINE "v3.24/community/aarch64/musl-1.2.6-r3.apk",
+        TM_ALPINE "v3.24/main/x86_64/musl-1.2.6-r3.apk",
+        /* A release of another branch, a release candidate, no patch number. */
+        TM_ALPINE "v3.24/releases/aarch64/alpine-minirootfs-3.23.4-aarch64.tar.gz",
+        TM_ALPINE "v3.24/releases/aarch64/alpine-minirootfs-3.24.0_rc1-aarch64.tar.gz",
+        TM_ALPINE "v3.24/releases/aarch64/alpine-minirootfs-3.24-aarch64.tar.gz",
+        TM_ALPINE "v3.24/releases/aarch64/alpine-minirootfs-3.24.-aarch64.tar.gz",
+        TM_ALPINE "v3.24/releases/aarch64/alpine-minirootfs-3.24.04-aarch64.tar.gz",
+        TM_ALPINE "v3.24/releases/aarch64/alpine-minirootfs-3.24.44444-aarch64.tar.gz",
+        TM_ALPINE "v3/releases/aarch64/alpine-minirootfs-3.4-aarch64.tar.gz",
+        TM_ALPINE "v03.24/releases/aarch64/alpine-minirootfs-03.24.4-aarch64.tar.gz",
+        /* Another architecture or product, or anything after the file name. */
+        TM_ALPINE "v3.24/releases/x86_64/alpine-minirootfs-3.24.4-x86_64.tar.gz",
+        TM_ALPINE "v3.24/releases/aarch64/alpine-minirootfs-3.24.4-x86_64.tar.gz",
+        TM_ALPINE "v3.24/releases/aarch64/alpine-standard-3.24.4-aarch64.iso",
+        TM_ALPINE "v3.24/releases/aarch64/alpine-minirootfs-3.24.4-aarch64.tar.gz.asc",
+        TM_ALPINE "v3.24/releases/aarch64/alpine-minirootfs-3.24.4-aarch64.tar.gz?mirror=1",
+        TM_ALPINE "v3.24/releases/aarch64/alpine-minirootfs-3.24.4-aarch64.tar.gz ",
+        TM_ALPINE "v3.24/releases/aarch64/../aarch64/alpine-minirootfs-3.24.4-aarch64.tar.gz",
+        TM_ALPINE "v3.24//releases/aarch64/alpine-minirootfs-3.24.4-aarch64.tar.gz",
+        /* Names that move: a branch alias and the rolling development branch. */
+        TM_ALPINE "latest-stable/releases/aarch64/alpine-minirootfs-3.24.4-aarch64.tar.gz",
+        TM_ALPINE "edge/releases/aarch64/alpine-minirootfs-20261101-aarch64.tar.gz",
+        TM_ALPINE "V3.24/releases/aarch64/alpine-minirootfs-3.24.4-aarch64.tar.gz",
+        /* Another scheme or host. */
+        "http://dl-cdn.alpinelinux.org/alpine/v3.24/releases/aarch64/alpine-minirootfs-3.24.4-aarch64.tar.gz",
+        "https://dl-cdn.alpinelinux.org.attacker.example/alpine/v3.24/releases/aarch64/alpine-minirootfs-3.24.4-aarch64.tar.gz",
+        "https://attacker.example/alpine/v3.24/releases/aarch64/alpine-minirootfs-3.24.4-aarch64.tar.gz"};
+    for (size_t i = 0; i < sizeof refused / sizeof *refused; i++) {
+        if (tm_musl_source(refused[i], build) != TM_MUSL_SOURCE_INVALID)
+            fprintf(stderr, "Unexpected loader source acceptance: %s\n", refused[i]);
+        assert(tm_musl_source(refused[i], build) == TM_MUSL_SOURCE_INVALID);
+    }
+    assert(tm_musl_source(NULL, build) == TM_MUSL_SOURCE_INVALID);
+    assert(tm_musl_source(TM_ALPINE "v3.24/main/aarch64/musl-1.2.6-r3.apk", NULL) ==
+           TM_MUSL_SOURCE_INVALID);
+    puts("PASS C unit: a musl loader pin is an exact Alpine release archive or package address");
     const char *bad[] = {"{", "[]", "{}{}", "{\"x\":NaN}", "{\"x\":1,}", "{\"x\":\"\xff\"}"};
     for (size_t i = 0; i < sizeof bad / sizeof *bad; i++)
         rejects_json(bad[i], strlen(bad[i]));

@@ -248,6 +248,42 @@ bool tm_backend_native(const char *backend) {
         tm_die("invalid_backend", "Unknown runtime backend; choose native or proot.");
     return !strcmp(backend, TM_BACKEND_NATIVE);
 }
+/* The length of a decimal number without a sign or a leading zero, or 0. */
+static size_t number_length(const char *s) {
+    size_t n = 0;
+    while (isdigit((unsigned char)s[n]))
+        n++;
+    return n && n <= 4 && (s[0] != '0' || n == 1) ? n : 0;
+}
+/* Classify a musl loader pin by its exact official address. Whatever is not
+ * one of the two shapes character for character is invalid: another host,
+ * branch alias, architecture or product, a release candidate, a query. */
+enum tm_musl_source tm_musl_source(const char *url, const char *version) {
+    static const char origin[] = TM_ALPINE "v", archive[] = "/releases/aarch64/alpine-minirootfs-";
+    if (!url || !version || strncmp(url, origin, sizeof origin - 1))
+        return TM_MUSL_SOURCE_INVALID;
+    /* The branch is vMAJOR.MINOR. A release archive repeats it in its name. */
+    const char *series = url + sizeof origin - 1;
+    size_t major = number_length(series);
+    size_t minor = major && series[major] == '.' ? number_length(series + major + 1) : 0;
+    if (!minor)
+        return TM_MUSL_SOURCE_INVALID;
+    size_t length = major + 1 + minor;
+    const char *path = series + length;
+    char package[192];
+    int written = snprintf(package, sizeof package, "/main/aarch64/musl-%s.apk", version);
+    if (written > 0 && (size_t)written < sizeof package && !strcmp(path, package))
+        return TM_MUSL_SOURCE_PACKAGE;
+    if (strncmp(path, archive, sizeof archive - 1))
+        return TM_MUSL_SOURCE_INVALID;
+    const char *name = path + sizeof archive - 1;
+    if (strncmp(name, series, length) || name[length] != '.')
+        return TM_MUSL_SOURCE_INVALID;
+    size_t patch = number_length(name + length + 1);
+    if (!patch || strcmp(name + length + 1 + patch, "-aarch64.tar.gz"))
+        return TM_MUSL_SOURCE_INVALID;
+    return TM_MUSL_SOURCE_RELEASE;
+}
 bool tm_release_valid(const char *s) {
     if (!s || strlen(s) > 61)
         return false;

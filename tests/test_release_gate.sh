@@ -135,6 +135,23 @@ check; [[ $status != 0 ]] || fail 'symlink report accepted'; rm "$report"; reset
 set_json "$manifest" claude.package '"@someone/claude-code"'; reject 'unofficial package accepted'
 set_json "$manifest" claude.integrity '"sha512-invalid"'; reject 'malformed package integrity accepted'
 set_json "$manifest" musl.url '"https://attacker.example/musl.apk"'; reject 'unofficial loader accepted'
+# A release pins the loader where Alpine keeps it: the root filesystem archive
+# of a numbered release. Alpine replaces the package file whenever it rebuilds
+# musl, and 0.22.0, which pinned that file, stopped installing on new devices.
+alpine=https://dl-cdn.alpinelinux.org/alpine
+[[ $("$work/verifier" fixture-get "$manifest" musl.url) =~ ^$alpine/v([0-9]+\.[0-9]+)/releases/aarch64/alpine-minirootfs-([0-9]+\.[0-9]+)\.[0-9]+-aarch64\.tar\.gz$ &&
+    ${BASH_REMATCH[1]} == "${BASH_REMATCH[2]}" ]] || fail 'this release does not pin the loader in an Alpine release archive'
+((count+=1))
+set_json "$manifest" musl.url "\"$alpine/v3.24/main/aarch64/musl-$musl.apk\""
+check; [[ $status != 0 ]] || fail 'replaceable Alpine package address accepted as a release pin'
+grep -q 'replaces at every rebuild' "$work/error" || fail 'the package address was refused for the wrong reason'
+((count+=1)); reset
+for other in v3.24/releases/aarch64/alpine-minirootfs-3.23.4-aarch64.tar.gz v3.24/releases/aarch64/alpine-minirootfs-3.24.0_rc1-aarch64.tar.gz \
+    v3.24/releases/x86_64/alpine-minirootfs-3.24.4-x86_64.tar.gz latest-stable/releases/aarch64/alpine-minirootfs-3.24.4-aarch64.tar.gz \
+    edge/releases/aarch64/alpine-minirootfs-20261101-aarch64.tar.gz 'v3.24/releases/aarch64/alpine-minirootfs-3.24.4-aarch64.tar.gz?mirror=1' \
+    v3.24/releases/aarch64/../aarch64/alpine-minirootfs-3.24.4-aarch64.tar.gz; do
+    set_json "$manifest" musl.url "\"$alpine/$other\""; reject "loader address accepted: $other"
+done
 # Either backend can be a release's default. The native one runs a configured
 # copy of the pinned loader, and that copy's digest has to be pinned as well.
 for backend in unmodified-musl-proot musl-native; do
